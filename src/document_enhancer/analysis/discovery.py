@@ -9,13 +9,13 @@ from document_enhancer.domain.enums import Layer, ReviewStatus
 from document_enhancer.domain.ids import ensure_unique_ids
 from document_enhancer.domain.ontology import EntityRegistry
 from document_enhancer.llm.models import GeminiModelGateway
-from document_enhancer.llm.profiles import ROUTE_FLASH
 from document_enhancer.prompting import PromptPackComposer
 
-from .common import prompt_variables, select_analysis
+from .common import prompt_variables
 from .errors import CandidateGraphError
-from .gemini_adapter import invoke_analysis_report
+from .gemini_adapter import invoke_discovery_candidate_batch
 from .models import AnalysisBranchResult, AnalysisRequest
+from .promotion import promote_discovery_candidate_batch
 from .protocols import AnalysisCallBudget
 from .rendering import render_discovery_markdown
 
@@ -92,21 +92,14 @@ class ProcessMethodologyDiscoverer:
     ) -> AnalysisBranchResult:
         if budget is not None:
             budget.reserve(self.name)
-        report, call = invoke_analysis_report(
+        candidates, call = invoke_discovery_candidate_batch(
             self.gateway,
             self.composer,
-            prompt_id=self.prompt_id,
             variables=prompt_variables(request),
             stage=self.name,
             source_digest=request.source_digest,
         )
-        analysis = select_analysis(
-            request,
-            report,
-            DiscoveryAnalysis,
-            prompt_id=self.prompt_id,
-            model_route=ROUTE_FLASH,
-        )
+        analysis = promote_discovery_candidate_batch(request, candidates)
         validate_candidate_graph(request, analysis)
         return AnalysisBranchResult(
             specialist=self.name,

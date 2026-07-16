@@ -1,19 +1,16 @@
-"""Prompt-pack and Gemini gateway adapter for schema-valid analysis reports.
+"""Prompt-pack and Gemini gateway adapters for schema-valid analysis calls.
 
-The persisted analysis schema contains validation keywords that Pydantic enforces but the
-Gemini native-schema subset does not accept.  The adapter removes only those provider-side
-keywords.  The gateway still promotes every response through the complete ``AnalysisReport``
-contract before this lane accepts it.
+Persisted stage reports use a Gemini-compatible projection of their complete domain schema.
+Discovery instead uses a deliberately small provider DTO; its separate deterministic promoter
+constructs and validates the persistence-grade ``DiscoveryAnalysis`` contract.
 """
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from document_enhancer.domain.analysis import (
     AnalysisReport,
-    DiscoveryAnalysis,
     MacroAnalysis,
     RagReadinessAnalysis,
     SectionAnalysis,
@@ -25,6 +22,7 @@ from document_enhancer.prompting import ComposedPrompt, PromptPackComposer
 
 from .errors import AnalysisPromptContractError
 from .models import PromptCallRecord
+from .provider_models import DiscoveryCandidateBatch
 
 ANALYSIS_OUTPUT_SCHEMA = "analysis.schema.json"
 
@@ -67,91 +65,6 @@ def _provider_schema(value: Any) -> Any:
     return cleaned
 
 
-def _compact_discovery_object_union(schema: dict[str, Any]) -> dict[str, Any]:
-    """Project the ontology union to fields that every safely promotable variant shares.
-
-    Repeating every semantic subtype exceeds Gemini's native-schema limit. Merging every
-    subtype-specific field is also unsafe: the resulting object is both large and permits
-    combinations that no persisted subtype accepts. The provider therefore receives only the
-    common entity fields and discriminator values for variants that add no required fields.
-    ``DiscoveryAnalysis`` remains the promotion boundary and restores subtype defaults while
-    rejecting any response that does not satisfy the complete persisted contract.
-    """
-
-    definitions = schema.get("$defs")
-    if not isinstance(definitions, dict):  # pragma: no cover - Pydantic contract invariant
-        return schema
-    discovery = definitions.get("DiscoveryAnalysis")
-    if not isinstance(discovery, dict):  # pragma: no cover - Pydantic contract invariant
-        return schema
-    try:
-        items = discovery["properties"]["objects"]["items"]
-        variants = items.get("oneOf") or items["anyOf"]
-    except (KeyError, TypeError):  # pragma: no cover - Pydantic contract invariant
-        return schema
-    if not isinstance(variants, list) or not variants:
-        return schema
-
-    variant_schemas: list[dict[str, Any]] = []
-    for variant in variants:
-        if not isinstance(variant, dict) or not isinstance(variant.get("$ref"), str):
-            return schema
-        name = variant["$ref"].removeprefix("#/$defs/")
-        resolved = definitions.get(name)
-        if not isinstance(resolved, dict):
-            return schema
-        variant_schemas.append(resolved)
-
-    required_sets = [set(variant.get("required", [])) for variant in variant_schemas]
-    common_required = set.intersection(*required_sets)
-    safe_variants = [
-        variant
-        for variant, required in zip(variant_schemas, required_sets, strict=True)
-        if not (required - common_required)
-    ]
-    if not safe_variants:  # pragma: no cover - ontology contract invariant
-        return schema
-
-    property_sets: list[set[str]] = []
-    for variant in safe_variants:
-        properties = variant.get("properties")
-        if not isinstance(properties, dict):  # pragma: no cover - Pydantic contract invariant
-            return schema
-        property_names = {name for name in properties if isinstance(name, str)}
-        if len(property_names) != len(properties):  # pragma: no cover - JSON Schema invariant
-            return schema
-        property_sets.append(property_names)
-    common_property_names = set.intersection(*property_sets)
-
-    merged_properties: dict[str, Any] = {}
-    entity_types: set[str] = set()
-    for name in sorted(common_property_names):
-        schemas = [variant["properties"][name] for variant in safe_variants]
-        if name == "entity_type":
-            for value in schemas:
-                literal = value.get("const") if isinstance(value, dict) else None
-                if not isinstance(literal, str):
-                    return schema  # pragma: no cover - Pydantic contract invariant
-                entity_types.add(literal)
-            merged_properties[name] = {"type": "string", "enum": sorted(entity_types)}
-            continue
-        canonical = {json.dumps(value, sort_keys=True, separators=(",", ":")) for value in schemas}
-        if len(canonical) != 1:  # pragma: no cover - common entity field contract invariant
-            continue
-        merged_properties[name] = schemas[0]
-
-    if "entity_type" not in merged_properties:  # pragma: no cover - ontology contract invariant
-        return schema
-    required = common_required | {"entity_type"}
-    discovery["properties"]["objects"]["items"] = {
-        "type": "object",
-        "properties": merged_properties,
-        "required": sorted(required),
-        "additionalProperties": False,
-    }
-    return schema
-
-
 class _GeminiStageReport(AnalysisReport):
     """Provider projection shared by exact stage report contracts."""
 
@@ -168,15 +81,6 @@ class GeminiSectionAnalysisReport(_GeminiStageReport):
     analyses: list[SectionAnalysis]
 
 
-class GeminiDiscoveryAnalysisReport(_GeminiStageReport):
-    analyses: list[DiscoveryAnalysis]
-
-    @classmethod
-    def model_json_schema(cls, *args: Any, **kwargs: Any) -> dict[str, Any]:
-        raw = super(_GeminiStageReport, cls).model_json_schema(*args, **kwargs)
-        return _provider_schema(_compact_discovery_object_union(raw))
-
-
 class GeminiRagReadinessAnalysisReport(_GeminiStageReport):
     analyses: list[RagReadinessAnalysis]
 
@@ -188,7 +92,6 @@ class GeminiSynthesisAnalysisReport(_GeminiStageReport):
 _STAGE_SCHEMAS: dict[str, type[_GeminiStageReport]] = {
     "analysis.macro": GeminiMacroAnalysisReport,
     "analysis.sections": GeminiSectionAnalysisReport,
-    "analysis.process-methodology-discovery": GeminiDiscoveryAnalysisReport,
     "analysis.rag-readiness": GeminiRagReadinessAnalysisReport,
     "analysis.synthesize-findings": GeminiSynthesisAnalysisReport,
 }
@@ -278,13 +181,59 @@ def invoke_analysis_report(
     return report, record
 
 
+def invoke_discovery_candidate_batch(
+    gateway: GeminiModelGateway,
+    composer: PromptPackComposer,
+    *,
+    variables: dict[str, Any],
+    stage: str,
+    source_digest: str,
+) -> tuple[DiscoveryCandidateBatch, PromptCallRecord]:
+    """Invoke discovery against its narrow provider DTO, before domain promotion."""
+
+    prompt_id = "analysis.process-methodology-discovery"
+    composed = compose_analysis_prompt(composer, prompt_id=prompt_id, variables=variables)
+    reference_digests = sorted(
+        item.sha256 for item in composed.resolved_references if item.sha256 != source_digest
+    )
+    call = gateway.invoke(
+        route=ROUTE_FLASH,
+        schema=DiscoveryCandidateBatch,
+        prompt=composed.text,
+        stage=stage,
+        prompt_id=prompt_id,
+        prompt_version=composed.pack_version,
+        prompt_digest=composed.digest,
+        input_digests=[source_digest, *reference_digests],
+        input_token_budget=composed.input_token_budget,
+        output_token_budget=composed.output_token_budget,
+    )
+    manifest = call.manifest
+    if (
+        manifest.requested_route_id != ROUTE_FLASH
+        or manifest.effective_route_id != ROUTE_FLASH
+        or manifest.model != ROUTE_FLASH
+    ):
+        raise AnalysisPromptContractError("analysis model route changed during invocation")
+    if manifest.prompt_id != prompt_id or manifest.prompt_version != composed.pack_version:
+        raise AnalysisPromptContractError("analysis call manifest prompt identity mismatch")
+    if manifest.prompt_digest != composed.digest:
+        raise AnalysisPromptContractError("analysis call manifest prompt digest mismatch")
+    batch = DiscoveryCandidateBatch.model_validate(call.artifact.model_dump(mode="python"))
+    record = PromptCallRecord(
+        resolution=composed.resolution.model_copy(deep=True),
+        manifest=manifest.model_copy(deep=True),
+    )
+    return batch, record
+
+
 __all__ = [
     "ANALYSIS_OUTPUT_SCHEMA",
-    "GeminiDiscoveryAnalysisReport",
     "GeminiMacroAnalysisReport",
     "GeminiRagReadinessAnalysisReport",
     "GeminiSectionAnalysisReport",
     "GeminiSynthesisAnalysisReport",
     "compose_analysis_prompt",
     "invoke_analysis_report",
+    "invoke_discovery_candidate_batch",
 ]

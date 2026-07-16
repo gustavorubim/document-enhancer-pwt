@@ -13,7 +13,6 @@ from document_enhancer.analysis.errors import (
     AnalysisPromptContractError,
 )
 from document_enhancer.analysis.gemini_adapter import (
-    GeminiDiscoveryAnalysisReport,
     GeminiMacroAnalysisReport,
     GeminiRagReadinessAnalysisReport,
     GeminiSectionAnalysisReport,
@@ -22,6 +21,8 @@ from document_enhancer.analysis.gemini_adapter import (
 from document_enhancer.analysis.macro import MacroReviewer
 from document_enhancer.analysis.models import AnalysisRequest, AnalysisRunResult
 from document_enhancer.analysis.orchestrator import AnalysisOrchestrator
+from document_enhancer.analysis.promotion import promote_discovery_candidate_batch
+from document_enhancer.analysis.provider_models import DiscoveryCandidateBatch
 from document_enhancer.domain.analysis import (
     AnalysisReport,
     DiscoveryAnalysis,
@@ -105,7 +106,6 @@ def test_fan_out_fan_in_is_bounded_ordered_injection_safe_and_schema_valid(
     expected_types = {
         "macro_reviewer": "macro",
         "section_mapper": "sections",
-        "process_methodology_discoverer": "discovery",
         "rag_readiness_reviewer": "rag_readiness",
         "finding_synthesizer": "synthesis",
     }
@@ -113,12 +113,11 @@ def test_fan_out_fan_in_is_bounded_ordered_injection_safe_and_schema_valid(
         analyses = schemas_by_stage[stage]["properties"]["analyses"]
         assert "anyOf" not in analyses["items"]
         assert analyses["items"]["properties"]["analysis_type"]["enum"] == [analysis_type]
-    discovery_objects = schemas_by_stage["process_methodology_discoverer"]["properties"][
-        "analyses"
-    ]["items"]["properties"]["objects"]["items"]
-    assert "anyOf" not in discovery_objects
-    assert len(discovery_objects["properties"]["entity_type"]["enum"]) == 42
-    assert "entity_type" in discovery_objects["required"]
+    discovery_schema = schemas_by_stage["process_methodology_discoverer"]
+    assert set(discovery_schema["properties"]) == {"candidates", "relationships", "judgments"}
+    candidate = discovery_schema["properties"]["candidates"]["items"]
+    assert len(candidate["properties"]["entity_type"]["enum"]) == 42
+    assert "entity_type" in candidate["required"]
 
 
 def test_invalid_structured_output_fails_closed_without_partial_artifact(
@@ -174,7 +173,6 @@ def test_prompt_route_mismatch_fails_before_provider_call(
     (
         (GeminiMacroAnalysisReport, "macro"),
         (GeminiSectionAnalysisReport, "sections"),
-        (GeminiDiscoveryAnalysisReport, "discovery"),
         (GeminiRagReadinessAnalysisReport, "rag_readiness"),
         (GeminiSynthesisAnalysisReport, "synthesis"),
     ),
@@ -250,71 +248,147 @@ def test_section_provider_schema_constrains_disposition_to_canonical_values() ->
 
 
 def test_discovery_provider_schema_is_compact_and_only_exposes_safe_common_fields() -> None:
-    schema = gemini_schema(GeminiDiscoveryAnalysisReport)
+    schema = gemini_schema(DiscoveryCandidateBatch)
     encoded = json.dumps(schema, sort_keys=True, separators=(",", ":")).encode()
-    objects = schema["properties"]["analyses"]["items"]["properties"]["objects"]["items"]
+    objects = schema["properties"]["candidates"]["items"]
 
-    assert len(encoded) < 16_000
+    assert len(encoded) < 12_000
     assert set(objects["properties"]) == {
         "aliases",
-        "attributes",
-        "authority",
+        "basis",
+        "confidence",
         "entity_type",
-        "id",
-        "layer",
+        "local_key",
         "name",
-        "provenance",
-        "provisional",
-        "review_status",
-        "valid_from",
-        "valid_to",
-        "validity",
+        "semantic_details",
+        "source_span_id",
     }
     entity_types = set(objects["properties"]["entity_type"]["enum"])
     assert len(entity_types) == 42
     assert {"DocumentIdentity", "DocumentVersion", "Section"}.isdisjoint(entity_types)
     assert {"Statement", "Process", "Control"} <= entity_types
-    assert set(objects["required"]) == {"id", "entity_type", "name", "provenance"}
-    assert "action" not in objects["properties"]
-    assert "document_type" not in objects["properties"]
-
-
-def test_compact_discovery_response_promotes_through_full_persisted_contract() -> None:
-    payload = {
-        "document_id": "DOC-COMPACT-LIVE",
-        "source_digest": "a" * 64,
-        "analyses": [
-            {
-                "analysis_id": "AN-DISCOVERY-COMPACT",
-                "analysis_type": "discovery",
-                "document_id": "DOC-COMPACT-LIVE",
-                "source_digest": "a" * 64,
-                "objects": [
-                    {
-                        "id": "STMT-COMPACT-001",
-                        "entity_type": "Statement",
-                        "name": "Compact provider object",
-                        "provenance": {
-                            "document_id": "DOC-COMPACT-LIVE",
-                            "source_span_id": "SPAN-COMPACT00000001",
-                            "origin": "source",
-                            "authority": "explicit",
-                            "layer": "extracted",
-                            "extraction_method": "analysis.process-methodology-discovery",
-                        },
-                    }
-                ],
-            }
-        ],
+    assert set(objects["required"]) == {
+        "local_key",
+        "entity_type",
+        "name",
+        "source_span_id",
+        "basis",
     }
 
-    provider = validate_artifact(GeminiDiscoveryAnalysisReport, payload)
-    persisted = AnalysisReport.model_validate(provider.model_dump(mode="python"))
+    banned = {
+        "analysis_id",
+        "authority",
+        "created_at",
+        "document_id",
+        "edge_id",
+        "extracted_at",
+        "finding_id",
+        "id",
+        "layer",
+        "provenance",
+        "provisional",
+        "review_status",
+        "source_digest",
+        "timestamp",
+    }
 
-    persisted_discovery = persisted.analyses[0]
-    assert isinstance(persisted_discovery, DiscoveryAnalysis)
-    assert isinstance(persisted_discovery.objects[0], Statement)
-    assert persisted_discovery.objects[0].aliases == []
+    def property_names(value: object) -> set[str]:
+        if isinstance(value, dict):
+            properties = value.get("properties")
+            names = {str(name) for name in properties} if isinstance(properties, dict) else set()
+            children: set[str] = set()
+            for item in value.values():
+                children.update(property_names(item))
+            return names | children
+        if isinstance(value, list):
+            children = set()
+            for item in value:
+                children.update(property_names(item))
+            return children
+        return set()
+
+    assert property_names(schema).isdisjoint(banned)
+
+
+def test_discovery_promotion_is_full_domain_valid_and_deterministic(
+    analysis_request: AnalysisRequest,
+) -> None:
+    span_id = analysis_request.authoritative_span_ids[1]
+    payload = {
+        "candidates": [
+            {
+                "local_key": "statement-one",
+                "entity_type": "Statement",
+                "name": "Compact provider object",
+                "aliases": ["Candidate statement"],
+                "source_span_id": span_id,
+                "basis": "explicit",
+                "semantic_details": [{"key": "text", "value": "Source-backed statement"}],
+            }
+        ],
+        "relationships": [],
+        "judgments": [],
+    }
+
+    provider = validate_artifact(DiscoveryCandidateBatch, payload)
+    first = promote_discovery_candidate_batch(analysis_request, provider)
+    second = promote_discovery_candidate_batch(analysis_request, provider)
+
+    assert first.model_dump(mode="json") == second.model_dump(mode="json")
+    assert DiscoveryAnalysis.model_validate_json(first.model_dump_json()) == first
+    assert isinstance(first.objects[0], Statement)
+    assert first.objects[0].id.startswith("PROV-STMT-")
+    assert first.objects[0].provisional is True
+    assert first.objects[0].provenance.document_id == analysis_request.document_id
+    assert first.objects[0].provenance.source_span_id == span_id
+    assert first.objects[0].provenance.confidence is None
+
+
+def test_discovery_promotion_quarantines_item_failures_without_inventing_confidence(
+    analysis_request: AnalysisRequest,
+) -> None:
+    span_id = analysis_request.authoritative_span_ids[1]
+    batch = DiscoveryCandidateBatch.model_validate(
+        {
+            "candidates": [
+                {
+                    "local_key": "good-role",
+                    "entity_type": "Role",
+                    "name": "Forecast Analyst",
+                    "source_span_id": span_id,
+                    "basis": "explicit",
+                },
+                {
+                    "local_key": "unsafe-inference",
+                    "entity_type": "Risk",
+                    "name": "Possible missing control",
+                    "source_span_id": span_id,
+                    "basis": "inferred",
+                },
+            ],
+            "relationships": [
+                {
+                    "local_key": "bad-edge",
+                    "source_key": "good-role",
+                    "relationship_type": "PERFORMED_BY",
+                    "target_key": "unsafe-inference",
+                    "source_span_id": span_id,
+                    "basis": "inferred",
+                }
+            ],
+            "judgments": [],
+        }
+    )
+
+    promoted = promote_discovery_candidate_batch(analysis_request, batch)
+
+    assert [item.name for item in promoted.objects] == ["Forecast Analyst"]
+    assert promoted.candidate_relationships == []
+    assert len(promoted.findings) == 2
+    assert all(item.category == "candidate_quarantine" for item in promoted.findings)
+    assert all(item.blocking is False for item in promoted.findings)
+    assert all(item.target_object_id is None for item in promoted.findings)
+    assert any("missing model confidence" in item.impact for item in promoted.findings)
 
 
 def test_rubric_score_requires_at_least_one_authoritative_evidence_item() -> None:

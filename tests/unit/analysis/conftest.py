@@ -79,6 +79,20 @@ def _analysis_base(analysis_id: str) -> dict[str, object]:
 
 
 def recorded_responses() -> dict[str, list[object]]:
+    def provider_source_span(item: dict[str, object]) -> str:
+        provenance = item.get("provenance")
+        assert isinstance(provenance, dict)
+        source_span_id = provenance.get("source_span_id")
+        assert isinstance(source_span_id, str)
+        return source_span_id
+
+    def provider_confidence(item: dict[str, object]) -> float:
+        provenance = item.get("provenance")
+        assert isinstance(provenance, dict)
+        confidence = provenance.get("confidence")
+        assert isinstance(confidence, float)
+        return confidence
+
     scope_quote = "The Forecast Analyst runs the monthly forecast using CALC-LOSS-001."
     macro_finding = _finding(
         "FND-SCOPE-MACRO",
@@ -160,7 +174,7 @@ def recorded_responses() -> dict[str, list[object]]:
         "missing_target_sections": ["SEC-LIMITATIONS"],
         "findings": [section_finding],
     }
-    objects = [
+    objects: list[dict[str, object]] = [
         {
             "id": "ROLE-FORECAST-ANALYST",
             "entity_type": "Role",
@@ -242,7 +256,7 @@ def recorded_responses() -> dict[str, list[object]]:
         ),
         ("CTRL-REVIEW-001", "Control", "MITIGATES", "RISK-THRESHOLD-001", "Risk", SPAN_IDS[2]),
     ]
-    relationships = [
+    relationships: list[dict[str, object]] = [
         {
             "source_id": source_id,
             "source_type": source_type,
@@ -253,12 +267,42 @@ def recorded_responses() -> dict[str, list[object]]:
         }
         for source_id, source_type, relation, target_id, target_type, span_id in relationship_specs
     ]
+    local_keys = {
+        "ROLE-FORECAST-ANALYST": "forecast-analyst",
+        "STEP-FORECAST-010": "monthly-forecast-step",
+        "CALC-LOSS-001": "loss-calculator",
+        "CTRL-REVIEW-001": "threshold-review-control",
+        "EVD-REVIEW-001": "review-evidence",
+        "RISK-THRESHOLD-001": "threshold-risk",
+    }
     discovery = {
-        **_analysis_base("AN-DISCOVERY-001"),
-        "analysis_type": "discovery",
-        "objects": objects,
-        "candidate_relationships": relationships,
-        "findings": [],
+        "candidates": [
+            {
+                "local_key": local_keys[str(item["id"])],
+                "entity_type": item["entity_type"],
+                "name": item["name"],
+                "aliases": [],
+                "source_span_id": provider_source_span(item),
+                "basis": "inferred",
+                "confidence": provider_confidence(item),
+                "semantic_details": [],
+            }
+            for item in objects
+        ],
+        "relationships": [
+            {
+                "local_key": f"relationship-{index}",
+                "source_key": local_keys[str(item["source_id"])],
+                "relationship_type": item["relationship_type"],
+                "target_key": local_keys[str(item["target_id"])],
+                "source_span_id": provider_source_span(item),
+                "basis": "inferred",
+                "confidence": provider_confidence(item),
+                "semantic_details": [],
+            }
+            for index, item in enumerate(relationships, start=1)
+        ],
+        "judgments": [],
     }
     rag = {
         **_analysis_base("AN-RAG-001"),
@@ -311,13 +355,7 @@ def recorded_responses() -> dict[str, list[object]]:
                 "analyses": [sections],
             }
         ],
-        "process_methodology_discoverer": [
-            {
-                "document_id": "DOC-LOSS-FORECAST",
-                "source_digest": SOURCE_DIGEST,
-                "analyses": [discovery],
-            }
-        ],
+        "process_methodology_discoverer": [discovery],
         "rag_readiness_reviewer": [
             {"document_id": "DOC-LOSS-FORECAST", "source_digest": SOURCE_DIGEST, "analyses": [rag]}
         ],

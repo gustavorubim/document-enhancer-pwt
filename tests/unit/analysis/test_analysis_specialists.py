@@ -18,6 +18,8 @@ from document_enhancer.analysis.errors import (
 )
 from document_enhancer.analysis.macro import MacroReviewer
 from document_enhancer.analysis.models import AnalysisRequest, SpanDisposition
+from document_enhancer.analysis.promotion import promote_discovery_candidate_batch
+from document_enhancer.analysis.provider_models import DiscoveryCandidateBatch
 from document_enhancer.analysis.rag_readiness import (
     RagReadinessReviewer,
     augment_rag_readiness,
@@ -49,6 +51,13 @@ def _analysis(response: object, expected: type[Any]) -> Any:
     assert len(report.analyses) == 1
     assert isinstance(report.analyses[0], expected)
     return report.analyses[0]
+
+
+def _discovery(response: object, request: AnalysisRequest) -> DiscoveryAnalysis:
+    return promote_discovery_candidate_batch(
+        request,
+        DiscoveryCandidateBatch.model_validate(response),
+    )
 
 
 def test_macro_reviewer_records_exact_route_round_trips_and_matches_markdown_snapshot(
@@ -202,7 +211,7 @@ def test_discovery_rejects_unresolvable_candidate_provenance(
     analysis_request: AnalysisRequest,
     responses: dict[str, list[object]],
 ) -> None:
-    discovery = _analysis(responses["process_methodology_discoverer"][0], DiscoveryAnalysis)
+    discovery = _discovery(responses["process_methodology_discoverer"][0], analysis_request)
     objects = list(discovery.objects)
     bad_provenance = objects[0].provenance.model_copy(
         update={"source_span_id": "SPAN-UNKNOWN00000001"}
@@ -220,7 +229,7 @@ def test_rag_reviewer_and_lint_are_deterministic_and_complete(
     responses: dict[str, list[object]],
     gateway_factory: GatewayFactory,
 ) -> None:
-    discovery = _analysis(responses["process_methodology_discoverer"][0], DiscoveryAnalysis)
+    discovery = _discovery(responses["process_methodology_discoverer"][0], analysis_request)
     validate_candidate_graph(analysis_request, discovery)
     gateway, _ = gateway_factory({"rag_readiness_reviewer": responses["rag_readiness_reviewer"]})
     branch = RagReadinessReviewer(composer, gateway).review(analysis_request)
@@ -278,7 +287,7 @@ def test_rag_lint_flags_provisional_root_section(
     request = AnalysisRequest.model_validate(
         {**analysis_request.model_dump(mode="python"), "document": document}
     )
-    discovery = _analysis(responses["process_methodology_discoverer"][0], DiscoveryAnalysis)
+    discovery = _discovery(responses["process_methodology_discoverer"][0], analysis_request)
 
     lint = deterministic_rag_lint(request, discovery)
 

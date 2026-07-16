@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, StrictStr, field_validator
@@ -52,6 +53,7 @@ class AnalysisRequest(FrozenModel):
     document_type: DocumentType
     metadata: tuple[MetadataEntry, ...] = ()
     reviewer_inputs: StrictStr = ""
+    requested_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     @field_validator("metadata")
     @classmethod
