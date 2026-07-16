@@ -1,0 +1,10 @@
+{
+  "clean.md": {"parser_origin": "parser", "auto_calls": ["structure.triage"], "recovery": false},
+  "mild-mess.md": {"parser_origin": "parser", "auto_calls": ["structure.triage", "structure.recover-window"], "recovery": true},
+  "severe-mess.md": {"parser_origin": "parser", "auto_calls": ["structure.triage", "structure.recover-window"], "recovery": true},
+  "invariants": [
+    "raw block order is unchanged",
+    "recovery uses span IDs and source digests only for provenance",
+    "prompt injection is source data, never an instruction"
+  ]
+}

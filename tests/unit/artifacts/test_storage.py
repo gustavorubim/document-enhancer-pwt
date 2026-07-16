@@ -59,6 +59,29 @@ def test_repository_keeps_versioned_bytes_and_rejects_different_overwrite(tmp_pa
     assert len(list((paths.versions_dir / "source__document.json").glob("*.bin"))) == 1
 
 
+def test_revision_promotion_interruption_preserves_prior_canonical_bytes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = FilesystemArtifactRepository(tmp_path / "runs")
+    paths = RunPaths(tmp_path / "runs", "run-revision")
+    repo.create_run(paths)
+    repo.put_json("run-revision", "source/selected-view.json", {"version": 1})
+
+    def fail_promote(_staged: Path, _target: Path) -> None:
+        raise OSError("simulated interruption")
+
+    monkeypatch.setattr("document_enhancer.artifacts.repository.atomic_promote", fail_promote)
+    with pytest.raises(OSError, match="interruption"):
+        repo.put_json_revision(
+            "run-revision",
+            "source/selected-view.json",
+            {"version": 2},
+            replace=True,
+        )
+    assert repo.get_json("run-revision", "source/selected-view.json") == {"version": 1}
+    assert not list((paths.run_dir / ".staging").rglob("*.json"))
+
+
 def test_cache_graph_changes_downstream_only() -> None:
     graph = CacheDependencyGraph()
     changed = graph.invalidated_by({"normalize"})

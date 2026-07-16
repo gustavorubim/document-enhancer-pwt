@@ -1,0 +1,19 @@
+{
+  "fixture_kind": "recorded_structured_response_shape",
+  "note": "Tests fill document and span digests from the parsed fixture before invoking the fake gateway.",
+  "triage": {
+    "scan_id": "SCAN-M3B-FIXTURE-001",
+    "decision": "recover",
+    "confidence": 0.35,
+    "boundary_regions": [],
+    "evidence_span_ids": [],
+    "ambiguities": ["bold pseudo-heading", "table heading"]
+  },
+  "recovery": {
+    "recovery_id": "RECOVERY-M3B-FIXTURE-001",
+    "sections": [],
+    "dispositions": "one exact disposition per supplied span",
+    "boundary_alternatives": [],
+    "disagreements": []
+  }
+}

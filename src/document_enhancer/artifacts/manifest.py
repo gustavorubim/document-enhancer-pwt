@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -51,13 +52,19 @@ class RunManifest(ManifestContract):
     media_type: str
     source_size_bytes: int = Field(ge=0)
     source_digest: str
-    structure_mode: Literal["auto", "parser", "llm"] = "auto"
+    structure_mode: Literal["auto", "parser", "llm", "recover", "force", "off"] = "auto"
     parser_name: str = "unknown"
     parser_version: str = "unknown"
     extraction_warnings: tuple[ExtractionWarning, ...] = ()
     parser_outline_digest: str | None = None
     structure_quality: StructureQualityReport | None = None
     selected_view_digest: str | None = None
+    structure_scan_digest: str | None = None
+    structure_recovery_digest: str | None = None
+    structure_reconciliation_digest: str | None = None
+    structure_validation_digest: str | None = None
+    structure_call_manifests: tuple[dict[str, Any], ...] = ()
+    structure_prompt_resolutions: tuple[dict[str, Any], ...] = ()
     artifacts: tuple[ArtifactRecord, ...] = ()
     stages: tuple[StageRecord, ...] = ()
     cache_keys: dict[str, str] = Field(default_factory=dict)
@@ -71,7 +78,7 @@ class RunManifest(ManifestContract):
         *,
         run_id: str,
         raw: RawDocument,
-        structure_mode: Literal["auto", "parser", "llm"] = "auto",
+        structure_mode: Literal["auto", "parser", "llm", "recover", "force", "off"] = "auto",
         quality: StructureQualityReport | None = None,
     ) -> RunManifest:
         return cls(
@@ -118,6 +125,40 @@ class RunManifest(ManifestContract):
                 "parser_outline_digest": outline_digest,
                 "selected_view_digest": selected_view_digest,
                 "structure_quality": quality,
+                "updated_at": utc_now(),
+            }
+        )
+
+    def with_structure_recovery(
+        self,
+        *,
+        mode: Literal["auto", "parser", "recover", "force", "off"],
+        scan_digest: str | None,
+        recovery_digest: str | None,
+        validation_digest: str,
+        selected_view_digest: str,
+        reconciliation_digest: str | None = None,
+        call_manifests: Sequence[Any] = (),
+        prompt_resolutions: Sequence[Any] = (),
+    ) -> RunManifest:
+        """Attach M3B structure evidence without conflating parser and model artifacts."""
+
+        def dump_items(items: Sequence[Any]) -> tuple[dict[str, Any], ...]:
+            return tuple(
+                item.model_dump(mode="json") if hasattr(item, "model_dump") else dict(item)
+                for item in items
+            )
+
+        return self.model_copy(
+            update={
+                "structure_mode": mode,
+                "structure_scan_digest": scan_digest,
+                "structure_recovery_digest": recovery_digest,
+                "structure_reconciliation_digest": reconciliation_digest,
+                "structure_validation_digest": validation_digest,
+                "selected_view_digest": selected_view_digest,
+                "structure_call_manifests": dump_items(call_manifests),
+                "structure_prompt_resolutions": dump_items(prompt_resolutions),
                 "updated_at": utc_now(),
             }
         )
