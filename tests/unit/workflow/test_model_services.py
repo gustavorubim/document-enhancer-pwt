@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
@@ -29,6 +30,7 @@ from document_enhancer.references.loader import load_reference_pack
 from document_enhancer.workflow.model_services import (
     GeminiChecklistGenerator,
     GeminiQuestionGenerator,
+    build_question_prompt_input,
 )
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -124,6 +126,27 @@ def test_question_generator_sends_baseline_and_referenced_findings_not_full_fano
     assert input_digests[0] == normalized.raw.source_digest
     assert len(input_digests) == 2
     assert all(len(digest) == 64 for digest in input_digests)
+
+
+def test_question_prompt_input_excludes_unrelated_analysis_fanout(tmp_path: Path) -> None:
+    source = tmp_path / "messy.md"
+    source.write_text("# Control review\n\nThe control owner is absent.\n", encoding="utf-8")
+    normalized = ingest_source(source)
+    findings = _finding_set(normalized.raw.blocks[1].span_id)
+    baseline = synthesize_questions(
+        findings,
+        document_id="DOC-STAGE-CONTEXT-001",
+        strict_blocking=True,
+    ).questions
+
+    prompt_input = build_question_prompt_input(
+        baseline,
+        {"finding_set": findings, "unrelated_analysis_fanout": "x" * 100_000},
+    )
+
+    encoded = json.dumps(prompt_input, sort_keys=True)
+    assert len(encoded) < 40_000
+    assert "unrelated_analysis_fanout" not in encoded
 
 
 def test_question_generator_rejects_evidence_outside_deterministic_baseline(

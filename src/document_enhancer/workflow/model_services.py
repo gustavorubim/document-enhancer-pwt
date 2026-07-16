@@ -151,7 +151,9 @@ def _analysis_findings(value: object) -> tuple[Finding, ...]:
     return ()
 
 
-def _question_input(baseline: QuestionsArtifact, analysis_result: object) -> dict[str, object]:
+def build_question_prompt_input(
+    baseline: QuestionsArtifact, analysis_result: object
+) -> dict[str, object]:
     """Build the compact deterministic question seed instead of serializing the full fan-out."""
 
     finding_ids = sorted(
@@ -346,7 +348,7 @@ class GeminiQuestionGenerator:
         normalized: NormalizedDocument,
         document_type: DocumentType,
     ) -> QuestionsArtifact:
-        question_input = _question_input(baseline, analysis_result)
+        question_input = build_question_prompt_input(baseline, analysis_result)
         artifact = _invoke(
             self.composer,
             self.gateway,

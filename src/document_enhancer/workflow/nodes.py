@@ -76,6 +76,7 @@ from document_enhancer.rewrite.governed_example import apply_governed_example_co
 
 from .cache import WorkflowCache, stage_inputs_for
 from .checkpoint import AnalysisArtifactRecorder, WorkflowCheckpoint
+from .model_services import build_question_prompt_input
 from .prompts import resolved_prompt_artifact
 from .routing import gate1_required, gate1_satisfied, gate2_required, gate2_satisfied, next_action
 from .state import WorkflowSnapshot, WorkflowState, state_json
@@ -608,7 +609,11 @@ def question_synthesis_node(state: WorkflowState, services: WorkflowServices) ->
         document_id=str(state["document_id"]),
         strict_blocking=True,
     )
-    questions = _as_questions(result.questions)
+    baseline_questions = _as_questions(result.questions)
+    question_prompt_input = build_question_prompt_input(
+        baseline_questions, state.get("analysis_result")
+    )
+    questions = baseline_questions
     if services.question_generator is not None:
         questions = services.question_generator.generate(
             baseline=questions,
@@ -659,9 +664,7 @@ def question_synthesis_node(state: WorkflowState, services: WorkflowServices) ->
                 "document_type": document_type,
                 "document_metadata": {},
                 "source_text": normalized.normalized_markdown,
-                "analysis_results": json.dumps(
-                    state_json(state.get("analysis_result")), sort_keys=True
-                ),
+                "analysis_results": json.dumps(question_prompt_input, sort_keys=True),
                 "reviewer_inputs": "",
             },
             destination=paths.artifact_path("prompts/resolved-manifest.json"),
