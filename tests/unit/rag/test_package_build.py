@@ -4,13 +4,16 @@ import hashlib
 import shutil
 import sqlite3
 import struct
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Barrier
 
 import pytest
 
 from document_enhancer.artifacts.atomic import digest_file
 from document_enhancer.llm import EmbeddingProfile, GeminiEmbeddingAdapter
 from document_enhancer.rag import (
+    CatalogConflictError,
     OfflineDeterministicEmbedder,
     RagBuildError,
     build_package,
@@ -130,13 +133,16 @@ def test_package_reconciles_vectors_fts_and_idempotent_rebuild(tmp_path: Path) -
         run_path,
         adapter=_offline_adapter(EmbeddingProfile()),
     )
-    assert digest_file(database) == before
+    # The workflow package is offline. Supplying an explicitly live-profile fake must rebuild in
+    # the requested live identity instead of reusing deterministic vectors.
+    assert digest_file(database) != before
     verification = verify_package(database, export_dir=run_path / "export")
     assert verification.valid, verification.errors
     assert verification.row_counts["chunks"] > 0
     assert verification.row_counts["chunks"] == verification.row_counts["embeddings"]
     assert verification.row_counts["chunks"] == verification.row_counts["chunks_fts"]
     assert manifest.vector_count == verification.row_counts["chunks"]
+    assert manifest.embedding_provider == "google"
     connection = connect(str(database))
     try:
         dimensions = {row[0] for row in connection.execute("SELECT dimension FROM embeddings")}
@@ -235,6 +241,88 @@ def test_catalog_ingestion_is_atomic_idempotent_and_monotonic(tmp_path: Path) ->
         connection.close()
 
 
+def test_offline_identity_is_explicit_and_mixed_profile_catalog_is_rejected(
+    tmp_path: Path,
+) -> None:
+    run_path = _approved_run(tmp_path)
+    database = run_path / "rag/document-rag.sqlite3"
+    connection = connect(str(database))
+    try:
+        build = connection.execute(
+            "SELECT embedding_profile, embedding_provider, embedding_backend, embedding_model FROM rag_builds"
+        ).fetchone()
+        assert build is not None
+        assert build[1:] == ("offline", "local", "offline-deterministic-sha256-v1")
+        assert str(build[0]).startswith("offline:local:document-enhancer-offline-v1:")
+        assert {
+            tuple(row)
+            for row in connection.execute(
+                "SELECT DISTINCT provider, backend, model FROM embeddings"
+            )
+        } == {("offline", "local", "offline-deterministic-sha256-v1")}
+    finally:
+        connection.close()
+
+    catalog = tmp_path / "catalog.sqlite3"
+    ingest_package(database, catalog)
+    live_profile = EmbeddingProfile()
+    build_package(
+        run_path,
+        profile=live_profile,
+        adapter=_offline_adapter(live_profile),
+    )
+    with pytest.raises(CatalogConflictError, match="mixed embedding profile"):
+        ingest_package(database, catalog)
+
+
+def test_concurrent_first_ingestions_cannot_create_a_mixed_profile_catalog(
+    tmp_path: Path,
+) -> None:
+    run_path = _approved_run(tmp_path)
+    database = run_path / "rag/document-rag.sqlite3"
+    offline_package = tmp_path / "offline-package.sqlite3"
+    shutil.copy2(database, offline_package)
+
+    live_profile = EmbeddingProfile()
+    build_package(run_path, profile=live_profile, adapter=_offline_adapter(live_profile))
+    live_package = tmp_path / "live-package.sqlite3"
+    shutil.copy2(database, live_package)
+
+    catalog = tmp_path / "concurrent-catalog.sqlite3"
+    connection = connect(str(catalog), catalog=True)
+    try:
+        migrate(connection)
+    finally:
+        connection.close()
+
+    start = Barrier(2)
+
+    def promote(package: Path) -> str:
+        start.wait()
+        try:
+            ingest_package(package, catalog, busy_attempts=20)
+        except CatalogConflictError:
+            return "profile-conflict"
+        return "promoted"
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        outcomes = list(pool.map(promote, (offline_package, live_package)))
+
+    assert sorted(outcomes) == ["profile-conflict", "promoted"]
+    connection = connect(str(catalog), catalog=True)
+    try:
+        profiles = {
+            str(row[0])
+            for row in connection.execute(
+                "SELECT DISTINCT embedding_profile FROM rag_builds WHERE status='validated'"
+            )
+        }
+        assert len(profiles) == 1
+        assert connection.execute("SELECT COUNT(*) FROM catalog_ingestions").fetchone()[0] == 1
+    finally:
+        connection.close()
+
+
 def test_catalog_retains_history_selects_current_and_rejects_identity_conflicts(
     tmp_path: Path,
 ) -> None:
@@ -273,8 +361,6 @@ def test_catalog_retains_history_selects_current_and_rejects_identity_conflicts(
     )
     conflict_db.commit()
     conflict_db.close()
-    from document_enhancer.rag import CatalogConflictError
-
     conflict_receipt = tmp_path / "catalog-conflict.json"
     with pytest.raises(CatalogConflictError, match="graph node identity conflict"):
         ingest_package(conflicting, catalog, receipt_path=conflict_receipt)

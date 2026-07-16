@@ -77,6 +77,24 @@ def test_embeddings_preserve_one_logical_input_per_vector_and_cache_metadata(
     )
 
 
+def test_embedding_cache_key_includes_full_implementation_identity() -> None:
+    first = GeminiEmbeddingAdapter(
+        profile=EmbeddingProfile(implementation="provider-wrapper-v1"),
+        embedder=FakeEmbedder(),
+    )
+    second = GeminiEmbeddingAdapter(
+        profile=EmbeddingProfile(implementation="provider-wrapper-v2"),
+        embedder=FakeEmbedder(),
+    )
+
+    first_key = first._key("same formatted input", task="document")
+    second_key = second._key("same formatted input", task="document")
+
+    assert first_key.digest != second_key.digest
+    assert first_key.parameters["profile_identity"] == first.profile.identity
+    assert second_key.parameters["profile_identity"] == second.profile.identity
+
+
 def test_embeddings_reject_oversize_dimension_and_nonfinite_values() -> None:
     with pytest.raises(EmbeddingInputTooLargeError):
         GeminiEmbeddingAdapter(

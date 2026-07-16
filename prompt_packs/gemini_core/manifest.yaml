@@ -304,7 +304,7 @@ prompts:
     template_path: rewrite/section.md
     shared_fragments: [shared/system.md, shared/evidence-and-no-invention.md, shared/source-as-untrusted-data.md, shared/rubric-application.md, shared/provenance.md, shared/reviewer-steering-and-waivers.md, shared/structured-output.md, shared/tool-prohibition.md]
     model_route: gemini-3.1-pro-preview
-    output_schema: semantic-document.schema.json
+    output_schema: section-rewrite.schema.json
     allowed_inputs: [document_type, document_metadata, source_text, approved_ledger, target_section, reviewer_inputs]
     optional_tools: []
     token_budget: 28000
@@ -341,7 +341,7 @@ prompts:
     template_path: rewrite/revision.md
     shared_fragments: [shared/system.md, shared/evidence-and-no-invention.md, shared/source-as-untrusted-data.md, shared/rubric-application.md, shared/provenance.md, shared/reviewer-steering-and-waivers.md, shared/structured-output.md, shared/tool-prohibition.md]
     model_route: gemini-3.1-pro-preview
-    output_schema: semantic-document.schema.json
+    output_schema: enhanced-document.schema.json
     allowed_inputs: [document_type, document_metadata, enhanced_document, audit_findings, reviewer_inputs]
     optional_tools: []
     token_budget: 24000
@@ -359,7 +359,7 @@ prompts:
     template_path: audit/content-fidelity.md
     shared_fragments: [shared/system.md, shared/evidence-and-no-invention.md, shared/source-as-untrusted-data.md, shared/rubric-application.md, shared/provenance.md, shared/reviewer-steering-and-waivers.md, shared/prompt-injection-resistance.md, shared/structured-output.md, shared/tool-prohibition.md]
     model_route: gemini-3.5-flash
-    output_schema: audit.schema.json
+    output_schema: independent-audit.schema.json
     allowed_inputs: [document_type, document_metadata, source_text, enhanced_document, reviewer_inputs]
     optional_tools: []
     token_budget: 26000

@@ -13,7 +13,7 @@ from document_enhancer.domain.analysis import (
     StructureRecoveryProposal,
     StructureScan,
 )
-from document_enhancer.domain.audit import Audit
+from document_enhancer.domain.audit import Audit, IndependentAuditResult
 from document_enhancer.domain.ontology import Entity, Relationship
 from document_enhancer.domain.provenance import Provenance
 from document_enhancer.domain.questions import (
@@ -39,7 +39,7 @@ from document_enhancer.domain.run import (
 )
 from document_enhancer.domain.semantic import SemanticDocument
 from document_enhancer.domain.source import RawDocument
-from document_enhancer.rewrite.models import EnhancedDocumentModel
+from document_enhancer.rewrite.models import EnhancedDocumentModel, SectionRewriteDraft
 
 SCHEMA_MODELS: Mapping[str, type[BaseModel]] = {
     "analysis.schema.json": AnalysisReport,
@@ -63,6 +63,8 @@ SCHEMA_MODELS: Mapping[str, type[BaseModel]] = {
     "run-manifest.schema.json": RunManifest,
     "semantic-document.schema.json": SemanticDocument,
     "enhanced-document.schema.json": EnhancedDocumentModel,
+    "section-rewrite.schema.json": SectionRewriteDraft,
+    "independent-audit.schema.json": IndependentAuditResult,
     "source-document.schema.json": RawDocument,
     "steering.schema.json": Steering,
     "structure-quality.schema.json": StructureQuality,

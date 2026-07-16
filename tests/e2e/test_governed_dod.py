@@ -61,6 +61,8 @@ def test_incomplete_governed_document_still_fails_all_observed_audit_codes(
         [
             "run",
             str(incomplete),
+            "--execution-mode",
+            "offline",
             "--document-type",
             "process",
             "--run-dir",

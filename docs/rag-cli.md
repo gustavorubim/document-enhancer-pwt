@@ -24,6 +24,8 @@ claim-level citations, run a grounding audit, and allow at most one retrieval re
 grounding repair. If evidence remains insufficient or grounding fails, the visible result is
 `insufficient`, never an unqualified answer. `--offline` uses deterministic local fakes for tests
 and demonstrations; normal use resolves the governed RAG prompt IDs and configured Gemini routes.
+Offline queries only accept offline deterministic indexes, and live queries only accept Google
+Gemini indexes.
 
 Chat is in-memory unless `--session ID` is supplied. A saved session stores visible user and final
 assistant messages, stable citations, retrieval diagnostics, and model metadata—never hidden
@@ -34,6 +36,13 @@ All non-interactive commands support stable `--json`. JSON and non-TTY output co
 control sequences. Set `NO_COLOR=1` or pass the root option `docenhance --no-color ...` to disable
 color in human-readable output.
 
-The vector adapter validates migration/integrity state, embedding profile, dimensions, vector
-digests, and chunk coverage before search. It uses pinned SQLiteVec when selected and supports only
-the explicit bounded exact-scan fallback. Corrupt data and profile mismatches fail closed.
+The vector adapter validates migration/integrity state, embedding profile, provider, backend,
+implementation, dimensions, vector digests, and chunk coverage before search. Offline vectors use
+the distinct `offline/local/offline-deterministic-sha256-v1` identity and never claim
+`google/developer_api`; live vectors use the pinned `google` provider and
+`gemini-embedding-2` model at 768 dimensions. Every logical chunk is sent as a separate embedding
+input and must return exactly one vector. Provider/implementation identity participates in build
+IDs and cache keys, so a live rebuild re-embeds an offline package instead of reusing fake vectors.
+Catalog ingestion rejects mixed embedding spaces. It uses pinned SQLiteVec when selected and
+supports only the explicit bounded exact-scan fallback; corrupt data and profile mismatches fail
+closed.

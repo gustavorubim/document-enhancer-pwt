@@ -50,6 +50,8 @@ class WorkflowState(TypedDict, total=False):
     stop_after: str | None
     gate2_enabled: bool
     offline: bool
+    structure_mode: str
+    execution_metadata: object
 
 
 class WorkflowSnapshot(StrictModel):
@@ -71,6 +73,8 @@ class WorkflowSnapshot(StrictModel):
     errors: list[StrictStr] = Field(default_factory=list)
     gate2_enabled: StrictBool = True
     offline: StrictBool = True
+    structure_mode: StrictStr = "parser"
+    execution_metadata: dict[StrictStr, object] | None = None
 
     @classmethod
     def from_state(cls, state: Mapping[str, Any]) -> WorkflowSnapshot:
@@ -90,6 +94,8 @@ class WorkflowSnapshot(StrictModel):
             "errors": data.get("errors", []),
             "gate2_enabled": data.get("gate2_enabled", True),
             "offline": data.get("offline", True),
+            "structure_mode": data.get("structure_mode", "parser"),
+            "execution_metadata": data.get("execution_metadata"),
         }
         return cls(state=data, **transient)
 

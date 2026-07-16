@@ -240,6 +240,12 @@ class DocumentWorkflow:
             "errors": [],
             "gate2_enabled": self.services.gate2_enabled,
             "offline": self.services.offline,
+            "structure_mode": self.services.structure_mode,
+            "execution_metadata": (
+                self.services.execution_metadata.model_dump(mode="json")
+                if self.services.execution_metadata is not None
+                else None
+            ),
             "stop_after": self.services.stop_after,
         }
 
@@ -301,6 +307,20 @@ class DocumentWorkflow:
 
         self.services.checkpoint = WorkflowCheckpoint(RunPaths(self.services.run_root, run_id))
         state = self.services.checkpoint.load_state()
+        if bool(state.get("offline", True)) != self.services.offline:
+            raise ValidationError("resume execution mode differs from the persisted run")
+        if str(state.get("structure_mode", "parser")) != self.services.structure_mode:
+            raise ValidationError("resume structure mode differs from the persisted run")
+        persisted_execution = state.get("execution_metadata")
+        current_execution = (
+            self.services.execution_metadata.model_dump(mode="json")
+            if self.services.execution_metadata is not None
+            else None
+        )
+        if persisted_execution != current_execution:
+            raise ValidationError(
+                "resume provider, pack, configuration, or embedding identity is incompatible"
+            )
         source = Path(str(state["source_path"]))
         if not source.is_file():
             raise ValidationError(f"source is no longer available: {source.name}")

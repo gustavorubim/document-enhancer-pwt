@@ -124,6 +124,7 @@ def ingest_package(
         build_id = str(build["rag_build_id"])
         document_id = str(build["document_id"])
         version_id = str(build["version_id"])
+        package_profile = str(build["embedding_profile"])
         catalog_path = catalog_path.expanduser().resolve()
         catalog_path.parent.mkdir(parents=True, exist_ok=True)
         catalog = connect(str(catalog_path), catalog=True)
@@ -158,8 +159,21 @@ def ingest_package(
             if not begun:
                 raise RagBuildError("catalog busy retry policy exhausted")
             try:
-                # Repeat idempotence and identity checks under the write lock. The earlier reads
-                # are only a fast path; these checks close the race with another ingestion.
+                # Embedding-space compatibility must be read under the same write transaction as
+                # promotion. Otherwise two first ingestions can both observe an empty catalog and
+                # commit incompatible vector spaces.
+                existing_profiles = {
+                    str(row[0])
+                    for row in catalog.execute(
+                        "SELECT DISTINCT embedding_profile FROM rag_builds WHERE status='validated'"
+                    )
+                }
+                if existing_profiles and existing_profiles != {package_profile}:
+                    raise CatalogConflictError(
+                        "catalog ingestion rejected a mixed embedding profile"
+                    )
+                # Repeat idempotence and identity checks under the write lock. The earlier
+                # idempotence read is only a fast path; this closes the race with another ingest.
                 existing = catalog.execute(
                     "SELECT * FROM catalog_ingestions WHERE rag_build_id=?", (build_id,)
                 ).fetchone()

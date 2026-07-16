@@ -73,6 +73,8 @@ class GeminiGatewayConfig(BaseModel):
         api_key = overrides.pop("api_key", None)
         if api_key is None and backend == BackendName.DEVELOPER_API:
             api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+        if isinstance(api_key, str) and not api_key.strip():
+            api_key = None
         project = overrides.pop("project", None) or os.getenv("GOOGLE_CLOUD_PROJECT")
         location = overrides.pop("location", None) or os.getenv("GOOGLE_CLOUD_LOCATION")
         return cls(

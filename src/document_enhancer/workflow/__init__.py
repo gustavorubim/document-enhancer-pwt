@@ -8,6 +8,11 @@ from .cache import (
     invalidation_impact,
 )
 from .checkpoint import SideEffectLedger, WorkflowCheckpoint
+from .execution import (
+    ExecutionMetadata,
+    ExecutionMode,
+    build_configured_workflow_services,
+)
 from .fingerprints import workflow_input_fingerprints
 from .graph import DocumentWorkflow, WorkflowResult, build_graph
 from .nodes import WorkflowServices
@@ -33,8 +38,11 @@ __all__ = [
     "WorkflowState",
     "WorkflowServices",
     "DocumentWorkflow",
+    "ExecutionMetadata",
+    "ExecutionMode",
     "WorkflowResult",
     "build_graph",
+    "build_configured_workflow_services",
     "gate1_required",
     "gate1_satisfied",
     "gate2_required",

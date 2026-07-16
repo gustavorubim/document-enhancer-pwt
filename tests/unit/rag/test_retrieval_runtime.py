@@ -313,15 +313,26 @@ def test_exact_scan_policy_rejects_unbounded_catalog(tmp_path: Path) -> None:
         SQLiteCatalogVectorStore(
             catalog,
             embedding=GeminiEmbeddingAdapter(
-                profile=EmbeddingProfile(
-                    model=profile.model,
-                    dimensions=profile.dimensions,
-                    backend=profile.backend,
-                ),
+                profile=profile,
                 embedder=OfflineDeterministicEmbedder(profile.dimensions),
             ),
             profile=identity,
             dimension=profile.dimensions,
             backend="exact_scan",
             exact_scan_policy=ExactScanPolicy(max_vectors=0, profile=identity),
+        )
+
+
+def test_query_adapter_rejects_cross_space_profiles(tmp_path: Path) -> None:
+    catalog = catalog_with_documents(tmp_path, count=1)
+    offline_profile, _identity = catalog_embedding_profile(catalog)
+    assert offline_profile.provider == "offline"
+    with pytest.raises(CatalogReadError, match="does not match"):
+        build_hybrid_retriever(
+            catalog,
+            GeminiEmbeddingAdapter(
+                profile=EmbeddingProfile(),
+                embedder=OfflineDeterministicEmbedder(768),
+            ),
+            vector_backend="exact_scan",
         )

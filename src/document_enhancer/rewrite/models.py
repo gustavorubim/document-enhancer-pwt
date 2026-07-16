@@ -121,6 +121,34 @@ class OpenIssue(StrictModel):
         return self
 
 
+class SectionRewriteDraft(StrictModel):
+    """Narrow model output for one governed section rewrite.
+
+    The workflow, not the model, owns section ordering, semantic identities, tables, diagrams,
+    and promotion.  This contract limits a provider to prose plus evidence already present in the
+    approved section input.
+    """
+
+    section_id: StrictStr = Field(pattern=r"^(SEC|PROV-SEC)-[A-Z0-9-]+$")
+    body: StrictStr
+    source_span_ids: list[StrictStr] = Field(default_factory=list)
+    evidence: list[EvidenceQuote] = Field(default_factory=list)
+    approved_answer_ids: list[StrictStr] = Field(default_factory=list)
+    open_issue_ids: list[StrictStr] = Field(default_factory=list)
+
+    @field_validator("body")
+    @classmethod
+    def validate_body(cls, value: StrictStr) -> StrictStr:
+        return non_empty(value, field_name="section rewrite body")
+
+    @field_validator("source_span_ids")
+    @classmethod
+    def validate_source_spans(cls, values: list[StrictStr]) -> list[StrictStr]:
+        for value in values:
+            validate_span_id(value)
+        return values
+
+
 class EnhancedSection(StrictModel):
     """One target section and its approved, traceable body."""
 
@@ -453,6 +481,7 @@ __all__ = [
     "OpenIssue",
     "RevisionCounters",
     "RevisionLimitExceeded",
+    "SectionRewriteDraft",
     "StructuredTable",
     "StructuredTableRow",
     "TableColumn",
