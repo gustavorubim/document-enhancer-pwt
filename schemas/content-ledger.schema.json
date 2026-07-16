@@ -33,9 +33,34 @@
           "title": "Rationale",
           "type": "string"
         },
+        "source_ordinal": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Ordinal"
+        },
         "source_span_id": {
           "title": "Source Span Id",
           "type": "string"
+        },
+        "source_text_digest": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Text Digest"
         },
         "target_anchor": {
           "anyOf": [

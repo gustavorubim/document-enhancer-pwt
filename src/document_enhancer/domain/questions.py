@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import UTC, datetime
 
 from pydantic import Field, StrictBool, StrictStr, field_validator, model_validator
@@ -274,6 +275,8 @@ class ContentLedgerEntry(StrictModel):
     rationale: StrictStr
     evidence_ids: list[StrictStr] = Field(default_factory=list)
     omitted_reason: StrictStr | None = None
+    source_text_digest: StrictStr | None = None
+    source_ordinal: int | None = Field(default=None, ge=0)
 
     @field_validator("ledger_entry_id")
     @classmethod
@@ -315,6 +318,33 @@ class ContentLedger(StrictModel):
         if not self.entries and self.complete:
             raise ValueError("a complete content ledger must contain entries")
         return self
+
+    def coverage_errors(self, source_span_ids: Iterable[str]) -> tuple[str, ...]:
+        """Return deterministic one-disposition-per-span coverage diagnostics."""
+
+        expected = tuple(validate_span_id(str(span_id)) for span_id in source_span_ids)
+        expected_set = set(expected)
+        seen: dict[str, int] = {}
+        errors: list[str] = []
+        for entry in self.entries:
+            seen[entry.source_span_id] = seen.get(entry.source_span_id, 0) + 1
+        duplicate_ids = sorted(span_id for span_id, count in seen.items() if count != 1)
+        missing = sorted(expected_set - set(seen))
+        unexpected = sorted(set(seen) - expected_set)
+        if duplicate_ids:
+            errors.append("duplicate dispositions: " + ", ".join(duplicate_ids))
+        if missing:
+            errors.append("missing dispositions: " + ", ".join(missing))
+        if unexpected:
+            errors.append("unexpected source spans: " + ", ".join(unexpected))
+        if len(expected) != len(expected_set):
+            errors.append("source span input contains duplicate IDs")
+        return tuple(errors)
+
+    def assert_coverage(self, source_span_ids: Iterable[str]) -> None:
+        errors = self.coverage_errors(source_span_ids)
+        if errors:
+            raise ValueError("content ledger coverage failed: " + "; ".join(errors))
 
 
 QuestionArtifact = QuestionsArtifact

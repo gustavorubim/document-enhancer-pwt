@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, cast
@@ -22,21 +23,38 @@ from document_enhancer.clarification import (
     write_checklist_artifacts,
     write_questions_artifacts,
 )
+from document_enhancer.config import yaml_parser
 from document_enhancer.domain.analysis import AnalysisReport, FindingSet
 from document_enhancer.domain.enums import DocumentType
 from document_enhancer.domain.questions import (
     AnswersArtifact,
+    ContentLedger,
     QuestionsArtifact,
     RewriteChecklist,
     Steering,
     WaiversArtifact,
 )
+from document_enhancer.domain.serialization import model_to_yaml
 from document_enhancer.domain.source import NormalizedDocument as DomainNormalizedDocument
 from document_enhancer.errors import ValidationError, WaitingForReviewError
 from document_enhancer.ingest.models import NormalizedDocument, RawDocument
 from document_enhancer.ingest.normalize import normalize_document
 from document_enhancer.ingest.pipeline import ParserRegistry, parse_source
 from document_enhancer.ingest.recovery import StructureRecoveryConfig, StructureRecoveryService
+from document_enhancer.references.loader import load_reference_pack
+from document_enhancer.rewrite import (
+    EnhancedDocumentModel,
+    GovernedReference,
+    RevisionCounters,
+    SectionRewriteInput,
+    build_content_ledger,
+    build_enhanced_document,
+    build_rewrite_inputs,
+    build_semantic_document,
+    render_enhanced_markdown,
+    validate_content_ledger,
+    validate_mermaid,
+)
 
 from .cache import WorkflowCache, stage_inputs_for
 from .checkpoint import WorkflowCheckpoint
@@ -45,6 +63,7 @@ from .routing import gate1_required, gate1_satisfied, gate2_required, gate2_sati
 from .state import WorkflowState, state_json
 
 AnalysisRunner = Callable[[AnalysisRequest], object]
+RewriteRunner = Callable[[tuple[SectionRewriteInput, ...]], object]
 
 
 @dataclass
@@ -58,6 +77,7 @@ class WorkflowServices:
     parser_registry: ParserRegistry | None = None
     structure_service: StructureRecoveryService | None = None
     analysis_runner: AnalysisRunner | None = None
+    rewrite_runner: RewriteRunner | None = None
     structure_mode: str = "parser"
     gate2_enabled: bool = True
     stop_after: str | None = None
@@ -72,6 +92,8 @@ class WorkflowServices:
         "clarification.questions",
         "clarification.rewrite-checklist",
     )
+    max_rewrite_revisions: int = 2
+    max_audit_revisions: int = 1
 
     def attach_run(self, raw: RawDocument, *, run_id: str | None = None) -> None:
         resolved_run_id = run_id or self.run_id or content_addressed_run_id(raw.source_digest)
@@ -123,6 +145,38 @@ def _as_checklist(value: object) -> RewriteChecklist:
     return value if isinstance(value, RewriteChecklist) else RewriteChecklist.model_validate(value)
 
 
+def _as_ledger(value: object) -> ContentLedger:
+    return value if isinstance(value, ContentLedger) else ContentLedger.model_validate(value)
+
+
+def _as_rewrite_inputs(value: object) -> tuple[SectionRewriteInput, ...]:
+    if isinstance(value, (list, tuple)):
+        return tuple(
+            item
+            if isinstance(item, SectionRewriteInput)
+            else SectionRewriteInput.model_validate(item)
+            for item in value
+        )
+    raise ValidationError("rewrite inputs are missing or invalid")
+
+
+def _as_enhanced_model(value: object) -> EnhancedDocumentModel:
+    return (
+        value
+        if isinstance(value, EnhancedDocumentModel)
+        else EnhancedDocumentModel.model_validate(value)
+    )
+
+
+def _as_revision_counters(value: object, services: WorkflowServices) -> RevisionCounters:
+    if value is None:
+        return RevisionCounters(
+            max_rewrite_revisions=services.max_rewrite_revisions,
+            max_audit_revisions=services.max_audit_revisions,
+        )
+    return value if isinstance(value, RevisionCounters) else RevisionCounters.model_validate(value)
+
+
 def _finding_set(value: object) -> FindingSet:
     if isinstance(value, FindingSet):
         return value
@@ -161,6 +215,9 @@ def _input_values(state: WorkflowState, services: WorkflowServices) -> dict[str,
         "analysis": state.get("cache_keys", {}).get("analysis", ""),
         "questions": state.get("cache_keys", {}).get("question_synthesis", ""),
         "checklist": state.get("cache_keys", {}).get("checklist", ""),
+        "ledger": state.get("cache_keys", {}).get("content_ledger", ""),
+        "rewrite": state.get("cache_keys", {}).get("rewrite_model", ""),
+        "semantic_model": state.get("cache_keys", {}).get("semantic", ""),
         **services.input_fingerprints,
     }
     if isinstance(raw, RawDocument):
@@ -547,6 +604,266 @@ def gate2_node(state: WorkflowState, services: WorkflowServices) -> WorkflowStat
     return _finish_stage(state, services, "gate2")
 
 
+def _m6_reference_contract(
+    services: WorkflowServices,
+) -> tuple[list[dict[str, object]], str, str, str, str]:
+    """Resolve only machine-readable template metadata; authoring comments never enter inputs."""
+
+    document_type = services.document_type.value
+    if services.reference_pack is None:
+        sections: list[dict[str, object]] = [
+            {
+                "id": f"SEC-{document_type.upper()}-CONTENT",
+                "heading": "Document content",
+                "anchor": "document-content",
+            }
+        ]
+        return sections, "enterprise_core", "1.0.0", f"TPL-{document_type.upper()}-001", "1.0.0"
+    pack = load_reference_pack(services.reference_pack)
+    requirements_path = pack.requirements_path(document_type)
+    requirements = yaml_parser().load(requirements_path.read_text(encoding="utf-8"))
+    sections: list[dict[str, object]] = []
+    for item in requirements.get("sections", ()) if isinstance(requirements, dict) else ():
+        if not isinstance(item, dict):
+            continue
+        heading = str(item.get("heading", item.get("id", "section")))
+        sections.append(
+            {
+                "id": str(item.get("id")),
+                "heading": heading,
+                "anchor": _m6_slug(heading),
+                "order": int(item.get("order", len(sections))),
+            }
+        )
+    template_id = str(requirements.get("template_id", f"TPL-{document_type.upper()}-001"))
+    template_version = str(requirements.get("version", "1.0.0"))
+    return sections, pack.pack_id, pack.version, template_id, template_version
+
+
+def _m6_slug(value: str) -> str:
+    import re
+
+    return "-".join(re.findall(r"[a-z0-9]+", value.lower())) or "section"
+
+
+def _m6_governed_references(services: WorkflowServices) -> tuple[GovernedReference, ...]:
+    if services.reference_pack is None:
+        return ()
+    pack = load_reference_pack(services.reference_pack)
+    return tuple(
+        GovernedReference(
+            reference_id=f"REF-{item.path.replace('/', '-').replace('.', '-').upper()}",
+            kind=item.kind,
+            title=item.path,
+            precedence=item.kind,
+            digest=item.sha256,
+        )
+        for item in pack.files
+        if item.path != "manifest.yaml"
+    )
+
+
+def content_ledger_node(state: WorkflowState, services: WorkflowServices) -> WorkflowState:
+    normalized = _as_normalized(state["normalized"])
+    sections, _pack_id, _pack_version, _template_id, _template_version = _m6_reference_contract(
+        services
+    )
+    ledger = build_content_ledger(
+        normalized,
+        document_id=str(state["document_id"]),
+        target_sections=sections,
+    )
+    source_blocks = normalized.raw.blocks
+    source_ids = [block.span_id.upper() for block in source_blocks]
+    source_texts = {block.span_id.upper(): block.text for block in source_blocks}
+    coverage = validate_content_ledger(ledger, source_ids, source_texts=source_texts)
+    if not coverage.valid:
+        raise ValidationError("content ledger coverage failed: " + "; ".join(coverage.errors))
+    state["content_ledger"] = ledger
+    from document_enhancer.artifacts.atomic import atomic_write_bytes, atomic_write_json
+
+    assert services.checkpoint is not None
+    payload = ledger.model_dump(mode="json")
+
+    def write_ledger() -> None:
+        jsonl = "".join(
+            json.dumps(entry.model_dump(mode="json"), sort_keys=True) + "\n"
+            for entry in ledger.entries
+        )
+        atomic_write_bytes(
+            services.paths.artifact_path("output/content-ledger.jsonl"), jsonl.encode("utf-8")
+        )
+        atomic_write_json(services.paths.artifact_path("output/content-ledger.json"), payload)
+
+    services.checkpoint.side_effect_once("content_ledger", "content-ledger", payload, write_ledger)
+    return _finish_stage(state, services, "content_ledger")
+
+
+def rewrite_inputs_node(state: WorkflowState, services: WorkflowServices) -> WorkflowState:
+    normalized = _as_normalized(state["normalized"])
+    ledger = _as_ledger(state["content_ledger"])
+    sections, _pack_id, _pack_version, _template_id, _template_version = _m6_reference_contract(
+        services
+    )
+    questions, answers, steering, waivers = _load_reviewer_inputs(state, services)
+    del questions, waivers
+    checklist = _as_checklist(state.get("checklist"))
+    inputs = build_rewrite_inputs(
+        normalized,
+        ledger,
+        sections=sections,
+        answers=answers,
+        steering=steering,
+        checklist=checklist,
+        governed_references=_m6_governed_references(services),
+    )
+    state["rewrite_inputs"] = list(inputs)
+    from document_enhancer.artifacts.atomic import atomic_write_json
+
+    assert services.checkpoint is not None
+    payload = [item.model_dump(mode="json") for item in inputs]
+    services.checkpoint.side_effect_once(
+        "rewrite_inputs",
+        "rewrite-inputs",
+        payload,
+        lambda: (
+            atomic_write_json(services.paths.artifact_path("output/rewrite-inputs.json"), payload),
+            None,
+        )[1],
+    )
+    return _finish_stage(state, services, "rewrite_inputs")
+
+
+def rewrite_model_node(state: WorkflowState, services: WorkflowServices) -> WorkflowState:
+    inputs = _as_rewrite_inputs(state["rewrite_inputs"])
+    ledger = _as_ledger(state["content_ledger"])
+    _sections, pack_id, pack_version, template_id, template_version = _m6_reference_contract(
+        services
+    )
+    counters = _as_revision_counters(state.get("revision_counters"), services).consume_rewrite()
+    if services.rewrite_runner is not None:
+        candidate = services.rewrite_runner(inputs)
+        if isinstance(candidate, Mapping) and "model" in candidate:
+            candidate = cast(Mapping[str, object], candidate)["model"]
+        model = _as_enhanced_model(candidate)
+    else:
+        model = build_enhanced_document(
+            inputs,
+            document_id=str(state["document_id"]),
+            document_type=services.document_type,
+            reference_pack_id=pack_id,
+            reference_pack_version=pack_version,
+            template_id=template_id,
+            template_version=template_version,
+            ledger=ledger,
+            revision_counters=counters,
+        )
+    model = model.model_copy(update={"revision_counters": counters})
+    state["revision_counters"] = counters
+    state["enhanced_model"] = model
+    from document_enhancer.artifacts.atomic import atomic_write_bytes, atomic_write_json
+
+    assert services.checkpoint is not None
+    payload = model.model_dump(mode="json")
+
+    def write_model() -> None:
+        atomic_write_json(services.paths.artifact_path("output/enhanced-model.json"), payload)
+        atomic_write_bytes(
+            services.paths.artifact_path("output/open-issues.yaml"),
+            json.dumps(
+                {"issues": [issue.model_dump(mode="json") for issue in model.open_issues]},
+                indent=2,
+                sort_keys=True,
+            ).encode("utf-8")
+            + b"\n",
+        )
+
+    services.checkpoint.side_effect_once("rewrite_model", "enhanced-model", payload, write_model)
+    return _finish_stage(state, services, "rewrite_model")
+
+
+def render_node(state: WorkflowState, services: WorkflowServices) -> WorkflowState:
+    model = _as_enhanced_model(state["enhanced_model"])
+    if services.reference_pack is None:
+        from document_enhancer.references.loader import bundled_reference_pack_path
+
+        reference_pack = bundled_reference_pack_path()
+    else:
+        reference_pack = services.reference_pack
+    markdown = render_enhanced_markdown(model, reference_pack=reference_pack)
+    digest = hashlib.sha256(markdown.encode("utf-8")).hexdigest()
+    version = model.version.model_copy(update={"enhanced_digest": digest})
+    model = model.model_copy(update={"version": version, "markdown_digest": digest})
+    state["enhanced_model"] = model
+    from document_enhancer.artifacts.atomic import atomic_write_bytes, atomic_write_json
+
+    assert services.checkpoint is not None
+    payload = {"digest": digest, "markdown_artifact": model.markdown_artifact}
+
+    def write_render() -> None:
+        atomic_write_bytes(
+            services.paths.artifact_path("output/enhanced.md"), markdown.encode("utf-8")
+        )
+        atomic_write_json(
+            services.paths.artifact_path("output/enhanced-model.json"),
+            model.model_dump(mode="json"),
+        )
+
+    services.checkpoint.side_effect_once("render", "enhanced-markdown", payload, write_render)
+    return _finish_stage(state, services, "render")
+
+
+def semantic_node(state: WorkflowState, services: WorkflowServices) -> WorkflowState:
+    model = _as_enhanced_model(state["enhanced_model"])
+    semantic = build_semantic_document(model)
+    state["semantic_document"] = semantic
+    from document_enhancer.artifacts.atomic import atomic_write_bytes
+
+    assert services.checkpoint is not None
+    payload = semantic.model_dump(mode="json")
+    services.checkpoint.side_effect_once(
+        "semantic",
+        "semantic-sidecar",
+        payload,
+        lambda: (
+            atomic_write_bytes(
+                services.paths.artifact_path("output/enhanced.semantic.yaml"),
+                model_to_yaml(semantic).encode("utf-8"),
+            ),
+            None,
+        )[1],
+    )
+    return _finish_stage(state, services, "semantic")
+
+
+def mermaid_validate_node(state: WorkflowState, services: WorkflowServices) -> WorkflowState:
+    model = _as_enhanced_model(state["enhanced_model"])
+    results = []
+    for diagram in model.mermaid:
+        errors = validate_mermaid(diagram)
+        if errors:
+            raise ValidationError(
+                f"Mermaid validation failed for {diagram.diagram_id}: {'; '.join(errors)}"
+            )
+        results.append({"diagram_id": diagram.diagram_id, "valid": True, "errors": []})
+    state["mermaid_validation"] = results
+    from document_enhancer.artifacts.atomic import atomic_write_json
+
+    assert services.checkpoint is not None
+    services.checkpoint.side_effect_once(
+        "mermaid_validate",
+        "mermaid-validation",
+        results,
+        lambda: (
+            atomic_write_json(
+                services.paths.artifact_path("output/mermaid-validation.json"), results
+            ),
+            None,
+        )[1],
+    )
+    return _finish_stage(state, services, "mermaid_validate")
+
+
 def complete_node(state: WorkflowState, services: WorkflowServices) -> WorkflowState:
     state["status"] = "succeeded"
     state["current_stage"] = "complete"
@@ -558,9 +875,11 @@ __all__ = [
     "WorkflowServices",
     "analysis_node",
     "checklist_node",
+    "content_ledger_node",
     "complete_node",
     "gate1_node",
     "gate2_node",
+    "mermaid_validate_node",
     "normalize_node",
     "question_synthesis_node",
     "raw_ingest_node",
@@ -569,4 +888,8 @@ __all__ = [
     "structure_recovery_node",
     "structure_scan_node",
     "structure_validate_node",
+    "rewrite_inputs_node",
+    "rewrite_model_node",
+    "render_node",
+    "semantic_node",
 ]
