@@ -253,6 +253,42 @@ def _reviewer_input(
     }
 
 
+def _promote_questions(
+    baseline: QuestionsArtifact,
+    value: object,
+) -> QuestionsArtifact:
+    """Constrain provider questions to deterministic identity, findings, and evidence handles."""
+
+    artifact = QuestionsArtifact.model_validate(value)
+    if artifact.document_id != baseline.document_id:
+        raise ValidationError("question generator returned a different document identity")
+    allowed_evidence = {
+        (evidence.span_id, evidence.quote)
+        for question in baseline.questions
+        for evidence in question.evidence
+    }
+    for question in artifact.questions:
+        if any(
+            (evidence.span_id, evidence.quote) not in allowed_evidence
+            for evidence in question.evidence
+        ):
+            raise ValidationError(
+                "question generator cited evidence outside the deterministic baseline"
+            )
+    required_findings = {
+        finding_id
+        for question in baseline.questions
+        if question.blocking
+        for finding_id in question.source_finding_ids
+    }
+    returned_findings = {
+        finding_id for question in artifact.questions for finding_id in question.source_finding_ids
+    }
+    if not required_findings.issubset(returned_findings):
+        raise ValidationError("question generator omitted a deterministic blocking finding")
+    return artifact
+
+
 def _invoke(
     composer: PromptPackComposer,
     gateway: GeminiModelGateway,
@@ -329,29 +365,10 @@ class GeminiQuestionGenerator:
             },
             stage="clarification_questions",
             input_digests=(normalized.raw.source_digest, _json_digest(question_input)),
+            promote=lambda value: _promote_questions(baseline, value),
+            result_schema=QuestionsArtifact,
         )
-        if artifact.document_id != baseline.document_id:
-            raise ValidationError("question generator returned a different document identity")
-        # The strict domain evidence contract canonicalizes span identifiers to uppercase while
-        # deterministic ingestion retains its lowercase content-addressed representation.
-        known_spans = {block.span_id.upper() for block in normalized.raw.blocks}
-        for question in artifact.questions:
-            if any(item.span_id not in known_spans for item in question.evidence):
-                raise ValidationError("question generator cited an unknown source span")
-        required_findings = {
-            finding_id
-            for question in baseline.questions
-            if question.blocking
-            for finding_id in question.source_finding_ids
-        }
-        returned_findings = {
-            finding_id
-            for question in artifact.questions
-            for finding_id in question.source_finding_ids
-        }
-        if not required_findings.issubset(returned_findings):
-            raise ValidationError("question generator omitted a deterministic blocking finding")
-        return artifact
+        return QuestionsArtifact.model_validate(artifact)
 
 
 class GeminiChecklistGenerator:

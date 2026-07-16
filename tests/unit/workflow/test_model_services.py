@@ -4,6 +4,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
 
+import pytest
+
 from document_enhancer.clarification import build_rewrite_checklist, synthesize_questions
 from document_enhancer.domain.analysis import EvidenceQuote, Finding, FindingSet
 from document_enhancer.domain.enums import (
@@ -19,6 +21,7 @@ from document_enhancer.domain.questions import (
     Steering,
     WaiversArtifact,
 )
+from document_enhancer.errors import ValidationError
 from document_enhancer.ingest.pipeline import ingest_source
 from document_enhancer.llm import GeminiModelGateway
 from document_enhancer.prompting import PromptPackComposer, load_prompt_pack
@@ -40,7 +43,11 @@ class _CapturingGateway:
 
     def invoke(self, **kwargs: Any) -> SimpleNamespace:
         self.calls.append(kwargs)
-        return SimpleNamespace(artifact=self.artifact)
+        artifact = self.artifact
+        promote = kwargs.get("promote")
+        if callable(promote):
+            artifact = promote(artifact)
+        return SimpleNamespace(artifact=artifact)
 
 
 def _composer(document_type: str = "process") -> PromptPackComposer:
@@ -117,6 +124,40 @@ def test_question_generator_sends_baseline_and_referenced_findings_not_full_fano
     assert input_digests[0] == normalized.raw.source_digest
     assert len(input_digests) == 2
     assert all(len(digest) == 64 for digest in input_digests)
+
+
+def test_question_generator_rejects_evidence_outside_deterministic_baseline(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "messy.md"
+    source.write_text("# Control review\n\nThe control owner is absent.\n", encoding="utf-8")
+    normalized = ingest_source(source)
+    findings = _finding_set(normalized.raw.blocks[1].span_id)
+    baseline = synthesize_questions(
+        findings,
+        document_id="DOC-STAGE-CONTEXT-001",
+        strict_blocking=True,
+    ).questions
+    invalid_question = baseline.questions[0].model_copy(
+        update={
+            "evidence": [
+                baseline.questions[0]
+                .evidence[0]
+                .model_copy(update={"quote": "provider-invented quote"})
+            ]
+        }
+    )
+    invalid = baseline.model_copy(update={"questions": [invalid_question]})
+
+    with pytest.raises(ValidationError, match="outside the deterministic baseline"):
+        GeminiQuestionGenerator(
+            _composer(), cast(GeminiModelGateway, _CapturingGateway(invalid))
+        ).generate(
+            baseline=baseline,
+            analysis_result=SimpleNamespace(synthesis=SimpleNamespace(finding_set=findings)),
+            normalized=normalized,
+            document_type=DocumentType.PROCESS,
+        )
 
 
 def test_checklist_generator_sends_governed_seed_summaries_and_compact_reviewer_artifacts() -> None:
