@@ -127,7 +127,7 @@ def _proposal(
         "recovery_id": recovery_id,
         "document_id": mapping.domain.document_id,
         "source_digest": raw.source_digest,
-        "confidence": 0.8,
+        "confidence": confidence,
         "sections": [],
         "dispositions": dispositions,
         "associations": [],
@@ -703,6 +703,77 @@ def test_overlapping_window_split_conflict_retains_evidence_and_reconciles_once(
         == 1
     )
     assert len(fake.calls) == len(windows) + 1
+
+
+def test_identical_overlapping_splits_merge_min_confidence_and_mark_uncertain(
+    tmp_path: Path, composer: PromptPackComposer
+) -> None:
+    source = tmp_path / "long-identical-split.md"
+    source.write_text(
+        "# Root\n\n" + "\n\n".join(f"Paragraph {index} stable text." for index in range(28)),
+        encoding="utf-8",
+    )
+    raw = _raw(source)
+    mapping = adapt_raw_document(raw)
+    config = StructureRecoveryConfig(mode="recover", max_window_chars=400)
+    windows = build_recovery_windows(mapping.domain, config)
+    shared_span = next(
+        span_id for span_id in windows[1].span_ids if span_id in set(windows[0].span_ids)
+    )
+    shared_block = next(block for block in mapping.domain.blocks if block.span_id == shared_span)
+    split_high = [
+        _segment_payload(shared_span, shared_block.text, 0, 1, confidence=0.9),
+        _segment_payload(shared_span, shared_block.text, 1, len(shared_block.text), confidence=0.8),
+    ]
+    split_low = [
+        _segment_payload(shared_span, shared_block.text, 0, 1, confidence=0.7),
+        _segment_payload(shared_span, shared_block.text, 1, len(shared_block.text), confidence=0.2),
+    ]
+    split_high[0]["rationale"] = "first-window rationale"
+    split_low[0]["rationale"] = "second-window rationale"
+    shared_occurrence = 0
+    responses: list[object] = []
+    for window in windows:
+        segment_map = None
+        proposal_confidence = 0.8
+        if shared_span in window.span_ids:
+            segment_map = {shared_span: split_high if shared_occurrence == 0 else split_low}
+            proposal_confidence = 0.9 if shared_occurrence == 0 else 0.7
+            shared_occurrence += 1
+        responses.append(
+            _proposal(
+                raw,
+                span_ids=window.span_ids,
+                segments_by_span=segment_map,
+                confidence=proposal_confidence,
+            )
+        )
+    gateway, _ = _gateway(responses)
+
+    result = StructureRecoveryService(
+        config=config,
+        gateway=gateway,
+        prompt_composer=composer,
+    ).run(raw)
+
+    assert result.validation.passed
+    assert result.reconciliation is None
+    assert result.recovered_proposal is not None
+    merged_item = next(
+        item for item in result.recovered_proposal.dispositions if item.span_id == shared_span
+    )
+    assert merged_item.confidence == 0.7
+    assert merged_item.segments is not None
+    assert [segment.confidence for segment in merged_item.segments] == [0.7, 0.2]
+    assert merged_item.segments[0].rationale == "first-window rationale"
+    selected = next(
+        block
+        for block in result.selected_view.blocks
+        if block.source_span_id
+        == next(local for local, domain in mapping.local_to_domain.items() if domain == shared_span)
+    )
+    assert selected.disposition == "uncertain"
+    assert selected.segments is not None and selected.segments[1].confidence == 0.2
 
 
 def test_reconciliation_prompt_change_invalidates_only_reconciliation_stage(

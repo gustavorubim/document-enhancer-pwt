@@ -1077,6 +1077,38 @@ def _conflict_key(item: BlockDisposition) -> tuple[str, str | None, str, bytes]:
     )
 
 
+def _merge_structurally_identical_dispositions(
+    candidates: Sequence[BlockDisposition],
+) -> BlockDisposition:
+    """Merge identical structure while retaining the most conservative confidence."""
+
+    if not candidates:
+        raise StructureValidationFailure("cannot merge an empty disposition candidate set")
+    first = candidates[0]
+    if any(_conflict_key(candidate) != _conflict_key(first) for candidate in candidates[1:]):
+        raise StructureValidationFailure("cannot merge structurally different dispositions")
+    segments = None
+    if first.segments is not None:
+        segments = [
+            segment.model_copy(
+                update={
+                    "confidence": min(
+                        candidate.segments[index].confidence
+                        for candidate in candidates
+                        if candidate.segments is not None
+                    )
+                }
+            )
+            for index, segment in enumerate(first.segments)
+        ]
+    return first.model_copy(
+        update={
+            "confidence": min(candidate.confidence for candidate in candidates),
+            "segments": segments,
+        }
+    )
+
+
 def _dedupe_disagreements(
     disagreements: Sequence[StructureDisagreement],
 ) -> list[StructureDisagreement]:
@@ -1151,7 +1183,7 @@ def merge_window_proposals(
                 )
             )
         else:
-            merged_dispositions.append(first)
+            merged_dispositions.append(_merge_structurally_identical_dispositions(candidates))
     section_by_id: dict[str, Any] = {}
     alternatives: dict[str, Any] = {}
     associations: dict[tuple[str, str, str], StructureAssociation] = {}
