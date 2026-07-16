@@ -91,3 +91,17 @@ def test_path_traversal_in_reference_binding_is_rejected(tmp_path: Path) -> None
     report = validate_prompt_pack(pack)
     assert not report.ok
     assert any("Path traversal" in error or "non-canonical" in error for error in report.errors)
+
+
+def test_unlisted_regular_prompt_like_file_is_rejected(tmp_path: Path) -> None:
+    pack = _copy_pack(tmp_path)
+    extra = pack / ".hidden-prompt.md"
+    extra.write_text("This is an unlisted production instruction.", encoding="utf-8")
+
+    report = validate_prompt_pack(pack)
+
+    assert not report.ok
+    assert any(
+        "every regular prompt-pack file" in error and ".hidden-prompt.md" in error
+        for error in report.errors
+    )

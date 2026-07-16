@@ -82,6 +82,7 @@ class PromptPack:
     manifest: PromptPackManifest
     raw_manifest: Mapping[str, Any]
     file_digests: Mapping[str, str]
+    file_contents: Mapping[str, bytes]
     reference_inputs: Mapping[str, ReferenceInputSpec]
     templates: Mapping[str, PromptTemplate]
     manifest_sha256: str
@@ -91,6 +92,7 @@ class PromptPack:
         object.__setattr__(self, "root", self.root.resolve())
         object.__setattr__(self, "raw_manifest", _freeze(self.raw_manifest))
         object.__setattr__(self, "file_digests", MappingProxyType(dict(self.file_digests)))
+        object.__setattr__(self, "file_contents", MappingProxyType(dict(self.file_contents)))
         object.__setattr__(self, "reference_inputs", MappingProxyType(dict(self.reference_inputs)))
         object.__setattr__(self, "templates", MappingProxyType(dict(self.templates)))
 
@@ -113,3 +115,11 @@ class PromptPack:
             return self.templates[prompt.prompt_id]
         except KeyError as exc:  # pragma: no cover - guarded at load time
             raise KeyError(f"template for prompt {prompt.prompt_id!r} is not loaded") from exc
+
+    def file_bytes(self, relative: str) -> bytes:
+        """Return the load-time immutable bytes for a manifest-owned file."""
+
+        try:
+            return self.file_contents[relative]
+        except KeyError as exc:  # pragma: no cover - guarded at load time
+            raise KeyError(f"file {relative!r} is not loaded") from exc

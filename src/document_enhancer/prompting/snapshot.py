@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+import tempfile
+from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
@@ -86,7 +89,26 @@ def write_prompt_snapshot(path: Path, snapshot: dict[str, Any]) -> None:
 
     safe = _redact(snapshot)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(safe, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    payload = json.dumps(safe, indent=2, sort_keys=True) + "\n"
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
+    )
+    temporary_path = Path(temporary_name)
+    open_descriptor: int | None = descriptor
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as handle:
+            open_descriptor = None
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        temporary_path.replace(path)
+    except BaseException:
+        if open_descriptor is not None:
+            os.close(open_descriptor)
+        raise
+    finally:
+        with suppress(FileNotFoundError):
+            temporary_path.unlink()
 
 
 __all__ = ["build_prompt_snapshot", "write_prompt_snapshot"]

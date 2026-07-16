@@ -147,6 +147,37 @@ def _read_file(root: Path, relative: str, *, max_bytes: int = MAX_FILE_BYTES) ->
     return raw
 
 
+def _read_pack_file(
+    root: Path,
+    relative: str,
+    file_digests: Mapping[str, str],
+    file_contents: Mapping[str, bytes] | None = None,
+) -> bytes:
+    """Read a listed pack file from its immutable snapshot or verify a live read."""
+
+    _safe_relative(root, relative)
+    expected = file_digests.get(relative)
+    if expected is None:
+        raise PromptPackValidationError(
+            f"Prompt-pack file is not listed in manifest.file_digests: {relative}"
+        )
+    if file_contents is None:
+        raw = _read_file(root, relative)
+    else:
+        try:
+            raw = file_contents[relative]
+        except KeyError as exc:
+            raise PromptPackValidationError(
+                f"Prompt-pack immutable file snapshot is missing: {relative}"
+            ) from exc
+    actual = _sha256_bytes(raw)
+    if actual != expected:
+        raise PromptPackValidationError(
+            f"digest mismatch for {relative}: expected {expected}, got {actual}"
+        )
+    return raw
+
+
 def _parse_markdown(raw: bytes, *, relative: str) -> tuple[Mapping[str, Any], str]:
     try:
         text = raw.decode("utf-8")
@@ -170,6 +201,7 @@ def _expand_includes(
     body: str,
     file_digests: Mapping[str, str],
     *,
+    file_contents: Mapping[str, bytes] | None = None,
     stack: tuple[str, ...] = (),
 ) -> str:
     if relative in stack:
@@ -182,13 +214,14 @@ def _expand_includes(
             raise PromptPackValidationError(
                 f"Unresolved prompt include {include!r} referenced by {relative}"
             )
-        raw = _read_file(root, include)
+        raw = _read_pack_file(root, include, file_digests, file_contents)
         _front, included_body = _parse_markdown(raw, relative=include)
         return _expand_includes(
             root,
             include,
             included_body,
             file_digests,
+            file_contents=file_contents,
             stack=(*stack, relative),
         )
 
@@ -200,6 +233,7 @@ def _expand_frontmatter_includes(
     relative: str,
     front_matter: Mapping[str, Any],
     file_digests: Mapping[str, str],
+    file_contents: Mapping[str, bytes] | None = None,
 ) -> str:
     declared = front_matter.get("includes", ())
     if declared in (None, ""):
@@ -212,9 +246,18 @@ def _expand_frontmatter_includes(
             raise PromptPackValidationError(
                 f"Unresolved prompt include {include!r} referenced by {relative}"
             )
-        raw = _read_file(root, include)
+        raw = _read_pack_file(root, include, file_digests, file_contents)
         _front, body = _parse_markdown(raw, relative=include)
-        pieces.append(_expand_includes(root, include, body, file_digests, stack=(relative,)))
+        pieces.append(
+            _expand_includes(
+                root,
+                include,
+                body,
+                file_digests,
+                file_contents=file_contents,
+                stack=(relative,),
+            )
+        )
     return "\n\n".join(pieces)
 
 
@@ -314,14 +357,14 @@ def _load(location: Path) -> PromptPack:
     if not isinstance(raw, Mapping):
         raise PromptPackValidationError("manifest.yaml root must be a mapping")
     raw = dict(raw)
-    if len(raw.get("file_digests", {})) > MAX_PACK_FILES:
-        raise PromptPackSecurityError("Prompt pack contains too many manifest-listed files")
-
     manifest = _manifest_model(raw)
     file_digests_raw = raw.get("file_digests")
     if not isinstance(file_digests_raw, Mapping) or not file_digests_raw:
         raise PromptPackValidationError("manifest.file_digests must list every prompt-pack file")
+    if len(file_digests_raw) > MAX_PACK_FILES:
+        raise PromptPackSecurityError("Prompt pack contains too many manifest-listed files")
     file_digests: dict[str, str] = {}
+    file_contents: dict[str, bytes] = {}
     for relative, expected in file_digests_raw.items():
         if (
             not isinstance(relative, str)
@@ -334,12 +377,25 @@ def _load(location: Path) -> PromptPack:
         path = _safe_relative(root, relative)
         if not path.is_file():
             raise PromptPackValidationError(f"manifest.file_digests lists missing file: {relative}")
-        actual = _sha256_bytes(_read_file(root, relative))
+        actual_bytes = _read_file(root, relative)
+        actual = _sha256_bytes(actual_bytes)
         if actual != expected:
             raise PromptPackValidationError(
                 f"digest mismatch for {relative}: expected {expected}, got {actual}"
             )
         file_digests[relative] = expected
+        file_contents[relative] = actual_bytes
+
+    for path in root.rglob("*"):
+        if not path.is_file() or path.is_symlink():
+            continue
+        relative = path.relative_to(root).as_posix()
+        if relative == "manifest.yaml":
+            continue
+        if relative not in file_digests:
+            raise PromptPackValidationError(
+                f"manifest.file_digests must list every regular prompt-pack file: {relative}"
+            )
 
     required = manifest.required_references
     reference_specs = _load_reference_specs(raw, required)
@@ -354,16 +410,28 @@ def _load(location: Path) -> PromptPack:
                 raise PromptPackValidationError(
                     f"prompt {prompt.prompt_id} shared fragment is not listed: {fragment}"
                 )
-        raw_template = _read_file(root, prompt.template_path)
+        raw_template = _read_pack_file(root, prompt.template_path, file_digests, file_contents)
         front, body = _parse_markdown(raw_template, relative=prompt.template_path)
         for field, expected in (("prompt_id", prompt.prompt_id), ("stage", prompt.stage)):
             if front.get(field) != expected:
                 raise PromptPackValidationError(
                     f"{prompt.template_path} front matter {field!r} does not match manifest"
                 )
-        declared = _expand_frontmatter_includes(root, prompt.template_path, front, file_digests)
+        declared = _expand_frontmatter_includes(
+            root,
+            prompt.template_path,
+            front,
+            file_digests,
+            file_contents,
+        )
         expanded_body = "\n\n".join(part for part in (declared, body) if part)
-        expanded = _expand_includes(root, prompt.template_path, expanded_body, file_digests)
+        expanded = _expand_includes(
+            root,
+            prompt.template_path,
+            expanded_body,
+            file_digests,
+            file_contents=file_contents,
+        )
         templates[prompt.prompt_id] = PromptTemplate(
             path=prompt.template_path,
             digest=file_digests[prompt.template_path],
@@ -378,6 +446,7 @@ def _load(location: Path) -> PromptPack:
         manifest=manifest,
         raw_manifest=raw,
         file_digests=file_digests,
+        file_contents=file_contents,
         reference_inputs=reference_specs,
         templates=templates,
         manifest_sha256=manifest_sha256,
@@ -444,9 +513,20 @@ def _reference_file_digest(reference_pack: ReferencePack, relative: str) -> str:
     for entry in reference_pack.files:
         if entry.path == relative:
             return entry.sha256
-    # ReferencePack.path performs the manifest allow-list and root-constrained check.
+    raise PromptPackValidationError(f"Reference-pack file has no recorded digest: {relative}")
+
+
+def _read_reference_file(reference_pack: ReferencePack, relative: str) -> tuple[bytes, str]:
+    """Read a resolved reference only when its load-time manifest digest still matches."""
+
+    expected = _reference_file_digest(reference_pack, relative)
     raw = reference_pack.path(relative).read_bytes()
-    return _sha256_bytes(raw)
+    actual = _sha256_bytes(raw)
+    if actual != expected:
+        raise PromptPackValidationError(
+            f"reference-pack digest mismatch for {relative}: expected {expected}, got {actual}"
+        )
+    return raw, expected
 
 
 def resolve_reference_inputs(
@@ -505,8 +585,7 @@ def resolve_reference_inputs(
         for relative, reference_id, kind in selected:
             if not relative:
                 continue
-            path = reference_pack.path(relative)
-            raw = path.read_bytes()
+            raw, digest = _read_reference_file(reference_pack, relative)
             try:
                 content = raw.decode("utf-8")
             except UnicodeDecodeError as exc:
@@ -521,7 +600,7 @@ def resolve_reference_inputs(
                     pack_id=reference_pack.pack_id,
                     pack_version=reference_pack.version,
                     pack_sha256=reference_pack.pack_sha256,
-                    sha256=_reference_file_digest(reference_pack, relative),
+                    sha256=digest,
                     size_bytes=len(raw),
                     content=content,
                     reference_id=reference_id,

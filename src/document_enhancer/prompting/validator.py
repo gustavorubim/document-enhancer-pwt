@@ -20,7 +20,7 @@ from .loader import (
     _expand_includes,
     _load,
     _parse_markdown,
-    _read_file,
+    _read_reference_file,
     resolve_reference_inputs,
 )
 from .manifest import PromptPack
@@ -203,16 +203,21 @@ def _prompt_errors(
 
         for fragment in prompt.shared_fragments:
             try:
-                raw_fragment = _read_file(pack.root, fragment)
+                raw_fragment = pack.file_bytes(fragment)
                 front, fragment_body = _parse_markdown(raw_fragment, relative=fragment)
                 declared = _expand_frontmatter_includes(
-                    pack.root, fragment, front, pack.file_digests
+                    pack.root,
+                    fragment,
+                    front,
+                    pack.file_digests,
+                    pack.file_contents,
                 )
                 _expand_includes(
                     pack.root,
                     fragment,
                     "\n\n".join(part for part in (declared, fragment_body) if part),
                     pack.file_digests,
+                    file_contents=pack.file_contents,
                 )
             except PromptPackError as exc:
                 errors.extend(
@@ -248,8 +253,9 @@ def _prompt_errors(
             if file_entry.kind != "rubric":
                 continue
             try:
-                rubric_text = reference_pack.path(file_entry.path).read_text(encoding="utf-8")
-            except (OSError, UnicodeDecodeError):
+                rubric_raw, _digest = _read_reference_file(reference_pack, file_entry.path)
+                rubric_text = rubric_raw.decode("utf-8")
+            except (OSError, UnicodeDecodeError, PromptPackError):
                 continue
             for line in rubric_text.splitlines():
                 normalized = " ".join(line.split())

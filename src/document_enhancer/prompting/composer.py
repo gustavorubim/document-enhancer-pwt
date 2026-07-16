@@ -326,10 +326,14 @@ class PromptPackComposer:
     def _shared_fragments(self, spec: PromptSpec) -> str:
         fragments: list[str] = []
         for relative in spec.shared_fragments:
-            raw = self.pack.root.joinpath(*relative.split("/")).read_bytes()
+            raw = self.pack.file_bytes(relative)
             front, body = _parse_markdown(raw, relative=relative)
             declared = _expand_frontmatter_includes(
-                self.pack.root, relative, front, self.pack.file_digests
+                self.pack.root,
+                relative,
+                front,
+                self.pack.file_digests,
+                self.pack.file_contents,
             )
             fragments.append(
                 _expand_includes(
@@ -337,6 +341,7 @@ class PromptPackComposer:
                     relative,
                     "\n\n".join(part for part in (declared, body) if part),
                     self.pack.file_digests,
+                    file_contents=self.pack.file_contents,
                 )
             )
         return (
