@@ -1,1 +1,87 @@
-"""Model gateway ports and provider adapters."""
+"""Model gateway ports, Gemini adapters, and restricted specialist harnesses."""
+
+from .caching import CacheKey, ResponseCache
+from .callbacks import UsageMetadata
+from .embeddings import (
+    EmbeddingDocument,
+    EmbeddingInputTooLargeError,
+    EmbeddingManifest,
+    EmbeddingProfile,
+    EmbeddingValidationError,
+    GeminiEmbeddingAdapter,
+    format_document,
+    format_query,
+)
+from .models import (
+    BackendName,
+    BudgetExceededError,
+    CallManifest,
+    CallStatus,
+    FakeStructuredModel,
+    GatewayConfigurationError,
+    GeminiGatewayConfig,
+    GeminiModelGateway,
+    ModelLifecycleError,
+    RecordedStructuredModel,
+    RetryClass,
+    StructuredCall,
+    classify_provider_error,
+    is_model_lifecycle_error,
+)
+from .profiles import (
+    EMBEDDING_MODEL,
+    ROUTE_FLASH,
+    ROUTE_FLASH_LITE,
+    ROUTE_PRO_PREVIEW,
+    GeminiRoute,
+    resolve_route,
+)
+from .specialists import (
+    RestrictedSpecialist,
+    RestrictedSpecialistFactory,
+    SpecialistBudget,
+    SpecialistSpec,
+)
+from .structured import GeminiSchemaError, StructuredOutputError, gemini_schema, validate_artifact
+
+__all__ = [
+    "BackendName",
+    "BudgetExceededError",
+    "CacheKey",
+    "CallManifest",
+    "CallStatus",
+    "EmbeddingDocument",
+    "EmbeddingInputTooLargeError",
+    "EmbeddingManifest",
+    "EmbeddingProfile",
+    "EmbeddingValidationError",
+    "EMBEDDING_MODEL",
+    "FakeStructuredModel",
+    "GeminiEmbeddingAdapter",
+    "GeminiGatewayConfig",
+    "GeminiModelGateway",
+    "GeminiRoute",
+    "GeminiSchemaError",
+    "GatewayConfigurationError",
+    "ModelLifecycleError",
+    "ROUTE_FLASH",
+    "ROUTE_FLASH_LITE",
+    "ROUTE_PRO_PREVIEW",
+    "RecordedStructuredModel",
+    "ResponseCache",
+    "RestrictedSpecialist",
+    "RestrictedSpecialistFactory",
+    "RetryClass",
+    "SpecialistBudget",
+    "SpecialistSpec",
+    "StructuredCall",
+    "StructuredOutputError",
+    "UsageMetadata",
+    "classify_provider_error",
+    "format_document",
+    "format_query",
+    "gemini_schema",
+    "is_model_lifecycle_error",
+    "resolve_route",
+    "validate_artifact",
+]
