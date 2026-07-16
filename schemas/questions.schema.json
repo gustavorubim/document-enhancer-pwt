@@ -1,0 +1,249 @@
+{
+  "$defs": {
+    "EvidenceQuote": {
+      "additionalProperties": false,
+      "properties": {
+        "end_offset": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End Offset"
+        },
+        "quote": {
+          "title": "Quote",
+          "type": "string"
+        },
+        "span_id": {
+          "title": "Span Id",
+          "type": "string"
+        },
+        "start_offset": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start Offset"
+        }
+      },
+      "required": [
+        "span_id",
+        "quote"
+      ],
+      "title": "EvidenceQuote",
+      "type": "object"
+    },
+    "Question": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed_statuses": {
+          "items": {
+            "$ref": "#/$defs/QuestionStatus"
+          },
+          "title": "Allowed Statuses",
+          "type": "array"
+        },
+        "blocking": {
+          "title": "Blocking",
+          "type": "boolean"
+        },
+        "category": {
+          "$ref": "#/$defs/QuestionCategory"
+        },
+        "depends_on_question_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Depends On Question Ids",
+          "type": "array"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceQuote"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "examples": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Examples",
+          "type": "array"
+        },
+        "expected_answer_shape": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected Answer Shape"
+        },
+        "priority": {
+          "$ref": "#/$defs/QuestionPriority"
+        },
+        "proposed_safe_default": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Proposed Safe Default"
+        },
+        "question": {
+          "title": "Question",
+          "type": "string"
+        },
+        "question_id": {
+          "title": "Question Id",
+          "type": "string"
+        },
+        "target_object_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Object Id"
+        },
+        "target_section_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Section Id"
+        },
+        "why_it_matters": {
+          "title": "Why It Matters",
+          "type": "string"
+        }
+      },
+      "required": [
+        "question_id",
+        "category",
+        "priority",
+        "blocking",
+        "question",
+        "why_it_matters"
+      ],
+      "title": "Question",
+      "type": "object"
+    },
+    "QuestionCategory": {
+      "enum": [
+        "missing",
+        "ambiguity",
+        "conflict",
+        "validation",
+        "ownership",
+        "control",
+        "calculation",
+        "dependency",
+        "exception",
+        "steering"
+      ],
+      "title": "QuestionCategory",
+      "type": "string"
+    },
+    "QuestionPriority": {
+      "enum": [
+        "blocking",
+        "high",
+        "medium",
+        "low"
+      ],
+      "title": "QuestionPriority",
+      "type": "string"
+    },
+    "QuestionStatus": {
+      "enum": [
+        "open",
+        "answered",
+        "deferred",
+        "not_applicable",
+        "waived"
+      ],
+      "title": "QuestionStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "digest": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Digest"
+    },
+    "document_id": {
+      "pattern": "^DOC-[A-Z0-9-]+$",
+      "title": "Document Id",
+      "type": "string"
+    },
+    "generated_at": {
+      "format": "date-time",
+      "title": "Generated At",
+      "type": "string"
+    },
+    "questions": {
+      "items": {
+        "$ref": "#/$defs/Question"
+      },
+      "title": "Questions",
+      "type": "array"
+    },
+    "version_id": {
+      "anyOf": [
+        {
+          "pattern": "^(DOCV|VER)-[A-Z0-9-]+$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Version Id"
+    }
+  },
+  "required": [
+    "document_id"
+  ],
+  "title": "QuestionsArtifact",
+  "type": "object"
+}

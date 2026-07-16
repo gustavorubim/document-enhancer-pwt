@@ -1,0 +1,19 @@
+document_id: DOC-FIXTURE-0001
+version_id: DOCV-FIXTURE-0001-001
+questions:
+  - question_id: Q-FIXTURE-001
+    category: ownership
+    priority: high
+    blocking: true
+    question: Who owns the documented process?
+    why_it_matters: An accountable owner is required for governance.
+    evidence: []
+    target_section_id: SEC-FIXTURE-001
+    target_object_id: null
+    expected_answer_shape: A stable ROLE identifier.
+    examples: [ROLE-PROCESS-OWNER]
+    allowed_statuses: [answered, deferred, not_applicable, waived]
+    depends_on_question_ids: []
+    proposed_safe_default: null
+generated_at: 2026-07-15T12:00:00Z
+digest: null

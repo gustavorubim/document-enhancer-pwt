@@ -1,0 +1,7565 @@
+{
+  "$defs": {
+    "Activity": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "entity_type": {
+          "const": "Activity",
+          "default": "Activity",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "provisional": {
+          "default": false,
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provenance"
+      ],
+      "title": "Activity",
+      "type": "object"
+    },
+    "Approval": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "entity_type": {
+          "const": "Approval",
+          "default": "Approval",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "provisional": {
+          "default": false,
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provenance"
+      ],
+      "title": "Approval",
+      "type": "object"
+    },
+    "Assumption": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "applies_to_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Applies To Ids",
+          "type": "array"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "entity_type": {
+          "const": "Assumption",
+          "default": "Assumption",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "owner_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Owner Id"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "provisional": {
+          "default": false,
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "review_frequency": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Review Frequency"
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "risk_if_violated": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Risk If Violated"
+        },
+        "statement": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Statement"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validation_method": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Validation Method"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provenance"
+      ],
+      "title": "Assumption",
+      "type": "object"
+    },
+    "Authority": {
+      "enum": [
+        "explicit",
+        "derived",
+        "inferred",
+        "reviewed"
+      ],
+      "title": "Authority",
+      "type": "string"
+    },
+    "Calculator": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "calculator_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Calculator Type"
+        },
+        "criticality": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Criticality"
+        },
+        "entity_type": {
+          "const": "Calculator",
+          "default": "Calculator",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "input_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Input Ids",
+          "type": "array"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "location_reference": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Location Reference"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "output_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Output Ids",
+          "type": "array"
+        },
+        "owner_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Owner Id"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "provisional": {
+          "default": false,
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "recovery_fallback": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Recovery Fallback"
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "using_step_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Using Step Ids",
+          "type": "array"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validation_date": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Validation Date"
+        },
+        "validation_status": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Validation Status"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Version"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provenance"
+      ],
+      "title": "Calculator",
+      "type": "object"
+    },
+    "CompletionCondition": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "condition": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Condition"
+        },
+        "entity_type": {
+          "const": "CompletionCondition",
+          "default": "CompletionCondition",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "provisional": {
+          "default": false,
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provenance"
+      ],
+      "title": "CompletionCondition",
+      "type": "object"
+    },
+    "Control": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "entity_type": {
+          "const": "Control",
+          "default": "Control",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "escalation_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Escalation Id"
+        },
+        "evidence_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "execution_frequency": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Execution Frequency"
+        },
+        "failure_response": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Failure Response"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "objective": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Objective"
+        },
+        "owner_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Owner Id"
+        },
+        "performer_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Performer Id"
+        },
+        "procedure_or_step_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Procedure Or Step Id"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "provisional": {
+          "default": false,
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "risk_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Risk Ids",
+          "type": "array"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provenance"
+      ],
+      "title": "Control",
+      "type": "object"
+    },
+    "DataAsset": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "entity_type": {
+          "const": "DataAsset",
+          "default": "DataAsset",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "provisional": {
+          "default": false,
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provenance"
+      ],
+      "title": "DataAsset",
+      "type": "object"
+    },
+    "DataElement": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "entity_type": {
+          "const": "DataElement",
+          "default": "DataElement",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "provisional": {
+          "default": false,
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provenance"
+      ],
+      "title": "DataElement",
+      "type": "object"
+    },
+    "Decision": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "branch_target_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Branch Target Ids",
+          "type": "array"
+        },
+        "condition_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Condition Ids",
+          "type": "array"
+        },
+        "decision_owner_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Decision Owner Id"
+        },
+        "entity_type": {
+          "const": "Decision",
+          "default": "Decision",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "evidence_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "outcomes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Outcomes",
+          "type": "array"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "provisional": {
+          "default": false,
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "rule_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Rule Ids",
+          "type": "array"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provenance"
+      ],
+      "title": "Decision",
+      "type": "object"
+    },
+    "Dependency": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "dependency_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dependency Type"
+        },
+        "entity_type": {
+          "const": "Dependency",
+          "default": "Dependency",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "escalation_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Escalation Id"
+        },
+        "failure_impact": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Failure Impact"
+        },
+        "fallback": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fallback"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "provider_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Provider Id"
+        },
+        "provisional": {
+          "default": false,
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "readiness_condition": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Readiness Condition"
+        },
+        "required_object_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Required Object Id"
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "timing": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Timing"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provenance"
+      ],
+      "title": "Dependency",
+      "type": "object"
+    },
+    "DocumentIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "document_type": {
+          "$ref": "#/$defs/DocumentType"
+        },
+        "entity_type": {
+          "const": "DocumentIdentity",
+          "default": "DocumentIdentity",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "namespace": {
+          "default": "default",
+          "title": "Namespace",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "provisional": {
+          "default": false,
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "source_digest": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Digest"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provenance",
+        "document_type"
+      ],
+      "title": "DocumentIdentity",
+      "type": "object"
+    },
+    "DocumentType": {
+      "enum": [
+        "process",
+        "methodology",
+        "standard",
+        "desktop_procedure"
+      ],
+      "title": "DocumentType",
+      "type": "string"
+    },
+    "DocumentVersion": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "confidentiality": {
+          "default": "internal",
+          "title": "Confidentiality",
+          "type": "string"
+        },
+        "document_id": {
+          "pattern": "^DOC-[A-Z0-9-]+$",
+          "title": "Document Id",
+          "type": "string"
+        },
+        "effective_dates": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "enhanced_digest": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Enhanced Digest"
+        },
+        "entity_type": {
+          "const": "DocumentVersion",
+          "default": "DocumentVersion",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "provisional": {
+          "default": false,
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "source_digest": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Digest"
+        },
+        "status": {
+          "$ref": "#/$defs/VersionStatus"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "version": {
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provenance",
+        "document_id",
+        "version",
+        "status"
+      ],
+      "title": "DocumentVersion",
+      "type": "object"
+    },
+    "EntityType": {
+      "enum": [
+        "DocumentIdentity",
+        "DocumentVersion",
+        "Section",
+        "Statement",
+        "Table",
+        "Figure",
+        "Process",
+        "ProcessStep",
+        "Methodology",
+        "MethodologyStep",
+        "Activity",
+        "Decision",
+        "Trigger",
+        "Requirement",
+        "Control",
+        "Risk",
+        "Policy",
+        "Standard",
+        "Regulation",
+        "Approval",
+        "Evidence",
+        "Record",
+        "Role",
+        "Organization",
+        "EscalationPath",
+        "System",
+        "DataAsset",
+        "DataElement",
+        "Input",
+        "Output",
+        "Calculator",
+        "Model",
+        "Parameter",
+        "Rule",
+        "Metric",
+        "Threshold",
+        "Formula",
+        "ServiceLevel",
+        "Assumption",
+        "Limitation",
+        "Exception",
+        "Dependency",
+        "Precondition",
+        "CompletionCondition",
+        "GlossaryTerm"
+      ],
+      "title": "EntityType",
+      "type": "string"
+    },
+    "EscalationPath": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "entity_type": {
+          "const": "EscalationPath",
+          "default": "EscalationPath",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "provisional": {
+          "default": false,
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provenance"
+      ],
+      "title": "EscalationPath",
+      "type": "object"
+    },
+    "Evidence": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "as_of_date": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "As Of Date"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "entity_type": {
+          "const": "Evidence",
+          "default": "Evidence",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "evidence_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evidence Type"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "linked_control_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Linked Control Ids",
+          "type": "array"
+        },
+        "linked_decision_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Linked Decision Ids",
+          "type": "array"
+        },
+        "linked_step_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Linked Step Ids",
+          "type": "array"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "producer_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Producer Id"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "provisional": {
+          "default": false,
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "retention": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Retention"
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "reviewer_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reviewer Id"
+        },
+        "storage_reference": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Storage Reference"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provenance"
+      ],
+      "title": "Evidence",
+      "type": "object"
+    },
+    "EvidenceQuote": {
+      "additionalProperties": false,
+      "properties": {
+        "end_offset": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End Offset"
+        },
+        "quote": {
+          "title": "Quote",
+          "type": "string"
+        },
+        "span_id": {
+          "title": "Span Id",
+          "type": "string"
+        },
+        "start_offset": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start Offset"
+        }
+      },
+      "required": [
+        "span_id",
+        "quote"
+      ],
+      "title": "EvidenceQuote",
+      "type": "object"
+    },
+    "Exception": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "applies_to_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Applies To Ids",
+          "type": "array"
+        },
+        "approval_required": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Approval Required"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "authorized_role_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Authorized Role Id"
+        },
+        "entity_type": {
+          "const": "Exception",
+          "default": "Exception",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "evidence_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "justification": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Justification"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "provisional": {
+          "default": false,
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "review_or_expiry": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provenance"
+      ],
+      "title": "Exception",
+      "type": "object"
+    },
+    "Figure": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "asset_digest": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Asset Digest"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "caption": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Caption"
+        },
+        "entity_type": {
+          "const": "Figure",
+          "default": "Figure",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "provisional": {
+          "default": false,
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provenance"
+      ],
+      "title": "Figure",
+      "type": "object"
+    },
+    "Finding": {
+      "additionalProperties": false,
+      "properties": {
+        "blocking": {
+          "default": false,
+          "title": "Blocking",
+          "type": "boolean"
+        },
+        "category": {
+          "title": "Category",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceQuote"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "finding_id": {
+          "title": "Finding Id",
+          "type": "string"
+        },
+        "finding_type": {
+          "$ref": "#/$defs/FindingType"
+        },
+        "impact": {
+          "title": "Impact",
+          "type": "string"
+        },
+        "proposed_disposition": {
+          "title": "Proposed Disposition",
+          "type": "string"
+        },
+        "requirement_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Requirement Id"
+        },
+        "requires_human_answer": {
+          "title": "Requires Human Answer",
+          "type": "boolean"
+        },
+        "severity": {
+          "$ref": "#/$defs/FindingSeverity"
+        },
+        "target_object_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Object Id"
+        },
+        "target_template_section": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Template Section"
+        }
+      },
+      "required": [
+        "finding_id",
+        "category",
+        "severity",
+        "finding_type",
+        "impact",
+        "proposed_disposition",
+        "requires_human_answer"
+      ],
+      "title": "Finding",
+      "type": "object"
+    },
+    "FindingSeverity": {
+      "enum": [
+        "blocker",
+        "high",
+        "medium",
+        "low",
+        "informational"
+      ],
+      "title": "FindingSeverity",
+      "type": "string"
+    },
+    "FindingType": {
+      "enum": [
+        "missing",
+        "ambiguous",
+        "conflicting",
+        "duplicate",
+        "vague",
+        "unsupported",
+        "noncompliant",
+        "extraction_risk",
+        "improvement"
+      ],
+      "title": "FindingType",
+      "type": "string"
+    },
+    "Formula": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "entity_type": {
+          "const": "Formula",
+          "default": "Formula",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "provisional": {
+          "default": false,
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provenance"
+      ],
+      "title": "Formula",
+      "type": "object"
+    },
+    "GlossaryTerm": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "definition": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Definition"
+        },
+        "entity_type": {
+          "const": "GlossaryTerm",
+          "default": "GlossaryTerm",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "preferred_term": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Preferred Term"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "provisional": {
+          "default": false,
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provenance"
+      ],
+      "title": "GlossaryTerm",
+      "type": "object"
+    },
+    "Input": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "entity_type": {
+          "const": "Input",
+          "default": "Input",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "provisional": {
+          "default": false,
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provenance"
+      ],
+      "title": "Input",
+      "type": "object"
+    },
+    "Layer": {
+      "enum": [
+        "authoritative",
+        "governed",
+        "extracted",
+        "retrieval"
+      ],
+      "title": "Layer",
+      "type": "string"
+    },
+    "Limitation": {
+      "additionalProperties": false,
+      "properties": {
+        "affected_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Affected Ids",
+          "type": "array"
+        },
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "disclosure_requirements": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Disclosure Requirements"
+        },
+        "entity_type": {
+          "const": "Limitation",
+          "default": "Limitation",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "impact": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Impact"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "mitigation": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mitigation"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "provisional": {
+          "default": false,
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "statement": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Statement"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provenance"
+      ],
+      "title": "Limitation",
+      "type": "object"
+    },
+    "Methodology": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "entity_type": {
+          "const": "Methodology",
+          "default": "Methodology",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "provisional": {
+          "default": false,
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provenance"
+      ],
+      "title": "Methodology",
+      "type": "object"
+    },
+    "MethodologyStep": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "assumption_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Assumption Ids",
+          "type": "array"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "entity_type": {
+          "const": "MethodologyStep",
+          "default": "MethodologyStep",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "failure_conditions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Failure Conditions",
+          "type": "array"
+        },
+        "formula_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Formula Ids",
+          "type": "array"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "implementation_reference": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Implementation Reference"
+        },
+        "input_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Input Ids",
+          "type": "array"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "limitation_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Limitation Ids",
+          "type": "array"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "objective": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Objective"
+        },
+        "output_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Output Ids",
+          "type": "array"
+        },
+        "parameter_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Parameter Ids",
+          "type": "array"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "provisional": {
+          "default": false,
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "transformation": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Transformation"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validation_checks": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Validation Checks",
+          "type": "array"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provenance"
+      ],
+      "title": "MethodologyStep",
+      "type": "object"
+    },
+    "Metric": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "entity_type": {
+          "const": "Metric",
+          "default": "Metric",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "provisional": {
+          "default": false,
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provenance"
+      ],
+      "title": "Metric",
+      "type": "object"
+    },
+    "Model": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "entity_type": {
+          "const": "Model",
+          "default": "Model",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "provisional": {
+          "default": false,
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provenance"
+      ],
+      "title": "Model",
+      "type": "object"
+    },
+    "Organization": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "entity_type": {
+          "const": "Organization",
+          "default": "Organization",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "provisional": {
+          "default": false,
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provenance"
+      ],
+      "title": "Organization",
+      "type": "object"
+    },
+    "Output": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "entity_type": {
+          "const": "Output",
+          "default": "Output",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "provisional": {
+          "default": false,
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provenance"
+      ],
+      "title": "Output",
+      "type": "object"
+    },
+    "Parameter": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "entity_type": {
+          "const": "Parameter",
+          "default": "Parameter",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "provisional": {
+          "default": false,
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provenance"
+      ],
+      "title": "Parameter",
+      "type": "object"
+    },
+    "Policy": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "entity_type": {
+          "const": "Policy",
+          "default": "Policy",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "provisional": {
+          "default": false,
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provenance"
+      ],
+      "title": "Policy",
+      "type": "object"
+    },
+    "Precondition": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "condition": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Condition"
+        },
+        "entity_type": {
+          "const": "Precondition",
+          "default": "Precondition",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "provisional": {
+          "default": false,
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provenance"
+      ],
+      "title": "Precondition",
+      "type": "object"
+    },
+    "Process": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "entity_type": {
+          "const": "Process",
+          "default": "Process",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "provisional": {
+          "default": false,
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provenance"
+      ],
+      "title": "Process",
+      "type": "object"
+    },
+    "ProcessStep": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Action"
+        },
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "calculator_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Calculator Ids",
+          "type": "array"
+        },
+        "completion_condition_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Completion Condition Id"
+        },
+        "control_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Control Ids",
+          "type": "array"
+        },
+        "data_asset_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Data Asset Ids",
+          "type": "array"
+        },
+        "decision_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Decision Ids",
+          "type": "array"
+        },
+        "entity_type": {
+          "const": "ProcessStep",
+          "default": "ProcessStep",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "exception_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Exception Ids",
+          "type": "array"
+        },
+        "failure_path_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Failure Path Id"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "input_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Input Ids",
+          "type": "array"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "next_step_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Step Id"
+        },
+        "output_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Output Ids",
+          "type": "array"
+        },
+        "performer_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Performer Ids",
+          "type": "array"
+        },
+        "precondition_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Precondition Ids",
+          "type": "array"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "provisional": {
+          "default": false,
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "system_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "System Ids",
+          "type": "array"
+        },
+        "trigger_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Trigger Ids",
+          "type": "array"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provenance"
+      ],
+      "title": "ProcessStep",
+      "type": "object"
+    },
+    "Provenance": {
+      "additionalProperties": false,
+      "description": "Mandatory traceability attached to every semantic node and relationship.",
+      "properties": {
+        "authority": {
+          "$ref": "#/$defs/Authority"
+        },
+        "confidence": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Confidence"
+        },
+        "document_id": {
+          "pattern": "^DOC-[A-Z0-9-]+$",
+          "title": "Document Id",
+          "type": "string"
+        },
+        "document_version_id": {
+          "anyOf": [
+            {
+              "pattern": "^(DOCV|VER)-[A-Z0-9-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Document Version Id"
+        },
+        "extracted_at": {
+          "format": "date-time",
+          "title": "Extracted At",
+          "type": "string"
+        },
+        "extraction_method": {
+          "title": "Extraction Method",
+          "type": "string"
+        },
+        "layer": {
+          "$ref": "#/$defs/Layer"
+        },
+        "location": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceLocation"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "origin": {
+          "$ref": "#/$defs/ProvenanceOrigin"
+        },
+        "reference_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reference Id"
+        },
+        "review_status": {
+          "$ref": "#/$defs/ReviewStatus",
+          "default": "unreviewed"
+        },
+        "reviewer_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reviewer Id"
+        },
+        "section_id": {
+          "anyOf": [
+            {
+              "pattern": "^(SEC|PROV-SEC)-[A-Z0-9-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Section Id"
+        },
+        "source_span_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Span Id"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "document_id",
+        "origin",
+        "authority",
+        "layer",
+        "extraction_method"
+      ],
+      "title": "Provenance",
+      "type": "object"
+    },
+    "ProvenanceOrigin": {
+      "enum": [
+        "source",
+        "answer",
+        "steering",
+        "reference",
+        "model"
+      ],
+      "title": "ProvenanceOrigin",
+      "type": "string"
+    },
+    "Record": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "entity_type": {
+          "const": "Record",
+          "default": "Record",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "provisional": {
+          "default": false,
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provenance"
+      ],
+      "title": "Record",
+      "type": "object"
+    },
+    "Regulation": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "entity_type": {
+          "const": "Regulation",
+          "default": "Regulation",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "provisional": {
+          "default": false,
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provenance"
+      ],
+      "title": "Regulation",
+      "type": "object"
+    },
+    "Relationship": {
+      "additionalProperties": false,
+      "description": "A typed edge; arbitrary RELATED_TO edges are intentionally impossible.",
+      "properties": {
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "confidence": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Confidence"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Id"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "overwrites_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Overwrites Id"
+        },
+        "overwrites_layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "relationship_type": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RelationshipType"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "source_id": {
+          "title": "Source Id",
+          "type": "string"
+        },
+        "source_type": {
+          "$ref": "#/$defs/EntityType"
+        },
+        "target_id": {
+          "title": "Target Id",
+          "type": "string"
+        },
+        "target_type": {
+          "$ref": "#/$defs/EntityType"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "source_id",
+        "source_type",
+        "target_id",
+        "target_type",
+        "provenance"
+      ],
+      "title": "Relationship",
+      "type": "object"
+    },
+    "RelationshipType": {
+      "enum": [
+        "HAS_VERSION",
+        "CURRENT_VERSION",
+        "SUPERSEDES",
+        "HAS_SECTION",
+        "CONTAINS_STATEMENT",
+        "CONTAINS_TABLE",
+        "CONTAINS_FIGURE",
+        "DEFINES",
+        "REFERENCES",
+        "GOVERNED_BY",
+        "IMPLEMENTS",
+        "HAS_STEP",
+        "PRECEDES",
+        "NEXT_ON_TRUE",
+        "NEXT_ON_FALSE",
+        "TRIGGERED_BY",
+        "PERFORMED_BY",
+        "ACCOUNTABLE_TO",
+        "APPROVED_BY",
+        "ESCALATES_TO",
+        "CONSUMES",
+        "PRODUCES",
+        "USES",
+        "USES_SYSTEM",
+        "USES_DATA",
+        "USES_CALCULATOR",
+        "DEPENDS_ON",
+        "REQUIRES",
+        "HAS_PRECONDITION",
+        "HAS_COMPLETION_CONDITION",
+        "EVALUATES",
+        "USES_METRIC",
+        "HAS_THRESHOLD",
+        "TRIGGERS",
+        "MITIGATES",
+        "ADDRESSES_RISK",
+        "EXECUTES_CONTROL",
+        "PRODUCES_EVIDENCE",
+        "VALIDATED_BY",
+        "TESTED_BY",
+        "MONITORED_BY",
+        "HAS_ASSUMPTION",
+        "HAS_LIMITATION",
+        "HAS_EXCEPTION",
+        "OVERRIDES",
+        "HAS_PARAMETER",
+        "USES_MODEL",
+        "USES_FORMULA",
+        "DEFINED_BY",
+        "HAS_ALIAS",
+        "RELATED_TO_DOCUMENT"
+      ],
+      "title": "RelationshipType",
+      "type": "string"
+    },
+    "Requirement": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "entity_type": {
+          "const": "Requirement",
+          "default": "Requirement",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "provisional": {
+          "default": false,
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provenance"
+      ],
+      "title": "Requirement",
+      "type": "object"
+    },
+    "ReviewStatus": {
+      "enum": [
+        "unreviewed",
+        "in_review",
+        "accepted",
+        "rejected",
+        "waived",
+        "deprecated"
+      ],
+      "title": "ReviewStatus",
+      "type": "string"
+    },
+    "Risk": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "entity_type": {
+          "const": "Risk",
+          "default": "Risk",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "provisional": {
+          "default": false,
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provenance"
+      ],
+      "title": "Risk",
+      "type": "object"
+    },
+    "Role": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "entity_type": {
+          "const": "Role",
+          "default": "Role",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "provisional": {
+          "default": false,
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provenance"
+      ],
+      "title": "Role",
+      "type": "object"
+    },
+    "Rule": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "condition": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Condition"
+        },
+        "data_element_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Data Element Id"
+        },
+        "entity_type": {
+          "const": "Rule",
+          "default": "Rule",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "escalation_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Escalation Id"
+        },
+        "evaluation_period": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evaluation Period"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "metric_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Metric Id"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "operator": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Operator"
+        },
+        "outcome": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Outcome"
+        },
+        "override_authority_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Override Authority Id"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "provisional": {
+          "default": false,
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "required_evidence_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Required Evidence Ids",
+          "type": "array"
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "threshold_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Threshold Id"
+        },
+        "unit": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Unit"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provenance"
+      ],
+      "title": "Rule",
+      "type": "object"
+    },
+    "Section": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "anchor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Anchor"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "entity_type": {
+          "const": "Section",
+          "default": "Section",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "order": {
+          "minimum": 0,
+          "title": "Order",
+          "type": "integer"
+        },
+        "parent_section_id": {
+          "anyOf": [
+            {
+              "pattern": "^(SEC|PROV-SEC)-[A-Z0-9-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent Section Id"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "provisional": {
+          "default": false,
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provenance",
+        "order"
+      ],
+      "title": "Section",
+      "type": "object"
+    },
+    "ServiceLevel": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "entity_type": {
+          "const": "ServiceLevel",
+          "default": "ServiceLevel",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "provisional": {
+          "default": false,
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provenance"
+      ],
+      "title": "ServiceLevel",
+      "type": "object"
+    },
+    "SourceLocation": {
+      "additionalProperties": false,
+      "description": "Loss-aware location across Markdown, DOCX, PDF, and table sources.",
+      "properties": {
+        "char_end": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Char End"
+        },
+        "char_start": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Char Start"
+        },
+        "column_index": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Column Index"
+        },
+        "line_end": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Line End"
+        },
+        "line_start": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Line Start"
+        },
+        "page": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Page"
+        },
+        "paragraph_index": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Paragraph Index"
+        },
+        "row_index": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Row Index"
+        },
+        "table_index": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Table Index"
+        },
+        "xml_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Xml Path"
+        }
+      },
+      "title": "SourceLocation",
+      "type": "object"
+    },
+    "Standard": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "entity_type": {
+          "const": "Standard",
+          "default": "Standard",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "provisional": {
+          "default": false,
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provenance"
+      ],
+      "title": "Standard",
+      "type": "object"
+    },
+    "Statement": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "entity_type": {
+          "const": "Statement",
+          "default": "Statement",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "provisional": {
+          "default": false,
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Text"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provenance"
+      ],
+      "title": "Statement",
+      "type": "object"
+    },
+    "System": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "entity_type": {
+          "const": "System",
+          "default": "System",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "provisional": {
+          "default": false,
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provenance"
+      ],
+      "title": "System",
+      "type": "object"
+    },
+    "Table": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "entity_type": {
+          "const": "Table",
+          "default": "Table",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "headers": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Headers",
+          "type": "array"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "provisional": {
+          "default": false,
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "source_span_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Span Ids",
+          "type": "array"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provenance"
+      ],
+      "title": "Table",
+      "type": "object"
+    },
+    "TemporalValidity": {
+      "additionalProperties": false,
+      "description": "Inclusive validity interval; open-ended endpoints are allowed.",
+      "properties": {
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        }
+      },
+      "title": "TemporalValidity",
+      "type": "object"
+    },
+    "Threshold": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "entity_type": {
+          "const": "Threshold",
+          "default": "Threshold",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "provisional": {
+          "default": false,
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provenance"
+      ],
+      "title": "Threshold",
+      "type": "object"
+    },
+    "Trigger": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Authority"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "entity_type": {
+          "const": "Trigger",
+          "default": "Trigger",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Layer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "provisional": {
+          "default": false,
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        },
+        "validity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemporalValidity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "provenance"
+      ],
+      "title": "Trigger",
+      "type": "object"
+    },
+    "VersionStatus": {
+      "enum": [
+        "draft",
+        "in_review",
+        "approved",
+        "effective",
+        "superseded",
+        "retired"
+      ],
+      "title": "VersionStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Versioned canonical object graph emitted beside enhanced Markdown.",
+  "properties": {
+    "document": {
+      "$ref": "#/$defs/DocumentIdentity"
+    },
+    "generated_at": {
+      "format": "date-time",
+      "title": "Generated At",
+      "type": "string"
+    },
+    "markdown_artifact": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Markdown Artifact"
+    },
+    "objects": {
+      "items": {
+        "discriminator": {
+          "mapping": {
+            "Activity": "#/$defs/Activity",
+            "Approval": "#/$defs/Approval",
+            "Assumption": "#/$defs/Assumption",
+            "Calculator": "#/$defs/Calculator",
+            "CompletionCondition": "#/$defs/CompletionCondition",
+            "Control": "#/$defs/Control",
+            "DataAsset": "#/$defs/DataAsset",
+            "DataElement": "#/$defs/DataElement",
+            "Decision": "#/$defs/Decision",
+            "Dependency": "#/$defs/Dependency",
+            "DocumentIdentity": "#/$defs/DocumentIdentity",
+            "DocumentVersion": "#/$defs/DocumentVersion",
+            "EscalationPath": "#/$defs/EscalationPath",
+            "Evidence": "#/$defs/Evidence",
+            "Exception": "#/$defs/Exception",
+            "Figure": "#/$defs/Figure",
+            "Formula": "#/$defs/Formula",
+            "GlossaryTerm": "#/$defs/GlossaryTerm",
+            "Input": "#/$defs/Input",
+            "Limitation": "#/$defs/Limitation",
+            "Methodology": "#/$defs/Methodology",
+            "MethodologyStep": "#/$defs/MethodologyStep",
+            "Metric": "#/$defs/Metric",
+            "Model": "#/$defs/Model",
+            "Organization": "#/$defs/Organization",
+            "Output": "#/$defs/Output",
+            "Parameter": "#/$defs/Parameter",
+            "Policy": "#/$defs/Policy",
+            "Precondition": "#/$defs/Precondition",
+            "Process": "#/$defs/Process",
+            "ProcessStep": "#/$defs/ProcessStep",
+            "Record": "#/$defs/Record",
+            "Regulation": "#/$defs/Regulation",
+            "Requirement": "#/$defs/Requirement",
+            "Risk": "#/$defs/Risk",
+            "Role": "#/$defs/Role",
+            "Rule": "#/$defs/Rule",
+            "Section": "#/$defs/Section",
+            "ServiceLevel": "#/$defs/ServiceLevel",
+            "Standard": "#/$defs/Standard",
+            "Statement": "#/$defs/Statement",
+            "System": "#/$defs/System",
+            "Table": "#/$defs/Table",
+            "Threshold": "#/$defs/Threshold",
+            "Trigger": "#/$defs/Trigger"
+          },
+          "propertyName": "entity_type"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/$defs/DocumentIdentity"
+          },
+          {
+            "$ref": "#/$defs/DocumentVersion"
+          },
+          {
+            "$ref": "#/$defs/Section"
+          },
+          {
+            "$ref": "#/$defs/Statement"
+          },
+          {
+            "$ref": "#/$defs/Table"
+          },
+          {
+            "$ref": "#/$defs/Figure"
+          },
+          {
+            "$ref": "#/$defs/Process"
+          },
+          {
+            "$ref": "#/$defs/ProcessStep"
+          },
+          {
+            "$ref": "#/$defs/Methodology"
+          },
+          {
+            "$ref": "#/$defs/MethodologyStep"
+          },
+          {
+            "$ref": "#/$defs/Activity"
+          },
+          {
+            "$ref": "#/$defs/Decision"
+          },
+          {
+            "$ref": "#/$defs/Trigger"
+          },
+          {
+            "$ref": "#/$defs/Requirement"
+          },
+          {
+            "$ref": "#/$defs/Control"
+          },
+          {
+            "$ref": "#/$defs/Risk"
+          },
+          {
+            "$ref": "#/$defs/Policy"
+          },
+          {
+            "$ref": "#/$defs/Standard"
+          },
+          {
+            "$ref": "#/$defs/Regulation"
+          },
+          {
+            "$ref": "#/$defs/Approval"
+          },
+          {
+            "$ref": "#/$defs/Evidence"
+          },
+          {
+            "$ref": "#/$defs/Record"
+          },
+          {
+            "$ref": "#/$defs/Role"
+          },
+          {
+            "$ref": "#/$defs/Organization"
+          },
+          {
+            "$ref": "#/$defs/EscalationPath"
+          },
+          {
+            "$ref": "#/$defs/System"
+          },
+          {
+            "$ref": "#/$defs/DataAsset"
+          },
+          {
+            "$ref": "#/$defs/DataElement"
+          },
+          {
+            "$ref": "#/$defs/Input"
+          },
+          {
+            "$ref": "#/$defs/Output"
+          },
+          {
+            "$ref": "#/$defs/Calculator"
+          },
+          {
+            "$ref": "#/$defs/Model"
+          },
+          {
+            "$ref": "#/$defs/Parameter"
+          },
+          {
+            "$ref": "#/$defs/Rule"
+          },
+          {
+            "$ref": "#/$defs/Metric"
+          },
+          {
+            "$ref": "#/$defs/Threshold"
+          },
+          {
+            "$ref": "#/$defs/Formula"
+          },
+          {
+            "$ref": "#/$defs/ServiceLevel"
+          },
+          {
+            "$ref": "#/$defs/Assumption"
+          },
+          {
+            "$ref": "#/$defs/Limitation"
+          },
+          {
+            "$ref": "#/$defs/Exception"
+          },
+          {
+            "$ref": "#/$defs/Dependency"
+          },
+          {
+            "$ref": "#/$defs/Precondition"
+          },
+          {
+            "$ref": "#/$defs/CompletionCondition"
+          },
+          {
+            "$ref": "#/$defs/GlossaryTerm"
+          }
+        ]
+      },
+      "title": "Objects",
+      "type": "array"
+    },
+    "ontology_version": {
+      "default": "0.1.0",
+      "title": "Ontology Version",
+      "type": "string"
+    },
+    "open_issues": {
+      "items": {
+        "$ref": "#/$defs/Finding"
+      },
+      "title": "Open Issues",
+      "type": "array"
+    },
+    "provisional_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Provisional Ids",
+      "type": "array"
+    },
+    "reference_pack_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reference Pack Id"
+    },
+    "reference_pack_version": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reference Pack Version"
+    },
+    "relationships": {
+      "items": {
+        "$ref": "#/$defs/Relationship"
+      },
+      "title": "Relationships",
+      "type": "array"
+    },
+    "schema_version": {
+      "default": "0.1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "template_id": {
+      "title": "Template Id",
+      "type": "string"
+    },
+    "template_version": {
+      "title": "Template Version",
+      "type": "string"
+    },
+    "validation_passed": {
+      "default": true,
+      "title": "Validation Passed",
+      "type": "boolean"
+    },
+    "version": {
+      "$ref": "#/$defs/DocumentVersion"
+    }
+  },
+  "required": [
+    "document",
+    "version",
+    "template_id",
+    "template_version"
+  ],
+  "title": "SemanticDocument",
+  "type": "object"
+}

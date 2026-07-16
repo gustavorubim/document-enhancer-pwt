@@ -1,0 +1,125 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "additional_requirements": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Additional Requirements",
+      "type": "array"
+    },
+    "confidentiality_constraints": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Confidentiality Constraints",
+      "type": "array"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "desired_tone": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Desired Tone"
+    },
+    "document_id": {
+      "pattern": "^DOC-[A-Z0-9-]+$",
+      "title": "Document Id",
+      "type": "string"
+    },
+    "document_type_override": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Document Type Override"
+    },
+    "exclusions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Exclusions",
+      "type": "array"
+    },
+    "permitted_restructuring": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Permitted Restructuring"
+    },
+    "provided_by": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Provided By"
+    },
+    "steering_id": {
+      "title": "Steering Id",
+      "type": "string"
+    },
+    "target_audience": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Target Audience"
+    },
+    "template_override": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Template Override"
+    },
+    "terminology_preferences": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Terminology Preferences",
+      "type": "object"
+    }
+  },
+  "required": [
+    "steering_id",
+    "document_id"
+  ],
+  "title": "Steering",
+  "type": "object"
+}

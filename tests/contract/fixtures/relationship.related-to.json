@@ -1,0 +1,16 @@
+{
+  "source_id": "PROC-FIXTURE-001",
+  "source_type": "Process",
+  "predicate": "RELATED_TO",
+  "target_id": "RISK-FIXTURE-001",
+  "target_type": "Risk",
+  "provenance": {
+    "document_id": "DOC-FIXTURE-0001",
+    "source_span_id": "SPAN-ABCDEFGH",
+    "origin": "source",
+    "authority": "explicit",
+    "layer": "authoritative",
+    "extraction_method": "fixture",
+    "review_status": "unreviewed"
+  }
+}

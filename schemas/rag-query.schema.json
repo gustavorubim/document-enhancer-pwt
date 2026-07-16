@@ -1,0 +1,78 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "catalog_generation": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Catalog Generation"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "embedding_profile": {
+      "title": "Embedding Profile",
+      "type": "string"
+    },
+    "filters": {
+      "additionalProperties": true,
+      "title": "Filters",
+      "type": "object"
+    },
+    "normalized_question": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Normalized Question"
+    },
+    "query_id": {
+      "title": "Query Id",
+      "type": "string"
+    },
+    "question": {
+      "title": "Question",
+      "type": "string"
+    },
+    "session_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Session Id"
+    },
+    "top_k": {
+      "default": 10,
+      "exclusiveMinimum": 0,
+      "maximum": 1000,
+      "title": "Top K",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "query_id",
+    "question",
+    "embedding_profile"
+  ],
+  "title": "RagQuery",
+  "type": "object"
+}

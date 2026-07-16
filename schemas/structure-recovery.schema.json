@@ -1,0 +1,420 @@
+{
+  "$defs": {
+    "BlockDisposition": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "disposition": {
+          "$ref": "#/$defs/StructureDisposition"
+        },
+        "rationale": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rationale"
+        },
+        "section_id": {
+          "anyOf": [
+            {
+              "pattern": "^(SEC|PROV-SEC)-[A-Z0-9-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Section Id"
+        },
+        "source_text_digest": {
+          "title": "Source Text Digest",
+          "type": "string"
+        },
+        "span_id": {
+          "title": "Span Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "span_id",
+        "disposition",
+        "source_text_digest",
+        "confidence"
+      ],
+      "title": "BlockDisposition",
+      "type": "object"
+    },
+    "BoundaryAlternative": {
+      "additionalProperties": false,
+      "properties": {
+        "alternative_id": {
+          "title": "Alternative Id",
+          "type": "string"
+        },
+        "confidence": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "sections": {
+          "items": {
+            "$ref": "#/$defs/RecoveredSection"
+          },
+          "title": "Sections",
+          "type": "array"
+        }
+      },
+      "required": [
+        "alternative_id",
+        "sections",
+        "confidence",
+        "reason"
+      ],
+      "title": "BoundaryAlternative",
+      "type": "object"
+    },
+    "DocumentType": {
+      "enum": [
+        "process",
+        "methodology",
+        "standard",
+        "desktop_procedure"
+      ],
+      "title": "DocumentType",
+      "type": "string"
+    },
+    "RecoveredSection": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "end_span_id": {
+          "title": "End Span Id",
+          "type": "string"
+        },
+        "inferred_label": {
+          "default": false,
+          "title": "Inferred Label",
+          "type": "boolean"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "level": {
+          "maximum": 9,
+          "minimum": 1,
+          "title": "Level",
+          "type": "integer"
+        },
+        "rationale": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rationale"
+        },
+        "section_id": {
+          "pattern": "^(SEC|PROV-SEC)-[A-Z0-9-]+$",
+          "title": "Section Id",
+          "type": "string"
+        },
+        "source_heading_text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Heading Text"
+        },
+        "start_span_id": {
+          "title": "Start Span Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "section_id",
+        "label",
+        "level",
+        "start_span_id",
+        "end_span_id",
+        "confidence"
+      ],
+      "title": "RecoveredSection",
+      "type": "object"
+    },
+    "StructureAssociation": {
+      "additionalProperties": false,
+      "properties": {
+        "association": {
+          "enum": [
+            "table",
+            "figure",
+            "formula",
+            "caption",
+            "nearby"
+          ],
+          "title": "Association",
+          "type": "string"
+        },
+        "section_id": {
+          "title": "Section Id",
+          "type": "string"
+        },
+        "span_id": {
+          "title": "Span Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "span_id",
+        "section_id",
+        "association"
+      ],
+      "title": "StructureAssociation",
+      "type": "object"
+    },
+    "StructureDisagreement": {
+      "additionalProperties": false,
+      "properties": {
+        "model_label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model Label"
+        },
+        "parser_label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parser Label"
+        },
+        "requires_review": {
+          "default": true,
+          "title": "Requires Review",
+          "type": "boolean"
+        },
+        "resolution": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resolution"
+        },
+        "span_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Span Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "span_ids"
+      ],
+      "title": "StructureDisagreement",
+      "type": "object"
+    },
+    "StructureDisposition": {
+      "enum": [
+        "heading",
+        "body",
+        "list",
+        "table",
+        "figure",
+        "formula",
+        "page_furniture",
+        "table_of_contents",
+        "boilerplate",
+        "uncertain"
+      ],
+      "title": "StructureDisposition",
+      "type": "string"
+    },
+    "StructureValidation": {
+      "additionalProperties": false,
+      "properties": {
+        "covered_span_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Covered Span Ids",
+          "type": "array"
+        },
+        "errors": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Errors",
+          "type": "array"
+        },
+        "passed": {
+          "title": "Passed",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "passed"
+      ],
+      "title": "StructureValidation",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "associations": {
+      "items": {
+        "$ref": "#/$defs/StructureAssociation"
+      },
+      "title": "Associations",
+      "type": "array"
+    },
+    "boundary_alternatives": {
+      "items": {
+        "$ref": "#/$defs/BoundaryAlternative"
+      },
+      "title": "Boundary Alternatives",
+      "type": "array"
+    },
+    "confidence": {
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Confidence",
+      "type": "number"
+    },
+    "disagreements": {
+      "items": {
+        "$ref": "#/$defs/StructureDisagreement"
+      },
+      "title": "Disagreements",
+      "type": "array"
+    },
+    "dispositions": {
+      "items": {
+        "$ref": "#/$defs/BlockDisposition"
+      },
+      "title": "Dispositions",
+      "type": "array"
+    },
+    "document_id": {
+      "pattern": "^DOC-[A-Z0-9-]+$",
+      "title": "Document Id",
+      "type": "string"
+    },
+    "model": {
+      "title": "Model",
+      "type": "string"
+    },
+    "prompt_id": {
+      "title": "Prompt Id",
+      "type": "string"
+    },
+    "proposed_document_type": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DocumentType"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "proposed_title": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Proposed Title"
+    },
+    "recovery_id": {
+      "title": "Recovery Id",
+      "type": "string"
+    },
+    "sections": {
+      "items": {
+        "$ref": "#/$defs/RecoveredSection"
+      },
+      "title": "Sections",
+      "type": "array"
+    },
+    "source_digest": {
+      "title": "Source Digest",
+      "type": "string"
+    },
+    "validation": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/StructureValidation"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "recovery_id",
+    "document_id",
+    "source_digest",
+    "confidence",
+    "sections",
+    "dispositions",
+    "model",
+    "prompt_id"
+  ],
+  "title": "StructureRecoveryProposal",
+  "type": "object"
+}

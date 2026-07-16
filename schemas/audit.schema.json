@@ -1,0 +1,548 @@
+{
+  "$defs": {
+    "AuditFindingKind": {
+      "enum": [
+        "editorial",
+        "answer_clarification",
+        "structured_fact",
+        "inferred_proposal",
+        "unresolved",
+        "omission"
+      ],
+      "title": "AuditFindingKind",
+      "type": "string"
+    },
+    "AuditStatus": {
+      "enum": [
+        "pass",
+        "fail",
+        "waiting"
+      ],
+      "title": "AuditStatus",
+      "type": "string"
+    },
+    "DeterministicCheck": {
+      "additionalProperties": false,
+      "properties": {
+        "blocking": {
+          "default": true,
+          "title": "Blocking",
+          "type": "boolean"
+        },
+        "check_id": {
+          "title": "Check Id",
+          "type": "string"
+        },
+        "details": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Details"
+        },
+        "evidence": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "passed": {
+          "title": "Passed",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "check_id",
+        "name",
+        "passed"
+      ],
+      "title": "DeterministicCheck",
+      "type": "object"
+    },
+    "EvidenceQuote": {
+      "additionalProperties": false,
+      "properties": {
+        "end_offset": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End Offset"
+        },
+        "quote": {
+          "title": "Quote",
+          "type": "string"
+        },
+        "span_id": {
+          "title": "Span Id",
+          "type": "string"
+        },
+        "start_offset": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start Offset"
+        }
+      },
+      "required": [
+        "span_id",
+        "quote"
+      ],
+      "title": "EvidenceQuote",
+      "type": "object"
+    },
+    "Finding": {
+      "additionalProperties": false,
+      "properties": {
+        "blocking": {
+          "default": false,
+          "title": "Blocking",
+          "type": "boolean"
+        },
+        "category": {
+          "title": "Category",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceQuote"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "finding_id": {
+          "title": "Finding Id",
+          "type": "string"
+        },
+        "finding_type": {
+          "$ref": "#/$defs/FindingType"
+        },
+        "impact": {
+          "title": "Impact",
+          "type": "string"
+        },
+        "proposed_disposition": {
+          "title": "Proposed Disposition",
+          "type": "string"
+        },
+        "requirement_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Requirement Id"
+        },
+        "requires_human_answer": {
+          "title": "Requires Human Answer",
+          "type": "boolean"
+        },
+        "severity": {
+          "$ref": "#/$defs/FindingSeverity"
+        },
+        "target_object_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Object Id"
+        },
+        "target_template_section": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Template Section"
+        }
+      },
+      "required": [
+        "finding_id",
+        "category",
+        "severity",
+        "finding_type",
+        "impact",
+        "proposed_disposition",
+        "requires_human_answer"
+      ],
+      "title": "Finding",
+      "type": "object"
+    },
+    "FindingSeverity": {
+      "enum": [
+        "blocker",
+        "high",
+        "medium",
+        "low",
+        "informational"
+      ],
+      "title": "FindingSeverity",
+      "type": "string"
+    },
+    "FindingType": {
+      "enum": [
+        "missing",
+        "ambiguous",
+        "conflicting",
+        "duplicate",
+        "vague",
+        "unsupported",
+        "noncompliant",
+        "extraction_risk",
+        "improvement"
+      ],
+      "title": "FindingType",
+      "type": "string"
+    },
+    "QuestionStatus": {
+      "enum": [
+        "open",
+        "answered",
+        "deferred",
+        "not_applicable",
+        "waived"
+      ],
+      "title": "QuestionStatus",
+      "type": "string"
+    },
+    "SemanticChange": {
+      "additionalProperties": false,
+      "properties": {
+        "after": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "After"
+        },
+        "before": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Before"
+        },
+        "change_id": {
+          "title": "Change Id",
+          "type": "string"
+        },
+        "change_type": {
+          "title": "Change Type",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/AuditFindingKind"
+        },
+        "object_id": {
+          "title": "Object Id",
+          "type": "string"
+        },
+        "rationale": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rationale"
+        }
+      },
+      "required": [
+        "change_id",
+        "object_id",
+        "change_type",
+        "kind"
+      ],
+      "title": "SemanticChange",
+      "type": "object"
+    },
+    "SemanticDiff": {
+      "additionalProperties": false,
+      "properties": {
+        "added": {
+          "items": {
+            "$ref": "#/$defs/SemanticChange"
+          },
+          "title": "Added",
+          "type": "array"
+        },
+        "changed": {
+          "items": {
+            "$ref": "#/$defs/SemanticChange"
+          },
+          "title": "Changed",
+          "type": "array"
+        },
+        "removed": {
+          "items": {
+            "$ref": "#/$defs/SemanticChange"
+          },
+          "title": "Removed",
+          "type": "array"
+        },
+        "retyped": {
+          "items": {
+            "$ref": "#/$defs/SemanticChange"
+          },
+          "title": "Retyped",
+          "type": "array"
+        }
+      },
+      "title": "SemanticDiff",
+      "type": "object"
+    },
+    "SourceTargetMapping": {
+      "additionalProperties": false,
+      "properties": {
+        "disposition": {
+          "title": "Disposition",
+          "type": "string"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        },
+        "source_span_id": {
+          "title": "Source Span Id",
+          "type": "string"
+        },
+        "target_anchor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Anchor"
+        },
+        "target_object_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Target Object Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "source_span_id",
+        "disposition"
+      ],
+      "title": "SourceTargetMapping",
+      "type": "object"
+    },
+    "Waiver": {
+      "additionalProperties": false,
+      "properties": {
+        "approver": {
+          "title": "Approver",
+          "type": "string"
+        },
+        "downstream_impact": {
+          "title": "Downstream Impact",
+          "type": "string"
+        },
+        "expires_or_review_date": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expires Or Review Date"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/QuestionStatus",
+          "default": "waived"
+        },
+        "target_id": {
+          "title": "Target Id",
+          "type": "string"
+        },
+        "waiver_id": {
+          "title": "Waiver Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "waiver_id",
+        "target_id",
+        "reason",
+        "approver",
+        "downstream_impact"
+      ],
+      "title": "Waiver",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "audit_id": {
+      "title": "Audit Id",
+      "type": "string"
+    },
+    "content_findings": {
+      "items": {
+        "$ref": "#/$defs/Finding"
+      },
+      "title": "Content Findings",
+      "type": "array"
+    },
+    "deterministic_checks": {
+      "items": {
+        "$ref": "#/$defs/DeterministicCheck"
+      },
+      "title": "Deterministic Checks",
+      "type": "array"
+    },
+    "document_id": {
+      "pattern": "^DOC-[A-Z0-9-]+$",
+      "title": "Document Id",
+      "type": "string"
+    },
+    "generated_at": {
+      "format": "date-time",
+      "title": "Generated At",
+      "type": "string"
+    },
+    "revision_count": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Revision Count",
+      "type": "integer"
+    },
+    "semantic_diff": {
+      "$ref": "#/$defs/SemanticDiff"
+    },
+    "source_to_target": {
+      "items": {
+        "$ref": "#/$defs/SourceTargetMapping"
+      },
+      "title": "Source To Target",
+      "type": "array"
+    },
+    "status": {
+      "$ref": "#/$defs/AuditStatus"
+    },
+    "summary": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Summary"
+    },
+    "textual_diff": {
+      "default": "",
+      "title": "Textual Diff",
+      "type": "string"
+    },
+    "unresolved_issue_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Unresolved Issue Ids",
+      "type": "array"
+    },
+    "version_id": {
+      "anyOf": [
+        {
+          "pattern": "^(DOCV|VER)-[A-Z0-9-]+$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Version Id"
+    },
+    "waivers": {
+      "items": {
+        "$ref": "#/$defs/Waiver"
+      },
+      "title": "Waivers",
+      "type": "array"
+    }
+  },
+  "required": [
+    "audit_id",
+    "document_id",
+    "status"
+  ],
+  "title": "Audit",
+  "type": "object"
+}

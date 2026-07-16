@@ -1,0 +1,69 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "chunk_id": {
+      "title": "Chunk Id",
+      "type": "string"
+    },
+    "citation_id": {
+      "title": "Citation Id",
+      "type": "string"
+    },
+    "document_id": {
+      "pattern": "^DOC-[A-Z0-9-]+$",
+      "title": "Document Id",
+      "type": "string"
+    },
+    "markdown_anchor": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Markdown Anchor"
+    },
+    "section_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Section Id"
+    },
+    "section_path": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Section Path",
+      "type": "array"
+    },
+    "source_span_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Source Span Ids",
+      "type": "array"
+    },
+    "version_id": {
+      "pattern": "^(DOCV|VER)-[A-Z0-9-]+$",
+      "title": "Version Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "citation_id",
+    "chunk_id",
+    "document_id",
+    "version_id"
+  ],
+  "title": "RagCitation",
+  "type": "object"
+}
