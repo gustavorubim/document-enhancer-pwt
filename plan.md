@@ -1515,21 +1515,21 @@ Acceptance: equivalent fixture facts across Markdown/DOCX/PDF normalize to compa
 
 ### M4 — Model gateway and analysis specialists
 
-- [ ] M4.1 Implement stage-specific Gemini initialization through `ChatGoogleGenerativeAI`, including Developer API and Vertex AI backend selection, while preserving the narrow fakeable model port.
-- [ ] M4.2 Implement Gemini native JSON-schema invocation, supported-schema validation, repair limits, retry classification, budgets, cancellation, and call manifests.
-- [ ] M4.3 Implement content-addressed response caching without secrets.
-- [ ] M4.4 Provide fake/recorded structured models for offline tests.
-- [ ] M4.5 Implement restricted Deep Agents backend and specialist factory with no shell/network and explicit virtual paths.
-- [ ] M4.6 Implement macro reviewer and evidence-backed Markdown renderer.
-- [ ] M4.7 Implement section mapper with full source-span disposition coverage.
-- [ ] M4.8 Implement process/methodology discoverer and candidate semantic model.
-- [ ] M4.9 Implement RAG-readiness reviewer and deterministic lint augmentation.
-- [ ] M4.10 Implement fan-out/fan-in finding synthesis, conflict preservation, deduplication, and prioritization.
-- [ ] M4.11 Version prompts and create prompt-injection regression cases.
-- [ ] M4.12 Implement and test exact model routing for `gemini-3.1-flash-lite`, `gemini-3.5-flash`, and `gemini-3.1-pro-preview`, including preview retirement detection and explicit fallback behavior.
-- [ ] M4.13 Prove `gemini-embedding-2` through the pinned `GoogleGenerativeAIEmbeddings` integration or SDK adapter, including 768-dimensional output, independent batch items, input-limit handling, finite vectors, and cache metadata.
+- [x] M4.1 Implement stage-specific Gemini initialization through `ChatGoogleGenerativeAI`, including Developer API and Vertex AI backend selection, while preserving the narrow fakeable model port.
+- [x] M4.2 Implement Gemini native JSON-schema invocation, supported-schema validation, repair limits, retry classification, budgets, cancellation, and call manifests.
+- [x] M4.3 Implement content-addressed response caching without secrets.
+- [x] M4.4 Provide fake/recorded structured models for offline tests.
+- [x] M4.5 Implement restricted Deep Agents backend and specialist factory with no shell/network and explicit virtual paths.
+- [x] M4.6 Implement macro reviewer and evidence-backed Markdown renderer.
+- [x] M4.7 Implement section mapper with full source-span disposition coverage.
+- [x] M4.8 Implement process/methodology discoverer and candidate semantic model.
+- [x] M4.9 Implement RAG-readiness reviewer and deterministic lint augmentation.
+- [x] M4.10 Implement fan-out/fan-in finding synthesis, conflict preservation, deduplication, and prioritization.
+- [x] M4.11 Version prompts and create prompt-injection regression cases.
+- [x] M4.12 Implement and test exact model routing for `gemini-3.1-flash-lite`, `gemini-3.5-flash`, and `gemini-3.1-pro-preview`, including preview retirement detection and explicit fallback behavior.
+- [x] M4.13 Prove `gemini-embedding-2` through the pinned `GoogleGenerativeAIEmbeddings` integration or SDK adapter, including 768-dimensional output, independent batch items, input-limit handling, finite vectors, and cache metadata.
 
-Acceptance: all four branches can run concurrently against a fake model, emit schema-valid evidence-linked results, preserve disagreements, and fail closed on invalid structured output or budget exhaustion.
+Acceptance: all four branches can run concurrently against a fake model, emit schema-valid evidence-linked results, preserve disagreements, and fail closed on invalid structured output or budget exhaustion. **Verified 2026-07-16 on code commit `921d6ac`: 209 passed, 2 opt-in tests deselected; Ruff format/check, ty, schemas, reference/prompt packs, fixture corpus, build, and diff checks passed.**
 
 ### M5 — Questions, reviewer inputs, checklist, and resumable graph
 
