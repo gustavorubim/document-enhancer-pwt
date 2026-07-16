@@ -18,6 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from document_enhancer.domain.analysis import (
     BlockDisposition,
+    RecoveredSection,
     StructureAssociation,
     StructureDisagreement,
     StructureRecoveryProposal,
@@ -480,12 +481,266 @@ def _proposal_digest(proposal: StructureRecoveryProposal | None) -> str | None:
     return None if proposal is None else _digest_json(proposal.model_dump(mode="json"))
 
 
+def _stable_model_payload(value: BaseModel | None, *, exclude: set[str] | None = None) -> object:
+    if value is None:
+        return None
+    return value.model_dump(mode="json", exclude=exclude or set())
+
+
+def _route_schema_dependency(route_id: str, schema: type[BaseModel]) -> dict[str, object]:
+    route = resolve_route(route_id)
+    return {
+        "route_id": route.route_id,
+        "model": route.model,
+        "parameters": route.parameters(),
+        "schema_name": schema.__name__,
+        "schema_digest": _digest_json(schema.model_json_schema()),
+    }
+
+
+def _config_subset(config: StructureRecoveryConfig, fields: Sequence[str]) -> dict[str, object]:
+    dumped = config.model_dump(mode="json")
+    return {field: dumped[field] for field in fields}
+
+
+def _structure_cache_keys(
+    *,
+    raw: RawDocument,
+    config: StructureRecoveryConfig,
+    outline_digest: str,
+    quality_digest: str,
+    scan: StructureScan | None,
+    windows: Sequence[RecoveryWindow],
+    recovered: StructureRecoveryProposal | None,
+    reconciliation: StructureRecoveryProposal | None,
+    validation: StructureValidationReport,
+    prompt_dependencies: Mapping[str, Sequence[Mapping[str, object]]],
+    call_manifests: Sequence[CallManifest],
+    prompt_resolutions: Sequence[PromptResolution],
+) -> dict[str, str]:
+    """Build complete, stable stage keys without including source or prompt text."""
+
+    downstream_common = {
+        "source_digest": raw.source_digest,
+        "parser_outline_digest": outline_digest,
+        "quality_digest": quality_digest,
+    }
+    triage_inputs = {
+        "source_digest": raw.source_digest,
+        "parser_outline_digest": outline_digest,
+        "document_metadata": {
+            "media_type": raw.media_type,
+            "parser_name": raw.parser_name,
+            "parser_version": raw.parser_version,
+            "block_count": len(raw.blocks),
+            "warning_codes": [warning.code for warning in raw.warnings],
+        },
+        "configuration": _config_subset(config, ("document_type", "max_triage_chars")),
+    }
+    recovery_config = _config_subset(
+        config,
+        (
+            "mode",
+            "document_type",
+            "thresholds",
+            "max_window_chars",
+            "overlap_blocks",
+            "max_windows",
+            "max_model_calls",
+            "max_total_input_chars",
+            "max_total_output_tokens",
+        ),
+    )
+    reconciliation_config = {
+        **recovery_config,
+        **_config_subset(config, ("max_reconciliation_chars", "allow_reconciliation")),
+    }
+    selected_config = _config_subset(config, ("mode", "document_type", "thresholds"))
+    scan_payload = _stable_model_payload(scan, exclude={"created_at"})
+    window_payload = [window.model_dump(mode="json") for window in windows]
+    recovery_payload = _stable_model_payload(recovered)
+    reconciliation_payload = _stable_model_payload(reconciliation)
+    validation_payload = validation.model_dump(mode="json")
+    scan_key = _digest_json(
+        {
+            "stage": "structure_scan",
+            **triage_inputs,
+            "prompt_dependencies": list(prompt_dependencies.get("structure_scan", ())),
+            "route_schema": _route_schema_dependency(ROUTE_FLASH_LITE, GatewayStructureScan),
+        }
+    )
+    recovery_key = _digest_json(
+        {
+            "stage": "structure_recovery",
+            **downstream_common,
+            "configuration": recovery_config,
+            "upstream_scan_key": scan_key,
+            "scan": scan_payload,
+            "windows": window_payload,
+            "prompt_dependencies": list(prompt_dependencies.get("structure_recovery", ())),
+            "route_schema": _route_schema_dependency(
+                ROUTE_FLASH_LITE, GatewayStructureRecoveryProposal
+            ),
+        }
+    )
+    reconciliation_key = _digest_json(
+        {
+            "stage": "structure_reconciliation",
+            **downstream_common,
+            "configuration": reconciliation_config,
+            "upstream_recovery_key": recovery_key,
+            "recovered": recovery_payload,
+            "conflicts": [
+                disagreement.model_dump(mode="json")
+                for disagreement in (recovered.disagreements if recovered else [])
+            ],
+            "prompt_dependencies": list(prompt_dependencies.get("structure_reconciliation", ())),
+            "route_schema": _route_schema_dependency(
+                ROUTE_FLASH_LITE, GatewayStructureRecoveryProposal
+            ),
+        }
+    )
+    metadata_key = _digest_json(
+        {
+            "stage": "structure_metadata",
+            "source_digest": raw.source_digest,
+            "upstream_stage_keys": {
+                "structure_scan": scan_key,
+                "structure_recovery": recovery_key,
+                "structure_reconciliation": reconciliation_key,
+            },
+            "call_manifests": [
+                manifest.model_dump(
+                    mode="json",
+                    exclude={
+                        "call_id",
+                        "duration_ms",
+                        "attempts",
+                        "retries",
+                        "structured_repairs",
+                        "usage",
+                        "response_digest",
+                        "error_message",
+                    },
+                )
+                for manifest in call_manifests
+            ],
+            "prompt_resolutions": [
+                resolution.model_dump(mode="json", exclude={"resolved_at"})
+                for resolution in prompt_resolutions
+            ],
+        }
+    )
+    return {
+        "structure_scan": scan_key,
+        "structure_recovery": recovery_key,
+        "selected_view": _digest_json(
+            {
+                "stage": "selected_view",
+                **downstream_common,
+                "configuration": selected_config,
+                "upstream_stage_keys": {
+                    "structure_scan": scan_key,
+                    "structure_recovery": recovery_key,
+                    "structure_reconciliation": reconciliation_key,
+                },
+                "scan": scan_payload,
+                "windows": window_payload,
+                "recovered": recovery_payload,
+                "reconciliation": reconciliation_payload,
+                "validation": validation_payload,
+                "route_schema": {
+                    "recovery": _route_schema_dependency(
+                        ROUTE_FLASH_LITE, GatewayStructureRecoveryProposal
+                    ),
+                    "reconciliation": _route_schema_dependency(
+                        ROUTE_FLASH_LITE, GatewayStructureRecoveryProposal
+                    ),
+                },
+            }
+        ),
+        "structure_reconciliation": reconciliation_key,
+        "structure_metadata": metadata_key,
+    }
+
+
 def _section_interval(section: Any, ordinal_by_span: Mapping[str, int]) -> tuple[int, int] | None:
     start = ordinal_by_span.get(section.start_span_id)
     end = ordinal_by_span.get(section.end_span_id)
     if start is None or end is None:
         return None
     return start, end
+
+
+def _validate_section_collection(
+    sections: Sequence[RecoveredSection],
+    raw: DomainRawDocument,
+    ordinal_by_span: Mapping[str, int],
+    expected_ordinals: Sequence[int],
+    *,
+    label: str,
+) -> tuple[list[str], list[tuple[int, int, int, str]], dict[str, RecoveredSection]]:
+    errors: list[str] = []
+    intervals: list[tuple[int, int, int, str]] = []
+    by_id: dict[str, RecoveredSection] = {}
+    section_ids = [section.section_id for section in sections]
+    if len(section_ids) != len(set(section_ids)):
+        errors.append(f"duplicate section IDs in {label}")
+    for section in sections:
+        by_id.setdefault(section.section_id, section)
+        interval = _section_interval(section, ordinal_by_span)
+        if interval is None:
+            errors.append(
+                f"{label} section {section.section_id} references an unknown boundary span"
+            )
+            continue
+        start, end = interval
+        if start > end:
+            errors.append(f"{label} section {section.section_id} has reversed boundaries")
+            continue
+        if expected_ordinals and start < expected_ordinals[0]:
+            errors.append(
+                f"{label} section {section.section_id} begins outside the requested window"
+            )
+        if expected_ordinals and end > expected_ordinals[-1]:
+            errors.append(f"{label} section {section.section_id} ends outside the requested window")
+        heading = next(
+            (block for block in raw.blocks if block.span_id == section.start_span_id), None
+        )
+        if section.source_heading_text is not None and heading is not None:
+            allowed = {heading.text, heading.text.lstrip("# ").strip()}
+            if section.source_heading_text not in allowed:
+                errors.append(
+                    f"source heading text mutation at {label} section {section.section_id}"
+                )
+        intervals.append((start, end, section.level, section.section_id))
+
+    for left_index, left in enumerate(intervals):
+        for right in intervals[left_index + 1 :]:
+            left_start, left_end, left_level, left_id = left
+            right_start, right_end, right_level, right_id = right
+            crossing = (left_start < right_start <= left_end < right_end) or (
+                right_start < left_start <= right_end < left_end
+            )
+            if crossing:
+                errors.append(f"illegal crossing {label} boundaries: {left_id}/{right_id}")
+            if left_start == right_start and left_end == right_end and left_level != right_level:
+                errors.append(
+                    f"duplicate section interval with conflicting levels: {left_id}/{right_id}"
+                )
+
+    stack: list[tuple[int, int, str]] = []
+    for start, end, level, section_id in sorted(intervals, key=lambda item: (item[0], -item[1])):
+        while stack and start > stack[-1][0]:
+            stack.pop()
+        if stack:
+            parent_end, parent_level, parent_id = stack[-1]
+            if level <= parent_level:
+                errors.append(f"invalid section nesting level: {parent_id} contains {section_id}")
+            elif level > parent_level + 1:
+                errors.append(f"invalid section hierarchy level jump: {parent_id} to {section_id}")
+        stack.append((end, level, section_id))
+    return errors, intervals, by_id
 
 
 def validate_recovery_proposal(
@@ -525,62 +780,25 @@ def validate_recovery_proposal(
         block = by_id.get(item.span_id)
         if block is not None and item.source_text_digest != block.text_digest:
             errors.append(f"source text digest mismatch for {item.span_id}")
-    section_ids = [section.section_id for section in proposal.sections]
-    if len(section_ids) != len(set(section_ids)):
-        errors.append("duplicate section IDs")
-    intervals: list[tuple[int, int, int, str]] = []
-    for section in proposal.sections:
-        interval = _section_interval(section, ordinal_by_span)
-        if interval is None:
-            errors.append(f"section {section.section_id} references an unknown boundary span")
-            continue
-        start, end = interval
-        if start > end:
-            errors.append(f"section {section.section_id} has reversed boundaries")
-            continue
-        if expected_ordinals and start < expected_ordinals[0]:
-            errors.append(f"section {section.section_id} begins outside the requested window")
-        if expected_ordinals and end > expected_ordinals[-1]:
-            errors.append(f"section {section.section_id} ends outside the requested window")
-        intervals.append((start, end, section.level, section.section_id))
-        if section.source_heading_text is not None:
-            heading = by_id.get(section.start_span_id)
-            allowed = {heading.text} if heading is not None else set()
-            if heading is not None:
-                local = next(
-                    (block for block in raw.blocks if _domain_span(block) == heading.span_id),
-                    None,
-                )
-                if local is not None:
-                    allowed.add(local.text.lstrip("# ").strip())
-            if section.source_heading_text not in allowed:
-                errors.append(f"source heading text mutation at {section.section_id}")
-    for left_index, left in enumerate(intervals):
-        for right in intervals[left_index + 1 :]:
-            left_start, left_end, left_level, left_id = left
-            right_start, right_end, right_level, right_id = right
-            crossing = (left_start < right_start <= left_end < right_end) or (
-                right_start < left_start <= right_end < left_end
-            )
-            if crossing:
-                errors.append(f"illegal crossing section boundaries: {left_id}/{right_id}")
-            if left_start == right_start and left_end == right_end and left_level != right_level:
-                errors.append(
-                    f"duplicate section interval with conflicting levels: {left_id}/{right_id}"
-                )
-    stack: list[tuple[int, int, str]] = []
-    for start, end, level, section_id in sorted(intervals, key=lambda item: (item[0], -item[1])):
-        while stack and start > stack[-1][0]:
-            stack.pop()
-        if stack and level <= stack[-1][1]:
-            errors.append(f"invalid section nesting level: {stack[-1][2]} contains {section_id}")
-        stack.append((end, level, section_id))
-    known_sections = set(section_ids)
+    section_errors, _, section_by_id = _validate_section_collection(
+        proposal.sections,
+        raw,
+        ordinal_by_span,
+        expected_ordinals,
+        label="proposal",
+    )
+    errors.extend(section_errors)
+    known_sections = set(section_by_id)
     for item in proposal.dispositions:
         if item.section_id is not None and item.section_id not in known_sections:
             errors.append(
                 f"disposition {item.span_id} references unknown section {item.section_id}"
             )
+        elif item.section_id is not None:
+            interval = _section_interval(section_by_id[item.section_id], ordinal_by_span)
+            ordinal = ordinal_by_span.get(item.span_id)
+            if interval is None or ordinal is None or not interval[0] <= ordinal <= interval[1]:
+                errors.append(f"disposition {item.span_id} lies outside section {item.section_id}")
     for association in proposal.associations:
         if association.span_id not in expected_set:
             errors.append(
@@ -588,14 +806,29 @@ def validate_recovery_proposal(
             )
         if association.section_id not in known_sections:
             errors.append(f"association references unknown section {association.section_id}")
+        else:
+            interval = _section_interval(section_by_id[association.section_id], ordinal_by_span)
+            ordinal = ordinal_by_span.get(association.span_id)
+            if interval is None or ordinal is None or not interval[0] <= ordinal <= interval[1]:
+                errors.append(
+                    f"association {association.span_id} lies outside section {association.section_id}"
+                )
     for disagreement in proposal.disagreements:
         if any(span_id not in expected_set for span_id in disagreement.span_ids):
             errors.append("disagreement references a span outside the requested window")
+    alternative_ids: set[str] = set()
     for alternative in proposal.boundary_alternatives:
-        for section in alternative.sections:
-            interval = _section_interval(section, ordinal_by_span)
-            if interval is None or interval[0] > interval[1]:
-                errors.append(f"invalid alternative boundary: {alternative.alternative_id}")
+        if alternative.alternative_id in alternative_ids:
+            errors.append(f"duplicate boundary alternative ID: {alternative.alternative_id}")
+        alternative_ids.add(alternative.alternative_id)
+        alternative_errors, _, _ = _validate_section_collection(
+            alternative.sections,
+            raw,
+            ordinal_by_span,
+            expected_ordinals,
+            label=f"alternative {alternative.alternative_id}",
+        )
+        errors.extend(alternative_errors)
     uncertain = tuple(
         item.span_id
         for item in proposal.dispositions
@@ -713,7 +946,11 @@ def _recovered_local_view(
             StructuralBlockDisposition(
                 source_span_id=block.span_id,
                 ordinal=block.ordinal,
-                disposition=item.disposition.value,
+                disposition=(
+                    StructureDisposition.UNCERTAIN.value
+                    if item.confidence < 0.5
+                    else item.disposition.value
+                ),
                 section_id=item.section_id,
                 confidence=item.confidence,
                 source_text_digest=block.content_digest,
@@ -745,8 +982,6 @@ def _material_disagreement(
     parser_outline: ParserOutline,
     mapping: DomainRawMapping,
 ) -> bool:
-    if scan.decision is not StructureDecision.ACCEPT_PARSER:
-        return True
     if quality.warnings and scan.confidence < 0.85:
         return True
     parser_boundaries = {
@@ -766,6 +1001,25 @@ def _conflict_key(item: BlockDisposition) -> tuple[str, str | None, str]:
     return item.disposition.value, item.section_id, item.source_text_digest
 
 
+def _dedupe_disagreements(
+    disagreements: Sequence[StructureDisagreement],
+) -> list[StructureDisagreement]:
+    retained: list[StructureDisagreement] = []
+    seen: set[bytes] = set()
+    for disagreement in disagreements:
+        key = canonical_json(disagreement.model_dump(mode="json"))
+        if key not in seen:
+            seen.add(key)
+            retained.append(disagreement)
+    return retained
+
+
+def _alternative_content_key(alternative: Any) -> bytes:
+    payload = alternative.model_dump(mode="json")
+    payload["alternative_id"] = ""
+    return canonical_json(payload)
+
+
 def merge_window_proposals(
     proposals: Sequence[StructureRecoveryProposal],
     raw: DomainRawDocument,
@@ -781,7 +1035,7 @@ def merge_window_proposals(
         for item in proposal.dispositions:
             by_span[item.span_id].append(item)
     merged_dispositions: list[BlockDisposition] = []
-    disagreements = [*proposals[0].disagreements]
+    disagreements: list[StructureDisagreement] = []
     for span_id in (_domain_span(block) for block in raw.blocks):
         candidates = by_span.get(span_id, [])
         if not candidates:
@@ -812,8 +1066,81 @@ def merge_window_proposals(
     alternatives: dict[str, Any] = {}
     associations: dict[tuple[str, str, str], StructureAssociation] = {}
     for proposal in proposals:
-        section_by_id.update({section.section_id: section for section in proposal.sections})
-        alternatives.update({item.alternative_id: item for item in proposal.boundary_alternatives})
+        for section in proposal.sections:
+            prior = section_by_id.get(section.section_id)
+            if prior is None:
+                section_by_id[section.section_id] = section
+            elif (
+                prior.start_span_id,
+                prior.end_span_id,
+                prior.level,
+                prior.label,
+            ) != (
+                section.start_span_id,
+                section.end_span_id,
+                section.level,
+                section.label,
+            ):
+                boundary_span_ids = list(
+                    dict.fromkeys(
+                        [
+                            prior.start_span_id,
+                            prior.end_span_id,
+                            section.start_span_id,
+                            section.end_span_id,
+                        ]
+                    )
+                )
+                disagreements.append(
+                    StructureDisagreement(
+                        span_ids=boundary_span_ids,
+                        parser_label=prior.label,
+                        model_label="overlapping_window_section_boundary_conflict",
+                        resolution=None,
+                        requires_review=True,
+                    )
+                )
+        for alternative in proposal.boundary_alternatives:
+            if any(
+                _alternative_content_key(existing) == _alternative_content_key(alternative)
+                for existing in alternatives.values()
+            ):
+                continue
+            prior = alternatives.get(alternative.alternative_id)
+            if prior is None:
+                alternatives[alternative.alternative_id] = alternative
+            elif canonical_json(prior.model_dump(mode="json")) != canonical_json(
+                alternative.model_dump(mode="json")
+            ):
+                base_alternative_id = (
+                    f"{alternative.alternative_id}-ALT-"
+                    f"{_digest_json(alternative.model_dump(mode='json'))[:12].upper()}"
+                )
+                alternative_id = base_alternative_id
+                suffix = 2
+                while alternative_id in alternatives:
+                    alternative_id = f"{base_alternative_id}-{suffix}"
+                    suffix += 1
+                alternatives[alternative_id] = alternative.model_copy(
+                    update={"alternative_id": alternative_id}
+                )
+                disagreements.append(
+                    StructureDisagreement(
+                        span_ids=list(
+                            dict.fromkeys(
+                                section.start_span_id
+                                for section in (
+                                    *prior.sections,
+                                    *alternative.sections,
+                                )
+                            )
+                        ),
+                        parser_label=prior.alternative_id,
+                        model_label="overlapping_window_alternative_conflict",
+                        resolution=None,
+                        requires_review=True,
+                    )
+                )
         for association in proposal.associations:
             associations[(association.span_id, association.section_id, association.association)] = (
                 association
@@ -831,7 +1158,7 @@ def merge_window_proposals(
         dispositions=merged_dispositions,
         associations=list(associations.values()),
         boundary_alternatives=list(alternatives.values()),
-        disagreements=disagreements,
+        disagreements=_dedupe_disagreements(disagreements),
         model=proposals[0].model,
         prompt_id=proposals[0].prompt_id,
     )
@@ -852,6 +1179,7 @@ class StructureRecoveryService:
         self.prompt_composer = prompt_composer
         self._calls: list[CallManifest] = []
         self._resolutions: list[PromptResolution] = []
+        self._prompt_dependencies: list[dict[str, object]] = []
         self._input_chars = 0
         self._output_tokens = 0
 
@@ -862,6 +1190,11 @@ class StructureRecoveryService:
         repository: Any | None = None,
         run_id: str | None = None,
     ) -> StructureRecoveryResult:
+        self._calls = []
+        self._resolutions = []
+        self._prompt_dependencies = []
+        self._input_chars = 0
+        self._output_tokens = 0
         normalized = (
             document
             if isinstance(document, NormalizedDocument)
@@ -904,7 +1237,7 @@ class StructureRecoveryService:
                     warnings.append("triage_accept_parser")
             except Exception as exc:
                 warnings.append(f"structure_scan_failed:{type(exc).__name__}")
-                should_recover = False
+                should_recover = normalized.routing.mode == "llm_recovery"
         elif mode == "off":
             warnings.append("structure_recovery_disabled")
         elif mode == "parser":
@@ -1016,6 +1349,30 @@ class StructureRecoveryService:
             )
             status = "recovered"
         selected_digest = _digest_json(selected.model_dump(mode="json"))
+        prompt_dependencies: dict[str, list[Mapping[str, object]]] = defaultdict(list)
+        for dependency in self._prompt_dependencies:
+            prompt_id = dependency.get("prompt_id")
+            stage = {
+                "structure.triage": "structure_scan",
+                "structure.recover-window": "structure_recovery",
+                "structure.reconcile-boundaries": "structure_reconciliation",
+            }.get(str(prompt_id))
+            if stage is not None:
+                prompt_dependencies[stage].append(dependency)
+        cache_keys = _structure_cache_keys(
+            raw=raw,
+            config=self.config,
+            outline_digest=outline_digest,
+            quality_digest=_quality_digest(normalized.quality),
+            scan=scan,
+            windows=windows,
+            recovered=recovered,
+            reconciliation=reconciliation,
+            validation=validation,
+            prompt_dependencies=prompt_dependencies,
+            call_manifests=self._calls,
+            prompt_resolutions=self._resolutions,
+        )
         metadata = StructureArtifactMetadata(
             source_digest=raw.source_digest,
             document_id=mapping.domain.document_id,
@@ -1024,20 +1381,7 @@ class StructureRecoveryService:
             quality_digest=_quality_digest(normalized.quality),
             validation_digest=_digest_json(validation.model_dump(mode="json")),
             selected_view_digest=selected_digest,
-            cache_keys={
-                "structure_scan": _digest_json(
-                    {"source": raw.source_digest, "outline": outline_digest, "mode": mode}
-                ),
-                "structure_recovery": _digest_json(
-                    {
-                        "scan": _digest_json(scan.model_dump(mode="json")) if scan else None,
-                        "windows": [window.model_dump(mode="json") for window in windows],
-                    }
-                ),
-                "selected_view": _digest_json(
-                    {"validation": validation.model_dump(mode="json"), "selected": selected_digest}
-                ),
-            },
+            cache_keys=cache_keys,
             call_manifests=tuple(self._calls),
             prompt_resolutions=tuple(self._resolutions),
             warnings=tuple(dict.fromkeys(warnings)),
@@ -1080,6 +1424,10 @@ class StructureRecoveryService:
             raise ValidationError("structure recovery requires the WT11 prompt composer")
         composed = self.prompt_composer.compose_with_metadata(prompt_id, variables)
         self._resolutions.append(composed.resolution)
+        resolution = composed.resolution.model_dump(mode="json", exclude={"resolved_at"})
+        resolution["pack_manifest_sha256"] = getattr(composed, "pack_manifest_sha256", "")
+        resolution["pack_sha256"] = getattr(composed, "pack_sha256", "")
+        self._prompt_dependencies.append(resolution)
         return composed
 
     def _invoke(
@@ -1283,7 +1631,7 @@ def persist_structure_result(
             "source/structure-scan.json",
             scan_value,
             stage="structure_scan",
-            replace_deferred=True,
+            replace=True,
         )
     )
     records.append(
@@ -1309,7 +1657,7 @@ def persist_structure_result(
             resolved_run_id,
             "source/recovery/reconciliation.json",
             payload["reconciliation"],
-            stage="structure_recovery",
+            stage="structure_reconciliation",
             replace=True,
         )
     )
@@ -1319,7 +1667,7 @@ def persist_structure_result(
             "source/recovered-outline.json",
             proposal_value,
             stage="structure_recovery",
-            replace_deferred=True,
+            replace=True,
         )
     )
     records.append(
@@ -1352,7 +1700,11 @@ def persist_structure_result(
     )
     records.append(
         repo.put_json_revision(
-            resolved_run_id, "source/model-calls.json", calls, stage="structure_scan", replace=True
+            resolved_run_id,
+            "source/model-calls.json",
+            calls,
+            stage="structure_metadata",
+            replace=True,
         )
     )
     records.append(
@@ -1360,13 +1712,14 @@ def persist_structure_result(
             resolved_run_id,
             "source/prompt-resolutions.json",
             resolutions,
-            stage="structure_scan",
+            stage="structure_metadata",
             replace=True,
         )
     )
     parser_outline_digest = _outline_digest(result.normalized.parser_outline)
     quality_digest = _quality_digest(result.normalized.quality)
     digest_by_path = {record.relative_path: record.digest for record in records}
+    cache_keys = dict(result.metadata.cache_keys) if result.metadata else {}
     metadata = StructureArtifactMetadata(
         source_digest=result.raw.source_digest,
         document_id=result.authoritative_raw.document_id,
@@ -1379,23 +1732,7 @@ def persist_structure_result(
         reconciliation_digest=digest_by_path.get("source/recovery/reconciliation.json"),
         validation_digest=digest_by_path["source/recovery/validation.json"],
         selected_view_digest=digest_by_path["source/selected-view.json"],
-        cache_keys={
-            "structure_scan": _digest_json(
-                {"source": result.raw.source_digest, "outline": parser_outline_digest}
-            ),
-            "structure_recovery": _digest_json(
-                {
-                    "scan": digest_by_path["source/structure-scan.json"],
-                    "windows": digest_by_path["source/recovery/windows.json"],
-                }
-            ),
-            "selected_view": _digest_json(
-                {
-                    "validation": digest_by_path["source/recovery/validation.json"],
-                    "selected": digest_by_path["source/selected-view.json"],
-                }
-            ),
-        },
+        cache_keys=cache_keys,
         call_manifests=tuple(result.metadata.call_manifests) if result.metadata else (),
         prompt_resolutions=tuple(result.metadata.prompt_resolutions) if result.metadata else (),
         warnings=result.selected_view.warnings,
@@ -1405,7 +1742,7 @@ def persist_structure_result(
         resolved_run_id,
         "source/structure-recovery-metadata.json",
         metadata.model_dump(mode="json"),
-        stage="structure_recovery",
+        stage="structure_metadata",
         replace=True,
     )
     records.append(metadata_record)
@@ -1420,6 +1757,7 @@ def persist_structure_result(
             recovery_digest=digest_by_path.get("source/recovered-outline.json"),
             validation_digest=digest_by_path["source/recovery/validation.json"],
             selected_view_digest=digest_by_path["source/selected-view.json"],
+            reconciliation_digest=digest_by_path.get("source/recovery/reconciliation.json"),
             call_manifests=metadata.call_manifests,
             prompt_resolutions=metadata.prompt_resolutions,
         )
@@ -1429,6 +1767,12 @@ def persist_structure_result(
             "structure_scan": [record for record in records if record.stage == "structure_scan"],
             "structure_recovery": [
                 record for record in records if record.stage == "structure_recovery"
+            ],
+            "structure_reconciliation": [
+                record for record in records if record.stage == "structure_reconciliation"
+            ],
+            "structure_metadata": [
+                record for record in records if record.stage == "structure_metadata"
             ],
             "selected_view": [record for record in records if record.stage == "selected_view"],
         }

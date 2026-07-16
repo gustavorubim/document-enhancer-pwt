@@ -48,6 +48,13 @@ ambiguity loss. A failed scan or proposal leaves the parser-selected view active
 artifacts are retained separately for inspection, but are never treated as a successful selected
 view unless full validation passes.
 
+The authoritative WT1 `StructureRecoveryProposal`/`BlockDisposition` contract identifies whole
+source spans and carries a source-text digest, but it has no split-offset fields. WT3 therefore
+does not invent a lane-local split contract: deterministic compound-block splitting cannot be
+represented or validated end-to-end here. Such blocks remain whole and fail closed when exact
+coverage requires a split; central domain/prompt schema correction is required before that M3.13
+path can be enabled.
+
 ## Artifact contract
 
 M3B writes independent, content-addressed artifacts for the scan, window map, per-window
@@ -55,8 +62,10 @@ proposals, optional reconciliation, recovered proposal, validation report, selec
 manifests, prompt resolutions, and aggregate metadata. Call manifests contain route/model,
 prompt/schema/input/output/cache digests, retries, and resolution status; they never contain
 prompt text, raw source, or credentials. Revisions use atomic staging/promotion and retain the
-prior version. Existing M3A deferred reservations may be replaced only through the explicit
-deferred-replacement path.
+prior version. Aggregate calls, prompt resolutions, and recovery metadata use the neutral
+`structure_metadata` stage; the upstream `structure_scan` stage contains only its scan artifact.
+Existing M3A deferred reservations and promoted M3B structure artifacts may be replaced only
+through the explicit atomic revision path.
 
 The service intentionally does not manufacture scan or recovered model results in `off` and
 `parser` modes. Scanned/image-only PDFs and unsafe constructs remain parser-level fail-closed

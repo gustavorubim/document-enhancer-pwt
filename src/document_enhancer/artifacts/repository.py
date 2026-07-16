@@ -83,10 +83,10 @@ class FilesystemArtifactRepository:
     ) -> ArtifactRecord:
         """Write a content-addressed revision and atomically publish it.
 
-        The ordinary :meth:`put_json` contract remains immutable.  M3B uses this explicit
-        revision path for a new selected view or for replacing M3A's visible ``deferred``
-        reservation after a real model result has passed validation.  A failed promotion leaves
-        the prior canonical bytes untouched.
+        The ordinary :meth:`put_json` contract remains immutable. M3B uses this explicit
+        revision path for selected views and independently revisable structure artifacts after a
+        real result has passed validation; it also replaces M3A's visible ``deferred``
+        reservations. A failed promotion leaves the prior canonical bytes untouched.
         """
 
         paths = self.paths(run_id)

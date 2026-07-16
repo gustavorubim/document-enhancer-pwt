@@ -61,6 +61,7 @@ class RunManifest(ManifestContract):
     selected_view_digest: str | None = None
     structure_scan_digest: str | None = None
     structure_recovery_digest: str | None = None
+    structure_reconciliation_digest: str | None = None
     structure_validation_digest: str | None = None
     structure_call_manifests: tuple[dict[str, Any], ...] = ()
     structure_prompt_resolutions: tuple[dict[str, Any], ...] = ()
@@ -136,6 +137,7 @@ class RunManifest(ManifestContract):
         recovery_digest: str | None,
         validation_digest: str,
         selected_view_digest: str,
+        reconciliation_digest: str | None = None,
         call_manifests: Sequence[Any] = (),
         prompt_resolutions: Sequence[Any] = (),
     ) -> RunManifest:
@@ -152,6 +154,7 @@ class RunManifest(ManifestContract):
                 "structure_mode": mode,
                 "structure_scan_digest": scan_digest,
                 "structure_recovery_digest": recovery_digest,
+                "structure_reconciliation_digest": reconciliation_digest,
                 "structure_validation_digest": validation_digest,
                 "selected_view_digest": selected_view_digest,
                 "structure_call_manifests": dump_items(call_manifests),
