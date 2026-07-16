@@ -48,7 +48,7 @@ def _values(spec, *, document_type: str = "process") -> dict[str, object]:
 
 def test_pack_is_versioned_and_all_required_references_resolve(prompt_pack) -> None:
     assert prompt_pack.pack_id == "gemini_core"
-    assert prompt_pack.version == "1.0.1"
+    assert prompt_pack.version == "1.0.2"
     assert len(prompt_pack.manifest.prompts) == 20
     assert len(prompt_pack.pack_sha256) == 64
     assert set(prompt_pack.manifest.required_references) == {
@@ -102,6 +102,55 @@ def test_structure_compositions_are_source_first_and_bounded(prompt_pack, refere
         assert composed.reference_scope == ()
         assert "[REFERENCE " not in composed.text
         assert len(composed.text) <= 20_000
+
+
+@pytest.mark.parametrize(
+    ("prompt_id", "requires_segment_contract"),
+    (
+        ("structure.triage", False),
+        ("structure.recover-window", True),
+        ("structure.reconcile-boundaries", True),
+    ),
+)
+def test_structure_prompts_govern_exact_identity_literals(
+    prompt_pack, reference_pack, prompt_id: str, requires_segment_contract: bool
+) -> None:
+    spec = prompt_pack.prompt(prompt_id)
+    values = _values(spec)
+    values["document_metadata"] = {
+        "document_id": "DOC-EXACT-IDENTITY",
+        "source_digest": "a" * 64,
+        "parser_outline_digest": "b" * 64,
+    }
+    values["source_text"] = (
+        f"[SPAN id=SPAN-EXACT0001 ordinal=0 type=paragraph text_digest={'c' * 64}]\n"
+        "Exact source text.\n[/SPAN]"
+    )
+
+    composed = PromptPackComposer(prompt_pack, reference_pack=reference_pack).compose_with_metadata(
+        prompt_id, values
+    )
+
+    assert f"`prompt_id` must be exactly `{prompt_id}`" in composed.text
+    assert "`model` must be exactly `gemini-3.1-flash-lite`" in composed.text
+    assert "document_id" in composed.text
+    assert "source_digest" in composed.text
+    assert "parser_outline_digest" in composed.text
+    assert composed.reference_scope == ()
+    assert not composed.resolution.resolved_reference_digests
+    assert "structure-scan-v1" not in composed.text
+    assert f"{prompt_id}-v1" not in composed.text
+    if requires_segment_contract:
+        for literal in (
+            "source_text_digest",
+            "char_start",
+            "char_end",
+            "python_characters",
+            "slice_sha256",
+            "segment_id",
+            "parent_span_id + NUL + char_start + NUL + char_end + NUL + slice_sha256",
+        ):
+            assert literal in composed.text
 
 
 def test_empty_structure_scope_composes_without_reference_pack() -> None:
@@ -193,7 +242,7 @@ def test_snapshot_contains_digests_but_not_raw_source_or_credentials(
 def test_prompt_service_metadata_does_not_require_composing(prompt_pack) -> None:
     listed = list_prompts(prompt_pack)
     assert len(listed) == 20
-    assert listed[0]["pack_version"] == "1.0.1"
+    assert listed[0]["pack_version"] == "1.0.2"
     shown = cast(dict[str, object], show_prompt(prompt_pack, "rag.grounded-answer"))
     assert shown["output_schema"] == "rag-answer.schema.json"
     assert shown["reference_scope"] == ["glossary"]

@@ -38,6 +38,11 @@ def test_golden_fake_outputs_validate_against_the_same_schema_roots() -> None:
     payload = json.loads(fake_path.read_text(encoding="utf-8"))
     for schema_name, value in payload.items():
         schema_models()[schema_name].model_validate(value)
+    assert payload["structure-scan.schema.json"]["model"] == "gemini-3.1-flash-lite"
+    assert payload["structure-scan.schema.json"]["prompt_id"] == "structure.triage"
+    assert payload["structure-scan.schema.json"]["prompt_id"] != "structure-scan-v1"
+    assert payload["structure-recovery.schema.json"]["model"] == "gemini-3.1-flash-lite"
+    assert payload["structure-recovery.schema.json"]["prompt_id"] == ("structure.recover-window")
 
 
 def test_reference_compatibility_report_records_all_document_types() -> None:

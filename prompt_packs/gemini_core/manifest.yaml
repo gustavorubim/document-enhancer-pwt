@@ -1,6 +1,6 @@
 schema_version: "1.0"
 pack_id: gemini_core
-version: "1.0.1"
+version: "1.0.2"
 description: >-
   Versioned, Gemini-first prompt pack for governed document enhancement and grounded local RAG.
 owner: Document Enhancer Prompt Governance
@@ -106,8 +106,8 @@ file_digests:
   audit/remediation-routing.md: aad1588c9bd94cd173e8d23a2ad70c860721da474af30cc2009fbcf997a61118
   clarification/questions.md: 5f99be2b4e90b811d572ed503b8d0a21a67dc1c24eb005889c6a6835dbb45371
   clarification/rewrite-checklist.md: 356a6a5cc0060c461fe6dcb58577f770be2d45c190a1262da15a68833d97e4a0
-  golden/compositions.yaml: d6db2625f502ea4a2b6a21e29f4c599672533cede5819ee6dc245e4143f8985d
-  golden/fake_outputs.json: 3eb0bfcd4850ff91cc708775ce7cc4d66edc1fcdbf1b29668e5c6d50ee7ba6fc
+  golden/compositions.yaml: 9990c80f839f0ee933615a7431c26eaaeeba8a2db4d19e2d87a40094824f8591
+  golden/fake_outputs.json: aba9f3fda173142052441e78b472391984c4b47543b5862c9ec85f3ebc58d96b
   rag/citation-audit.md: 60a64d31aa960cbf280c3954fe9aeb3cbbde6f99cf7280cfcc605748d947b4c5
   rag/entity-linking.md: 579717547253ccf0e0399423c3dbb92ba1c594e16031534a5e69618c66a6d4dd
   rag/grounded-answer.md: d893514a6621486a69040533008e6c0854c6a4f5e4208f954c8a2aaae3dfb63c
@@ -126,9 +126,9 @@ file_digests:
   shared/structured-output.md: 412662d05ba45b7635b36b59b2679a515ce172a69ebfb8f8fef1890caf83d91c
   shared/system.md: 3ce55d2192d525a21f345e7f77ae2d1ad1631d31d0b142b78de80a83f1b8674e
   shared/tool-prohibition.md: 8723545728ef73412391335dee4eeb48f218c17fc71d0551f595c68309c632c7
-  structure/reconcile-boundaries.md: 574412b4409b6ed3e1302e09dfa8823399af6951eba0ba7bd89db8c21e4f688f
-  structure/recover-window.md: 276a0071be4ec799f56d311f0ab5dadc79ff2d67eee2b324eefcf4f190396138
-  structure/triage.md: e228236dd36285e421cc97460b2316994aeb78fd51a7b817c3c2099326891e70
+  structure/reconcile-boundaries.md: ca8c14a95fb05c2074c6926f813d281e840e2da9cefd87fe8a22855ccccf6b98
+  structure/recover-window.md: 5d817e59bb2eab526b5160cb9122611c13b78c2423ddf73bdf2f40226e850ef0
+  structure/triage.md: 764ec48758c3e03beeaa6755c2563317a620238faed9f0879ef4b3b36f1fa192
 prompts:
   - prompt_id: structure.triage
     stage: structure_triage

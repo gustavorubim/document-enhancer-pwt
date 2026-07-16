@@ -75,6 +75,8 @@ def _verify_compositions(pack_root: Path, reference_pack: Any) -> tuple[list[str
         pack = load_prompt_pack(pack_root, reference_pack=reference_pack)
     except PromptPackValidationError as exc:
         return list(exc.errors), {}
+    if value.get("pack_version") != pack.version:
+        return ["golden/compositions.yaml pack_version does not match the manifest"], {}
     prompt_ids = {prompt.prompt_id for prompt in pack.manifest.prompts}
     missing_scopes = sorted(prompt_ids - set(expected_scopes))
     unknown_scopes = sorted(set(expected_scopes) - prompt_ids)
