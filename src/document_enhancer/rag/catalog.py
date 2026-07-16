@@ -275,6 +275,8 @@ def ingest_package(
 
 
 def inspect_catalog(catalog_path: Path) -> dict[str, object]:
+    if not catalog_path.expanduser().is_file():
+        raise CatalogConflictError(f"catalog does not exist: {catalog_path.expanduser()}")
     connection = connect(str(catalog_path), catalog=True)
     try:
         migrate(connection)
@@ -305,6 +307,13 @@ def inspect_catalog(catalog_path: Path) -> dict[str, object]:
             ),
             "embeddings": int(connection.execute("SELECT COUNT(*) FROM embeddings").fetchone()[0]),
             "fts_rows": int(connection.execute("SELECT COUNT(*) FROM chunks_fts").fetchone()[0]),
+            "sessions": int(connection.execute("SELECT COUNT(*) FROM rag_sessions").fetchone()[0]),
+            "saved_queries": int(
+                connection.execute("SELECT COUNT(*) FROM rag_queries").fetchone()[0]
+            ),
+            "saved_answers": int(
+                connection.execute("SELECT COUNT(*) FROM rag_answers").fetchone()[0]
+            ),
         }
     finally:
         connection.close()
