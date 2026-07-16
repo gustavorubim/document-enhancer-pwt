@@ -2,7 +2,7 @@
 
 ## Decision
 
-SQLite FTS5 is the lexical baseline. The exact `sqlite-vec==0.1.6` package is pinned behind a local LangChain `VectorStore` adapter, with `BaseRetriever` composition and an exact cosine scan reserved for an explicitly bounded small-catalog fallback.
+SQLite FTS5 is the lexical baseline. The exact stable `sqlite-vec==0.1.9` package is pinned behind a local LangChain `VectorStore` adapter, with `BaseRetriever` composition and an exact cosine scan reserved for an explicitly bounded small-catalog fallback. The alpha `0.1.10` line is not selected.
 
 ## Embedding compatibility
 
@@ -10,4 +10,4 @@ Document inputs use the deterministic `title: ... — section | text: ...` profi
 
 ## Consequences and evidence
 
-WT0 proves FTS5, `sqlite-vec==0.1.6` extension loading, a `vec0` insert/query on macOS arm64 with the locked Python 3.12.11 environment, LangChain adapter classes, a `BaseRetriever.invoke` nearest-vector result, and hard exact-scan size/profile rejection boundaries offline. Later RAG work must validate vector encoding, integrity, and provider availability before promoting a catalog. The live Gemini Embedding 2 probe preserves the asymmetric document/query text formats and uses the same model and dimensionality without forcing legacy `task_type` values; if the pinned wrapper or endpoint requires a different API shape, that is reported as unavailable rather than hidden.
+WT0 proves FTS5, `sqlite-vec==0.1.9` extension loading, a `vec0` insert/query on macOS arm64 with the locked Python 3.12.11 environment, LangChain adapter classes, a `BaseRetriever.invoke` nearest-vector result, and hard exact-scan size/profile rejection boundaries offline. Later RAG work must validate vector encoding, integrity, and provider availability before promoting a catalog. The live Gemini Embedding 2 probe preserves the asymmetric document/query text formats and uses the same model and dimensionality without forcing legacy `task_type` values; if the pinned wrapper or endpoint requires a different API shape, that is reported as unavailable rather than hidden.
