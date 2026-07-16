@@ -40,10 +40,12 @@ Source blocks are serialized as ordered JSON data and passed only through the co
 receive no shell, network, browser, code-execution, or file-write capability.
 
 The persisted `AnalysisReport` schema includes Pydantic validation keywords outside Gemini's
-native JSON Schema subset. `GeminiAnalysisReport` is a narrow provider adapter: it removes only
-unsupported provider-side keywords and closes free-form maps, then promotes the response through
-the complete `AnalysisReport` Pydantic contract. The returned artifact is therefore valid against
-the repository's authoritative schema even though Gemini receives a compatible projection.
+native JSON Schema subset. Each provider call uses an exact stage report (`MacroAnalysis`,
+`SectionAnalysis`, `DiscoveryAnalysis`, `RagReadinessAnalysis`, or the dedicated
+`SynthesisAnalysis`) instead of sending the full union graph. The adapters remove only unsupported
+provider-side keywords and close free-form maps, then promote every response through the complete
+`AnalysisReport` Pydantic contract. The returned artifact is therefore valid against the
+repository's authoritative schema even though Gemini receives a smaller compatible projection.
 
 ## Fail-closed invariants
 

@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from document_enhancer.domain.schema_registry import schema_models
+from document_enhancer.llm.profiles import resolve_route
 from document_enhancer.references.loader import ReferencePack, load_reference_pack
 
 from .errors import (
@@ -185,6 +186,27 @@ def _prompt_errors(
             errors.append(
                 f"prompt {prompt.prompt_id}: token/output budgets exceed the hard safety bound"
             )
+        try:
+            route = resolve_route(prompt.model_route)
+        except ValueError as exc:
+            errors.append(f"prompt {prompt.prompt_id}: {exc}")
+        else:
+            total_budget = prompt.token_budget + prompt.output_budget
+            if total_budget > route.token_budget:
+                errors.append(
+                    f"prompt {prompt.prompt_id}: input-plus-output budget {total_budget} "
+                    f"exceeds exact route cap {route.token_budget}"
+                )
+            if prompt.output_budget > route.output_budget:
+                errors.append(
+                    f"prompt {prompt.prompt_id}: output budget {prompt.output_budget} "
+                    f"exceeds exact route cap {route.output_budget}"
+                )
+            if prompt.output_budget > route.max_output_tokens:
+                errors.append(
+                    f"prompt {prompt.prompt_id}: output budget {prompt.output_budget} "
+                    f"exceeds provider max_output_tokens {route.max_output_tokens}"
+                )
         if _FORBIDDEN_TOOL_RE.search(" ".join(prompt.optional_tools)):
             errors.append(f"prompt {prompt.prompt_id}: prohibited optional tool configured")
         for variable in prompt.variables:

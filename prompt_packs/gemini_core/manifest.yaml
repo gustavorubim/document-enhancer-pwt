@@ -1,6 +1,6 @@
 schema_version: "1.0"
 pack_id: gemini_core
-version: "1.0.3"
+version: "1.0.4"
 description: >-
   Versioned, Gemini-first prompt pack for governed document enhancement and grounded local RAG.
 owner: Document Enhancer Prompt Governance
@@ -106,7 +106,7 @@ file_digests:
   audit/remediation-routing.md: aad1588c9bd94cd173e8d23a2ad70c860721da474af30cc2009fbcf997a61118
   clarification/questions.md: 5f99be2b4e90b811d572ed503b8d0a21a67dc1c24eb005889c6a6835dbb45371
   clarification/rewrite-checklist.md: 356a6a5cc0060c461fe6dcb58577f770be2d45c190a1262da15a68833d97e4a0
-  golden/compositions.yaml: 5e541ca6eeab021cecdd2fd466e117325a6ec3a153594a7fd2cd4fde13255fcc
+  golden/compositions.yaml: 1a884614462d7dfe44b343496d454ad0c25860c5ffdfaa0a5c1a4eef5c0ec528
   golden/fake_outputs.json: c56cd2b5738027a726b1621f6df08b16aa7a56d3b391be9fd74b393bb35b8531
   rag/citation-audit.md: 60a64d31aa960cbf280c3954fe9aeb3cbbde6f99cf7280cfcc605748d947b4c5
   rag/entity-linking.md: 579717547253ccf0e0399423c3dbb92ba1c594e16031534a5e69618c66a6d4dd

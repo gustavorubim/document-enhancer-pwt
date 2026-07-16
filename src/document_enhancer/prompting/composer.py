@@ -74,6 +74,8 @@ class ComposedPrompt:
     pack_manifest_sha256: str
     pack_sha256: str
     reference_scope: tuple[str, ...]
+    input_token_budget: int
+    output_token_budget: int
     text: str
     resolution: PromptResolution
     resolved_references: tuple[ResolvedReferenceInput, ...]
@@ -91,12 +93,12 @@ def _canonical(value: Any) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
 
-def _schema_json(schema_name: str) -> str:
+def _schema_digest(schema_name: str) -> str:
     models = schema_models()
     model = models.get(schema_name)
     if model is None:
         raise PromptPackValidationError(f"unknown output schema: {schema_name}")
-    return json.dumps(model.model_json_schema(), sort_keys=True, separators=(",", ":"))
+    return _digest(_canonical(model.model_json_schema()))
 
 
 def _variable_type_ok(variable: PromptVariable, value: Any) -> bool:
@@ -231,9 +233,8 @@ class PromptPackComposer:
                 raise PromptPackValidationError(f"unknown composition-order segment: {item}")
             rendered_parts.append(segments[item])
         rendered = "\n\n".join(part for part in rendered_parts if part.strip())
-        # The budget is expressed in provider tokens; JSON Schema text is part of the governed
-        # prompt and is substantially denser than ordinary prose, so use a conservative 8-char
-        # conversion while retaining the absolute hard cap.
+        # The budget is expressed in provider tokens. The complete schema is enforced through
+        # native structured output and Pydantic promotion, not duplicated into prompt text.
         if len(rendered) > MAX_RENDERED_CHARS or len(rendered) > spec.token_budget * 8:
             raise PromptPackSecurityError(
                 f"composed prompt exceeds the bounded input budget for {prompt_id}"
@@ -276,6 +277,8 @@ class PromptPackComposer:
             pack_manifest_sha256=self.pack.manifest_sha256,
             pack_sha256=self.pack.pack_sha256,
             reference_scope=reference_scope,
+            input_token_budget=spec.token_budget,
+            output_token_budget=spec.output_budget,
             text=rendered,
             resolution=resolution,
             resolved_references=references,
@@ -411,12 +414,12 @@ class PromptPackComposer:
     def _output_contract(self, spec: PromptSpec) -> str:
         if any(tool.lower() in _DISALLOWED_TOOLS for tool in spec.optional_tools):
             raise PromptPackSecurityError(f"prompt {spec.prompt_id} enables a prohibited tool")
-        schema = _schema_json(spec.output_schema)
+        schema_digest = _schema_digest(spec.output_schema)
         return (
             _contract(self.pack, "output_open")
             + "\n"
             + _contract(self.pack, "output_preamble")
             + f"\nModel route: {spec.model_route}\n"
-            f"Output schema name: {spec.output_schema}\nJSON Schema: {schema}\n"
-            + _contract(self.pack, "output_close")
+            f"Output schema name: {spec.output_schema}\n"
+            f"Output schema SHA-256: {schema_digest}\n" + _contract(self.pack, "output_close")
         )

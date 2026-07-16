@@ -286,12 +286,17 @@ class GeminiModelGateway:
         schema_digest: str,
         input_digests: Sequence[str],
         prompt_digest: str,
+        token_budget: int,
+        output_budget: int,
     ) -> CacheKey:
+        parameters = route.parameters()
+        parameters["call_token_budget"] = token_budget
+        parameters["call_output_budget"] = output_budget
         return CacheKey(
             provider="google",
             backend=self.config.backend.value,
             model=route.model,
-            parameters=route.parameters(),
+            parameters=parameters,
             prompt_digest=prompt_digest or digest_bytes(prompt.encode("utf-8")),
             schema_digest=schema_digest,
             input_digests=tuple(input_digests),
@@ -316,6 +321,8 @@ class GeminiModelGateway:
         retries: int,
         repairs: int,
         started: float,
+        token_budget: int,
+        output_budget: int,
         usage: UsageMetadata | None = None,
         response_digest: str | None = None,
         error: BaseException | None = None,
@@ -345,8 +352,8 @@ class GeminiModelGateway:
             duration_ms=(time.perf_counter() - started) * 1000,
             usage=usage,
             response_digest=response_digest,
-            token_budget=effective.token_budget,
-            output_budget=effective.output_budget,
+            token_budget=token_budget,
+            output_budget=output_budget,
             cost_budget_usd=effective.cost_budget_usd,
             error_class=error_class,
             error_type=type(error).__name__ if error else None,
@@ -367,8 +374,26 @@ class GeminiModelGateway:
         prompt_digest: str | None = None,
         input_digests: Sequence[str] = (),
         use_cache: bool = True,
+        input_token_budget: int | None = None,
+        output_token_budget: int | None = None,
     ) -> StructuredCall[ArtifactT]:
         resolved = resolve_route(route)
+        if (input_token_budget is None) != (output_token_budget is None):
+            raise ValueError("input and output token budgets must be supplied together")
+        if input_token_budget is None or output_token_budget is None:
+            call_token_budget = resolved.token_budget
+            call_output_budget = resolved.output_budget
+        else:
+            if input_token_budget < 1 or output_token_budget < 1:
+                raise ValueError("input and output token budgets must be positive")
+            call_token_budget = input_token_budget + output_token_budget
+            call_output_budget = output_token_budget
+            if call_token_budget > resolved.token_budget:
+                raise ValueError(
+                    "prompt input-plus-output budget exceeds the exact route token cap"
+                )
+            if call_output_budget > resolved.output_budget:
+                raise ValueError("prompt output budget exceeds the exact route output cap")
         actual_stage = stage or (resolved.stage if route == resolved.route_id else route)
         native_schema = gemini_schema(schema)
         schema_digest = digest_json(native_schema)
@@ -379,6 +404,8 @@ class GeminiModelGateway:
             schema_digest=schema_digest,
             input_digests=input_digests,
             prompt_digest=resolved_prompt_digest,
+            token_budget=call_token_budget,
+            output_budget=call_output_budget,
         )
         call_id = uuid.uuid4().hex
         started = time.perf_counter()
@@ -419,6 +446,8 @@ class GeminiModelGateway:
                     response_digest=record.response_digest,
                     fallback_from=cached_fallback_from,
                     fallback_reason=cached_fallback_reason,
+                    token_budget=call_token_budget,
+                    output_budget=call_output_budget,
                 )
                 self.last_manifest = manifest
                 return StructuredCall(artifact, manifest)
@@ -437,6 +466,8 @@ class GeminiModelGateway:
                 key=key,
                 call_id=call_id,
                 started=started,
+                token_budget=call_token_budget,
+                output_budget=call_output_budget,
             )
         except ProviderError as exc:
             if resolved.route_id != ROUTE_PRO_PREVIEW or not self.config.allow_pro_fallback:
@@ -460,6 +491,8 @@ class GeminiModelGateway:
                 started=started,
                 fallback_from=resolved.route_id,
                 fallback_reason=_error_text(exc),
+                token_budget=call_token_budget,
+                output_budget=call_output_budget,
             )
             result.manifest.status = CallStatus.FALLBACK
             if self._cache is not None:
@@ -515,6 +548,8 @@ class GeminiModelGateway:
         key: CacheKey,
         call_id: str,
         started: float,
+        token_budget: int,
+        output_budget: int,
         fallback_from: str | None = None,
         fallback_reason: str | None = None,
     ) -> StructuredCall[ArtifactT]:
@@ -546,7 +581,13 @@ class GeminiModelGateway:
                 usage = callback.usage or UsageMetadata.from_response(response)
                 artifact = validate_artifact(schema, _extract_parsed(response))
                 artifact_payload = artifact_json(schema, artifact)
-                self._enforce_budget(effective, usage, artifact_payload)
+                self._enforce_budget(
+                    effective,
+                    usage,
+                    artifact_payload,
+                    token_budget=token_budget,
+                    output_budget=output_budget,
+                )
             except (StructuredOutputError, ValueError) as exc:
                 if repairs >= min(
                     effective.structured_repairs,
@@ -575,6 +616,8 @@ class GeminiModelGateway:
                         error=exc,
                         fallback_from=fallback_from,
                         fallback_reason=fallback_reason,
+                        token_budget=token_budget,
+                        output_budget=output_budget,
                     )
                     self.last_manifest = manifest
                     raise ProviderError(
@@ -611,6 +654,8 @@ class GeminiModelGateway:
                         error=lifecycle,
                         fallback_from=fallback_from,
                         fallback_reason=fallback_reason,
+                        token_budget=token_budget,
+                        output_budget=output_budget,
                     )
                     self.last_manifest = manifest
                     raise lifecycle from exc
@@ -640,6 +685,8 @@ class GeminiModelGateway:
                         error=exc,
                         fallback_from=fallback_from,
                         fallback_reason=fallback_reason,
+                        token_budget=token_budget,
+                        output_budget=output_budget,
                     )
                     self.last_manifest = manifest
                     raise ProviderError(
@@ -671,6 +718,8 @@ class GeminiModelGateway:
                     response_digest=response_digest,
                     fallback_from=fallback_from,
                     fallback_reason=fallback_reason,
+                    token_budget=token_budget,
+                    output_budget=output_budget,
                 )
                 if self._cache is not None:
                     self._cache.put(
@@ -682,12 +731,29 @@ class GeminiModelGateway:
 
     @staticmethod
     def _enforce_budget(
-        route: GeminiRoute, usage: UsageMetadata | None, artifact: Mapping[str, Any]
+        route: GeminiRoute,
+        usage: UsageMetadata | None,
+        artifact: Mapping[str, Any],
+        *,
+        token_budget: int | None = None,
+        output_budget: int | None = None,
     ) -> None:
+        bounded_tokens = route.token_budget if token_budget is None else token_budget
+        bounded_output = route.output_budget if output_budget is None else output_budget
+        bounded_input = bounded_tokens - bounded_output
         if usage is not None:
-            if usage.total_tokens is not None and usage.total_tokens > route.token_budget:
+            observed_total = usage.total_tokens
+            if (
+                observed_total is None
+                and usage.input_tokens is not None
+                and usage.output_tokens is not None
+            ):
+                observed_total = usage.input_tokens + usage.output_tokens
+            if usage.input_tokens is not None and usage.input_tokens > bounded_input:
+                raise BudgetExceededError("model request exceeded the stage input token budget")
+            if observed_total is not None and observed_total > bounded_tokens:
                 raise BudgetExceededError("model response exceeded the stage token budget")
-            if usage.output_tokens is not None and usage.output_tokens > route.output_budget:
+            if usage.output_tokens is not None and usage.output_tokens > bounded_output:
                 raise BudgetExceededError("model response exceeded the stage output budget")
             if (
                 usage.cost_usd is not None
@@ -696,7 +762,7 @@ class GeminiModelGateway:
             ):
                 raise BudgetExceededError("model response exceeded the stage cost budget")
         estimated_output_tokens = max(1, len(canonical_json(artifact)) // 4)
-        if estimated_output_tokens > route.output_budget:
+        if estimated_output_tokens > bounded_output:
             raise BudgetExceededError(
                 "serialized structured artifact exceeded the stage output budget"
             )

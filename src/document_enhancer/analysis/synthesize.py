@@ -6,7 +6,12 @@ import hashlib
 from collections import defaultdict
 from collections.abc import Iterable
 
-from document_enhancer.domain.analysis import AnalysisReport, Finding, FindingSet
+from document_enhancer.domain.analysis import (
+    AnalysisReport,
+    Finding,
+    FindingSet,
+    SynthesisAnalysis,
+)
 from document_enhancer.domain.enums import FindingSeverity
 from document_enhancer.llm.models import GeminiModelGateway
 from document_enhancer.llm.profiles import ROUTE_FLASH
@@ -177,6 +182,8 @@ def _canonicalize_model_report(
         raise AnalysisIdentityError("finding synthesis must return at least one analysis result")
     analyses = []
     for analysis in report.analyses:
+        if not isinstance(analysis, SynthesisAnalysis):
+            raise AnalysisIdentityError("finding synthesis returned a non-synthesis analysis type")
         if analysis.prompt_id not in (None, prompt_id):
             raise AnalysisIdentityError(
                 f"synthesis analysis {analysis.analysis_id} has a mismatched prompt ID"

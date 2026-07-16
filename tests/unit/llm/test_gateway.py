@@ -118,6 +118,48 @@ def test_native_structured_output_is_promoted_and_manifest_is_digest_only() -> N
     assert result.manifest.prompt_digest
 
 
+def test_prompt_scoped_usage_within_budget_is_accepted_and_overage_fails_closed() -> None:
+    class UsageModel:
+        def __init__(self, total_tokens: int) -> None:
+            self.total_tokens = total_tokens
+
+        def with_structured_output(self, *_: object, **__: object) -> object:
+            parent = self
+
+            class Runnable:
+                def invoke(self, *_: object, **__: object) -> object:
+                    return {
+                        "parsed": {"ok": True, "note": "bounded"},
+                        "usage_metadata": {
+                            "input_tokens": parent.total_tokens - 8_000,
+                            "output_tokens": 8_000,
+                            "total_tokens": parent.total_tokens,
+                        },
+                    }
+
+            return Runnable()
+
+    accepted = gateway(UsageModel(30_000)).invoke(
+        route=ROUTE_FLASH,
+        schema=Probe,
+        prompt="macro prompt",
+        input_token_budget=22_000,
+        output_token_budget=8_000,
+    )
+    assert accepted.artifact.ok is True
+    assert accepted.manifest.token_budget == 30_000
+    assert accepted.manifest.output_budget == 8_000
+
+    with pytest.raises(ProviderError, match="configured retry policy"):
+        gateway(UsageModel(30_001)).invoke(
+            route=ROUTE_FLASH,
+            schema=Probe,
+            prompt="macro prompt",
+            input_token_budget=22_000,
+            output_token_budget=8_000,
+        )
+
+
 def test_bounded_repair_retries_invalid_structured_response() -> None:
     fake = FakeStructuredModel([{"ok": "not-a-bool", "note": "bad"}, {"ok": True, "note": "fixed"}])
     governed_prompt = "caller-composed governed prompt"

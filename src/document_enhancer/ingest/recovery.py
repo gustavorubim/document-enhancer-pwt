@@ -1571,6 +1571,8 @@ class StructureRecoveryService:
             prompt_version=composed.resolution.pack_version,
             prompt_digest=composed.digest,
             input_digests=input_digests,
+            input_token_budget=composed.input_token_budget,
+            output_token_budget=composed.output_token_budget,
         )
         schema_label = {
             GatewayStructureScan: "StructureScan",
