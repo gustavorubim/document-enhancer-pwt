@@ -51,6 +51,8 @@ from document_enhancer.ingest.models import NormalizedDocument, RawDocument
 from document_enhancer.ingest.normalize import normalize_document
 from document_enhancer.ingest.pipeline import ParserRegistry, parse_source
 from document_enhancer.ingest.recovery import StructureRecoveryConfig, StructureRecoveryService
+from document_enhancer.llm import EmbeddingProfile, GeminiEmbeddingAdapter
+from document_enhancer.rag import OfflineDeterministicEmbedder, build_package, ingest_package
 from document_enhancer.references.loader import load_reference_pack
 from document_enhancer.rewrite import (
     EnhancedDocumentModel,
@@ -107,6 +109,11 @@ class WorkflowServices:
     )
     max_rewrite_revisions: int = 2
     max_audit_revisions: int = 1
+    rag_enabled: bool = True
+    auto_catalog_ingest: bool = True
+    catalog_path: Path | None = None
+    embedding_profile: EmbeddingProfile = field(default_factory=EmbeddingProfile)
+    embedding_adapter: GeminiEmbeddingAdapter | None = None
 
     def attach_run(self, raw: RawDocument, *, run_id: str | None = None) -> None:
         resolved_run_id = run_id or self.run_id or content_addressed_run_id(raw.source_digest)
@@ -1008,6 +1015,39 @@ def export_node(state: WorkflowState, services: WorkflowServices) -> WorkflowSta
     return _finish_stage(state, services, "export")
 
 
+def rag_build_node(state: WorkflowState, services: WorkflowServices) -> WorkflowState:
+    if not services.rag_enabled:
+        state["rag_build"] = {"status": "disabled"}
+        return _finish_stage(state, services, "rag_build")
+    adapter = services.embedding_adapter
+    if adapter is None and services.offline:
+        adapter = GeminiEmbeddingAdapter(
+            profile=services.embedding_profile,
+            embedder=OfflineDeterministicEmbedder(services.embedding_profile.dimensions),
+        )
+    manifest = build_package(
+        services.paths.run_dir,
+        adapter=adapter,
+        profile=services.embedding_profile,
+    )
+    state["rag_build"] = manifest
+    return _finish_stage(state, services, "rag_build")
+
+
+def catalog_ingest_node(state: WorkflowState, services: WorkflowServices) -> WorkflowState:
+    if not services.rag_enabled or not services.auto_catalog_ingest:
+        state["catalog_ingestion"] = {"status": "disabled"}
+        return _finish_stage(state, services, "catalog_ingest")
+    catalog_path = services.catalog_path or services.run_root.parent / "rag/catalog.sqlite3"
+    receipt = ingest_package(
+        services.paths.artifact_path("rag/document-rag.sqlite3"),
+        catalog_path,
+        receipt_path=services.paths.artifact_path("rag/catalog-ingestion.json"),
+    )
+    state["catalog_ingestion"] = receipt.as_dict()
+    return _finish_stage(state, services, "catalog_ingest")
+
+
 def complete_node(state: WorkflowState, services: WorkflowServices) -> WorkflowState:
     state["status"] = "succeeded"
     state["current_stage"] = "complete"
@@ -1022,6 +1062,7 @@ __all__ = [
     "audit_node",
     "analysis_node",
     "checklist_node",
+    "catalog_ingest_node",
     "content_ledger_node",
     "complete_node",
     "chunk_node",
@@ -1032,6 +1073,7 @@ __all__ = [
     "mermaid_validate_node",
     "normalize_node",
     "question_synthesis_node",
+    "rag_build_node",
     "raw_ingest_node",
     "selected_view_node",
     "structure_quality_node",

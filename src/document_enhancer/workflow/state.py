@@ -44,6 +44,8 @@ class WorkflowState(TypedDict, total=False):
     audit_route: str
     chunks: object
     export_bundle: object
+    rag_build: object
+    catalog_ingestion: object
     errors: list[str]
     stop_after: str | None
     gate2_enabled: bool

@@ -22,6 +22,12 @@
       "default": null,
       "title": "Embedding Backend"
     },
+    "embedding_batch_count": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Embedding Batch Count",
+      "type": "integer"
+    },
     "embedding_dimension": {
       "anyOf": [
         {
@@ -58,6 +64,48 @@
       ],
       "default": null,
       "title": "Embedding Model"
+    },
+    "embedding_profile": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Embedding Profile"
+    },
+    "embedding_provider": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Embedding Provider"
+    },
+    "embedding_retry_count": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Embedding Retry Count",
+      "type": "integer"
+    },
+    "embedding_task_type": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Embedding Task Type"
     },
     "failed_count": {
       "default": 0,

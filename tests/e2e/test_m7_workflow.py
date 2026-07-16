@@ -25,7 +25,15 @@ def test_offline_graph_executes_audit_diff_chunk_and_export_idempotently(tmp_pat
     result = DocumentWorkflow(services).run()
     assert result.status == "succeeded"
     assert result.current_stage == "complete"
-    assert result.completed_stages[-5:] == ["audit", "diff", "chunk", "export", "complete"]
+    assert result.completed_stages[-7:] == [
+        "audit",
+        "diff",
+        "chunk",
+        "export",
+        "rag_build",
+        "catalog_ingest",
+        "complete",
+    ]
 
     run_dir = tmp_path / "runs" / result.run_id
     assert validate_export_bundle(run_dir / "export") == ()
@@ -35,6 +43,8 @@ def test_offline_graph_executes_audit_diff_chunk_and_export_idempotently(tmp_pat
     assert audit["independent_audit"]["provider"] == "offline-deterministic-fake"
     assert manifest["validation_passed"] is True
     assert manifest["chunks_count"] > 0
+    assert (run_dir / "rag/document-rag.sqlite3").is_file()
+    assert (run_dir / "rag/catalog-ingestion.json").is_file()
 
     resumed = DocumentWorkflow(
         WorkflowServices(

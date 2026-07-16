@@ -273,15 +273,36 @@ class RagBuildManifest(StrictModel):
     foreign_key_check_passed: StrictBool
     graph_layer_counts: dict[StrictStr, StrictInt] = Field(default_factory=dict)
     embedding_model: StrictStr | None = None
+    embedding_provider: StrictStr | None = None
     embedding_backend: StrictStr | None = None
+    embedding_task_type: StrictStr | None = None
+    embedding_profile: StrictStr | None = None
     embedding_dimension: StrictInt | None = Field(default=None, gt=0)
     embedding_input_format_version: StrictStr | None = None
+    embedding_batch_count: StrictInt = Field(default=0, ge=0)
+    embedding_retry_count: StrictInt = Field(default=0, ge=0)
     vector_count: StrictInt = Field(default=0, ge=0)
     failed_count: StrictInt = Field(default=0, ge=0)
     skipped_count: StrictInt = Field(default=0, ge=0)
     promotion_status: Literal["not_started", "failed", "promoted"]
     validation_passed: StrictBool
     generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+class CatalogIngestionReceipt(StrictModel):
+    schema_version: StrictStr = "m7.catalog-ingestion.v1"
+    ingestion_id: StrictStr
+    rag_build_id: StrictStr
+    document_id: StrictStr = Field(pattern=r"^DOC-[A-Z0-9-]+$")
+    version_id: StrictStr = Field(pattern=r"^(DOCV|VER)-[A-Z0-9-]+$")
+    catalog_generation: StrictInt = Field(gt=0)
+    idempotent: StrictBool
+    catalog_path: StrictStr
+    status: Literal["promoted"] = "promoted"
+    ingested_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+    def as_dict(self) -> dict[str, object]:
+        return self.model_dump(mode="json")
 
 
 class RagQuery(StrictModel):
