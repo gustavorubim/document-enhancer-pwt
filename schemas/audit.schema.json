@@ -1,5 +1,50 @@
 {
   "$defs": {
+    "AuditEvidence": {
+      "additionalProperties": false,
+      "description": "One immutable input or output citation used by an audit result.",
+      "properties": {
+        "artifact": {
+          "title": "Artifact",
+          "type": "string"
+        },
+        "digest": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Digest"
+        },
+        "locator": {
+          "title": "Locator",
+          "type": "string"
+        },
+        "quote": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Quote"
+        }
+      },
+      "required": [
+        "artifact",
+        "locator"
+      ],
+      "title": "AuditEvidence",
+      "type": "object"
+    },
     "AuditFindingKind": {
       "enum": [
         "editorial",
@@ -12,6 +57,50 @@
       "title": "AuditFindingKind",
       "type": "string"
     },
+    "AuditRoutingDecision": {
+      "additionalProperties": false,
+      "properties": {
+        "audit_revision": {
+          "minimum": 0,
+          "title": "Audit Revision",
+          "type": "integer"
+        },
+        "blocker_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blocker Ids",
+          "type": "array"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "remaining_audit_revisions": {
+          "minimum": 0,
+          "title": "Remaining Audit Revisions",
+          "type": "integer"
+        },
+        "route": {
+          "enum": [
+            "export",
+            "auto_revise",
+            "human_review",
+            "failed"
+          ],
+          "title": "Route",
+          "type": "string"
+        }
+      },
+      "required": [
+        "route",
+        "reason",
+        "audit_revision",
+        "remaining_audit_revisions"
+      ],
+      "title": "AuditRoutingDecision",
+      "type": "object"
+    },
     "AuditStatus": {
       "enum": [
         "pass",
@@ -21,13 +110,90 @@
       "title": "AuditStatus",
       "type": "string"
     },
+    "ContentAuditFinding": {
+      "additionalProperties": false,
+      "properties": {
+        "auto_revisable": {
+          "default": false,
+          "title": "Auto Revisable",
+          "type": "boolean"
+        },
+        "blocking": {
+          "default": false,
+          "title": "Blocking",
+          "type": "boolean"
+        },
+        "category": {
+          "title": "Category",
+          "type": "string"
+        },
+        "finding_id": {
+          "title": "Finding Id",
+          "type": "string"
+        },
+        "output_evidence": {
+          "items": {
+            "$ref": "#/$defs/AuditEvidence"
+          },
+          "minItems": 1,
+          "title": "Output Evidence",
+          "type": "array"
+        },
+        "proposed_disposition": {
+          "title": "Proposed Disposition",
+          "type": "string"
+        },
+        "severity": {
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "blocker"
+          ],
+          "title": "Severity",
+          "type": "string"
+        },
+        "source_evidence": {
+          "items": {
+            "$ref": "#/$defs/AuditEvidence"
+          },
+          "minItems": 1,
+          "title": "Source Evidence",
+          "type": "array"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        }
+      },
+      "required": [
+        "finding_id",
+        "category",
+        "severity",
+        "summary",
+        "source_evidence",
+        "output_evidence",
+        "proposed_disposition"
+      ],
+      "title": "ContentAuditFinding",
+      "type": "object"
+    },
     "DeterministicCheck": {
       "additionalProperties": false,
       "properties": {
+        "auto_revisable": {
+          "default": false,
+          "title": "Auto Revisable",
+          "type": "boolean"
+        },
         "blocking": {
           "default": true,
           "title": "Blocking",
           "type": "boolean"
+        },
+        "category": {
+          "title": "Category",
+          "type": "string"
         },
         "check_id": {
           "title": "Check Id",
@@ -47,7 +213,7 @@
         },
         "evidence": {
           "items": {
-            "type": "string"
+            "$ref": "#/$defs/AuditEvidence"
           },
           "title": "Evidence",
           "type": "array"
@@ -59,176 +225,75 @@
         "passed": {
           "title": "Passed",
           "type": "boolean"
+        },
+        "waived_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Waived By"
         }
       },
       "required": [
         "check_id",
         "name",
+        "category",
         "passed"
       ],
       "title": "DeterministicCheck",
       "type": "object"
     },
-    "EvidenceQuote": {
+    "IndependentAuditResult": {
       "additionalProperties": false,
       "properties": {
-        "end_offset": {
-          "anyOf": [
-            {
-              "minimum": 0,
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "End Offset"
-        },
-        "quote": {
-          "title": "Quote",
+        "audit_id": {
+          "title": "Audit Id",
           "type": "string"
         },
-        "span_id": {
-          "title": "Span Id",
-          "type": "string"
-        },
-        "start_offset": {
-          "anyOf": [
-            {
-              "minimum": 0,
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Start Offset"
-        }
-      },
-      "required": [
-        "span_id",
-        "quote"
-      ],
-      "title": "EvidenceQuote",
-      "type": "object"
-    },
-    "Finding": {
-      "additionalProperties": false,
-      "properties": {
-        "blocking": {
-          "default": false,
-          "title": "Blocking",
-          "type": "boolean"
-        },
-        "category": {
-          "title": "Category",
-          "type": "string"
-        },
-        "evidence": {
+        "findings": {
           "items": {
-            "$ref": "#/$defs/EvidenceQuote"
+            "$ref": "#/$defs/ContentAuditFinding"
           },
-          "title": "Evidence",
+          "title": "Findings",
           "type": "array"
         },
-        "finding_id": {
-          "title": "Finding Id",
+        "generated_at": {
+          "format": "date-time",
+          "title": "Generated At",
           "type": "string"
         },
-        "finding_type": {
-          "$ref": "#/$defs/FindingType"
-        },
-        "impact": {
-          "title": "Impact",
-          "type": "string"
-        },
-        "proposed_disposition": {
-          "title": "Proposed Disposition",
-          "type": "string"
-        },
-        "requirement_id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Requirement Id"
-        },
-        "requires_human_answer": {
-          "title": "Requires Human Answer",
+        "isolated_context": {
+          "const": true,
+          "default": true,
+          "title": "Isolated Context",
           "type": "boolean"
         },
-        "severity": {
-          "$ref": "#/$defs/FindingSeverity"
+        "provider": {
+          "title": "Provider",
+          "type": "string"
         },
-        "target_object_id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
+        "status": {
+          "enum": [
+            "pass",
+            "fail",
+            "unavailable"
           ],
-          "default": null,
-          "title": "Target Object Id"
-        },
-        "target_template_section": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Target Template Section"
+          "title": "Status",
+          "type": "string"
         }
       },
       "required": [
-        "finding_id",
-        "category",
-        "severity",
-        "finding_type",
-        "impact",
-        "proposed_disposition",
-        "requires_human_answer"
+        "audit_id",
+        "status",
+        "provider"
       ],
-      "title": "Finding",
+      "title": "IndependentAuditResult",
       "type": "object"
-    },
-    "FindingSeverity": {
-      "enum": [
-        "blocker",
-        "high",
-        "medium",
-        "low",
-        "informational"
-      ],
-      "title": "FindingSeverity",
-      "type": "string"
-    },
-    "FindingType": {
-      "enum": [
-        "missing",
-        "ambiguous",
-        "conflicting",
-        "duplicate",
-        "vague",
-        "unsupported",
-        "noncompliant",
-        "extraction_risk",
-        "improvement"
-      ],
-      "title": "FindingType",
-      "type": "string"
     },
     "QuestionStatus": {
       "enum": [
@@ -275,6 +340,12 @@
           "type": "string"
         },
         "change_type": {
+          "enum": [
+            "added",
+            "removed",
+            "changed",
+            "retyped"
+          ],
           "title": "Change Type",
           "type": "string"
         },
@@ -450,13 +521,6 @@
       "title": "Audit Id",
       "type": "string"
     },
-    "content_findings": {
-      "items": {
-        "$ref": "#/$defs/Finding"
-      },
-      "title": "Content Findings",
-      "type": "array"
-    },
     "deterministic_checks": {
       "items": {
         "$ref": "#/$defs/DeterministicCheck"
@@ -474,11 +538,17 @@
       "title": "Generated At",
       "type": "string"
     },
+    "independent_audit": {
+      "$ref": "#/$defs/IndependentAuditResult"
+    },
     "revision_count": {
       "default": 0,
       "minimum": 0,
       "title": "Revision Count",
       "type": "integer"
+    },
+    "routing": {
+      "$ref": "#/$defs/AuditRoutingDecision"
     },
     "semantic_diff": {
       "$ref": "#/$defs/SemanticDiff"
@@ -541,7 +611,9 @@
   "required": [
     "audit_id",
     "document_id",
-    "status"
+    "status",
+    "independent_audit",
+    "routing"
   ],
   "title": "Audit",
   "type": "object"

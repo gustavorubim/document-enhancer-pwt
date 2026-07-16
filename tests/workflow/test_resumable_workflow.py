@@ -106,3 +106,9 @@ def test_interrupt_resume_reuses_completed_analysis_and_side_effects(tmp_path: P
     assert calls == ["analysis"]
     assert (run_dir / "workflow-state.json").is_file()
     assert (run_dir / "clarification/questions.yaml").is_file()
+    assert (run_dir / "audit/audit.json").is_file()
+    assert (run_dir / "audit/source-to-target.csv").is_file()
+    assert (run_dir / "export/chunks.jsonl").is_file()
+    assert (run_dir / "export/nodes.jsonl").is_file()
+    assert (run_dir / "export/edges.jsonl").is_file()
+    assert (run_dir / "export/bundle-manifest.json").is_file()

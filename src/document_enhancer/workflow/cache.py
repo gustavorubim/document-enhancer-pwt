@@ -30,6 +30,12 @@ WorkflowStage = Literal[
     "render",
     "semantic",
     "mermaid_validate",
+    "audit",
+    "audit_gate",
+    "audit_failed",
+    "diff",
+    "chunk",
+    "export",
     "complete",
 ]
 
@@ -52,6 +58,12 @@ WORKFLOW_STAGES: tuple[str, ...] = (
     "render",
     "semantic",
     "mermaid_validate",
+    "audit",
+    "audit_gate",
+    "audit_failed",
+    "diff",
+    "chunk",
+    "export",
     "complete",
 )
 
@@ -74,7 +86,13 @@ WORKFLOW_DEPENDENCIES: dict[str, tuple[str, ...]] = {
     "render": ("rewrite_model",),
     "semantic": ("render",),
     "mermaid_validate": ("semantic",),
-    "complete": ("mermaid_validate",),
+    "audit": ("mermaid_validate",),
+    "audit_gate": ("audit",),
+    "audit_failed": ("audit",),
+    "diff": ("audit",),
+    "chunk": ("diff",),
+    "export": ("chunk",),
+    "complete": ("export",),
 }
 
 _FIELD_STAGE_IMPACT: dict[str, tuple[str, ...]] = {
@@ -146,7 +164,7 @@ class CacheInvalidationProof(StrictModel):
 class WorkflowCache:
     """Stable stage keys with input-specific downstream impact."""
 
-    schema_version: str = "m5.workflow-cache.v1"
+    schema_version: str = "m7.workflow-cache.v1"
 
     def key(
         self,
@@ -217,6 +235,12 @@ class WorkflowCache:
                 "render",
                 "semantic",
                 "mermaid_validate",
+                "audit",
+                "audit_gate",
+                "audit_failed",
+                "diff",
+                "chunk",
+                "export",
             }
             changed = [stage for stage in changed if stage not in m6_suffix]
             expected -= m6_suffix
@@ -312,7 +336,27 @@ def stage_inputs_for(stage: str, values: Mapping[str, object]) -> dict[str, obje
             "checklist": values.get("checklist", ""),
             "schema": values.get("schema", ""),
         }
-    if stage in {"render", "semantic", "mermaid_validate", "complete"}:
+    if stage == "audit":
+        return {
+            **common,
+            "semantic_model": values.get("semantic_model", ""),
+            "ledger": values.get("ledger", ""),
+            "waivers": values.get("waivers", ""),
+            "template": values.get("template", ""),
+            "reference": values.get("reference", ""),
+            "schema": values.get("schema", ""),
+        }
+    if stage in {
+        "render",
+        "semantic",
+        "mermaid_validate",
+        "audit_gate",
+        "audit_failed",
+        "diff",
+        "chunk",
+        "export",
+        "complete",
+    }:
         return {
             **common,
             "semantic_model": values.get("semantic_model", ""),

@@ -10,7 +10,7 @@ from document_enhancer.cli import app
 
 
 @pytest.mark.e2e
-def test_offline_cli_completes_m6_and_writes_agreeing_outputs(tmp_path: Path) -> None:
+def test_offline_cli_writes_m6_then_fails_closed_at_strict_m7_audit(tmp_path: Path) -> None:
     result = CliRunner().invoke(
         app,
         [
@@ -22,8 +22,10 @@ def test_offline_cli_completes_m6_and_writes_agreeing_outputs(tmp_path: Path) ->
             "--json",
         ],
     )
-    assert result.exit_code == 0, result.stdout
+    assert result.exit_code == 10, result.stdout
     payload = json.loads(result.stdout)
+    assert payload["status"] == "waiting"
+    assert payload["current_stage"] == "audit"
     run_dir = tmp_path / "runs" / payload["run_id"] / "output"
     required = {
         "content-ledger.jsonl",
@@ -39,3 +41,9 @@ def test_offline_cli_completes_m6_and_writes_agreeing_outputs(tmp_path: Path) ->
     semantic = (run_dir / "enhanced.semantic.yaml").read_text(encoding="utf-8")
     assert model["ledger_id"] in semantic
     assert "AUTHORING" not in (run_dir / "enhanced.md").read_text(encoding="utf-8")
+    audit_dir = run_dir.parent / "audit"
+    assert (audit_dir / "report.md").is_file()
+    audit = json.loads((audit_dir / "audit.json").read_text(encoding="utf-8"))
+    assert audit["status"] == "waiting"
+    assert audit["routing"]["blocker_ids"]
+    assert not (run_dir.parent / "export/bundle-manifest.json").exists()

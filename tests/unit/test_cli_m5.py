@@ -42,8 +42,19 @@ def test_cli_waiting_status_and_prompt_commands(tmp_path: Path) -> None:
     resumed = runner.invoke(
         app, ["resume", payload["run_id"], "--run-dir", str(tmp_path / "runs"), "--json"]
     )
-    assert resumed.exit_code == 0
-    assert json.loads(resumed.stdout)["status"] == "succeeded"
+    # A full resume now includes M7. The architecture document is not a process fixture, so the
+    # strict process/template audit must stop for review rather than report false success.
+    assert resumed.exit_code == 10
+    resumed_payload = json.loads(resumed.stdout)
+    assert resumed_payload["status"] == "waiting"
+    assert resumed_payload["current_stage"] == "audit"
+
+    audited = runner.invoke(
+        app,
+        ["audit", payload["run_id"], "--run-dir", str(tmp_path / "runs"), "--json"],
+    )
+    assert audited.exit_code == 30
+    assert json.loads(audited.stdout)["status"] == "waiting"
 
     prompts = runner.invoke(app, ["prompts", "list", "--json"])
     assert prompts.exit_code == 0

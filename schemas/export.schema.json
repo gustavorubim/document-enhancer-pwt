@@ -64,6 +64,13 @@
     "ExportBundleManifest": {
       "additionalProperties": false,
       "properties": {
+        "artifact_counts": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Artifact Counts",
+          "type": "object"
+        },
         "artifact_digests": {
           "additionalProperties": {
             "type": "string"
@@ -73,6 +80,10 @@
         },
         "bundle_id": {
           "title": "Bundle Id",
+          "type": "string"
+        },
+        "chunk_schema_version": {
+          "title": "Chunk Schema Version",
           "type": "string"
         },
         "chunks_count": {
@@ -90,6 +101,10 @@
           "title": "Edges Count",
           "type": "integer"
         },
+        "enhanced_digest": {
+          "title": "Enhanced Digest",
+          "type": "string"
+        },
         "generated_at": {
           "format": "date-time",
           "title": "Generated At",
@@ -99,14 +114,65 @@
           "title": "Generation Policy",
           "type": "string"
         },
+        "graph_schema_version": {
+          "title": "Graph Schema Version",
+          "type": "string"
+        },
         "nodes_count": {
           "minimum": 0,
           "title": "Nodes Count",
           "type": "integer"
         },
+        "ontology_version": {
+          "title": "Ontology Version",
+          "type": "string"
+        },
+        "reference_pack_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reference Pack Id"
+        },
+        "reference_pack_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reference Pack Version"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
         "schema_version": {
           "title": "Schema Version",
           "type": "string"
+        },
+        "semantic_digest": {
+          "title": "Semantic Digest",
+          "type": "string"
+        },
+        "source_digest": {
+          "title": "Source Digest",
+          "type": "string"
+        },
+        "validation_errors": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Validation Errors",
+          "type": "array"
         },
         "validation_passed": {
           "title": "Validation Passed",
@@ -123,6 +189,13 @@
         "document_id",
         "version_id",
         "schema_version",
+        "chunk_schema_version",
+        "graph_schema_version",
+        "run_id",
+        "source_digest",
+        "enhanced_digest",
+        "semantic_digest",
+        "ontology_version",
         "generation_policy",
         "chunks_count",
         "nodes_count",
@@ -135,6 +208,9 @@
     "ExportChunk": {
       "additionalProperties": false,
       "properties": {
+        "authority": {
+          "$ref": "#/$defs/Authority"
+        },
         "canonical_terms": {
           "items": {
             "type": "string"
@@ -178,6 +254,17 @@
           "minimum": 0,
           "title": "Ordinal",
           "type": "integer"
+        },
+        "provenance": {
+          "items": {
+            "$ref": "#/$defs/Provenance"
+          },
+          "minItems": 1,
+          "title": "Provenance",
+          "type": "array"
+        },
+        "review_status": {
+          "$ref": "#/$defs/ReviewStatus"
         },
         "section_id": {
           "anyOf": [
@@ -248,6 +335,9 @@
         "document_id",
         "version_id",
         "text",
+        "authority",
+        "review_status",
+        "provenance",
         "security_classification",
         "checksum",
         "ordinal"

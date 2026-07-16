@@ -23,7 +23,7 @@ from document_enhancer.domain.enums import (
     ReviewStatus,
 )
 from document_enhancer.domain.ids import ensure_unique_ids, validate_identifier, validate_span_id
-from document_enhancer.domain.ontology import EntityType, Provenance, Relationship
+from document_enhancer.domain.ontology import Entity, EntityType, Provenance, Relationship
 
 
 class PromptVariable(StrictModel):
@@ -129,6 +129,9 @@ class ExportChunk(StrictModel):
     text: StrictStr
     source_span_ids: list[StrictStr] = Field(default_factory=list)
     markdown_anchor: StrictStr | None = None
+    authority: Authority
+    review_status: ReviewStatus
+    provenance: list[Provenance] = Field(min_length=1)
     security_classification: StrictStr
     valid_from: str | None = None
     valid_to: str | None = None
@@ -164,6 +167,22 @@ class ExportNode(StrictModel):
     review_status: ReviewStatus
     provenance: Provenance
 
+    @classmethod
+    def from_entity(cls, entity: Entity) -> ExportNode:
+        if entity.layer is None or entity.authority is None or entity.review_status is None:
+            raise ValueError(f"entity {entity.id} is missing export authority metadata")
+        return cls(
+            id=entity.id,
+            entity_type=entity.entity_type,
+            canonical_name=entity.canonical_name,
+            aliases=entity.aliases,
+            attributes=entity.attributes,
+            layer=entity.layer,
+            authority=entity.authority,
+            review_status=entity.review_status,
+            provenance=entity.provenance,
+        )
+
 
 class ExportEdge(StrictModel):
     id: StrictStr
@@ -196,11 +215,22 @@ class ExportBundleManifest(StrictModel):
     document_id: StrictStr = Field(pattern=r"^DOC-[A-Z0-9-]+$")
     version_id: StrictStr = Field(pattern=r"^(DOCV|VER)-[A-Z0-9-]+$")
     schema_version: StrictStr
+    chunk_schema_version: StrictStr
+    graph_schema_version: StrictStr
+    run_id: StrictStr
+    source_digest: StrictStr
+    enhanced_digest: StrictStr
+    semantic_digest: StrictStr
+    reference_pack_id: StrictStr | None = None
+    reference_pack_version: StrictStr | None = None
+    ontology_version: StrictStr
     generation_policy: StrictStr
     chunks_count: StrictInt = Field(ge=0)
     nodes_count: StrictInt = Field(ge=0)
     edges_count: StrictInt = Field(ge=0)
     artifact_digests: dict[StrictStr, StrictStr] = Field(default_factory=dict)
+    artifact_counts: dict[StrictStr, StrictInt] = Field(default_factory=dict)
+    validation_errors: list[StrictStr] = Field(default_factory=list)
     validation_passed: StrictBool
     generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
@@ -224,6 +254,8 @@ class ExportBundle(StrictModel):
         ensure_unique_ids(chunk.chunk_id for chunk in self.chunks)
         ensure_unique_ids(node.id for node in self.nodes)
         ensure_unique_ids(edge.id for edge in self.edges)
+        if self.manifest.validation_passed and self.manifest.validation_errors:
+            raise ValueError("validated export manifest cannot contain validation errors")
         return self
 
 
