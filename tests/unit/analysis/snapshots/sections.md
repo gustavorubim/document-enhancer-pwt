@@ -1,6 +1,6 @@
 # Section mapping
 
-- Analysis ID: `AN-SECTIONS-001`
+- Analysis ID: `ANA-SECTIONS-57ADA4357C7F7BD9`
 - Covered source spans: 8/8
 
 ## Source-span dispositions
@@ -20,4 +20,4 @@
 
 | ID | Severity | Type | Category | Evidence | Impact | Proposed disposition | Human answer |
 |---|---|---|---|---|---|---|---|
-| `FND-SCOPE-SECTION` | blocker | conflicting | scope | `SPAN-ANALYSIS00000002`: “The Forecast Analyst runs the monthly forecast using CALC-LOSS-001.” | The source-to-target map cannot establish applicability boundaries. | Block rewrite until scope boundaries are reviewed. | blocking |
+| `FND-SECTIONS-C64E9DFCE76EF2EA` | blocker | conflicting | scope | `SPAN-ANALYSIS00000002`: “The Forecast Analyst runs the monthly forecast using CALC-LOSS-001.” | The source-to-target map cannot establish applicability boundaries. | Block rewrite until scope boundaries are reviewed. | blocking |

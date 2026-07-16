@@ -21,6 +21,7 @@ from typing import Any
 
 _SENSITIVE_KEY = re.compile(r"(?:api[_-]?key|access[_-]?token|authorization|password|secret)", re.I)
 _RAW_INPUT_KEY = re.compile(r"(?:prompt|source[_-]?text|document[_-]?text|raw[_-]?source)", re.I)
+_SAFE_PROMPT_IDENTITY_KEYS = {"prompt_digest", "prompt_id"}
 
 
 def canonical_json(value: object) -> str:
@@ -39,7 +40,10 @@ def _ensure_public(value: object, *, path: str = "value") -> None:
     if isinstance(value, Mapping):
         for key, child in value.items():
             key_text = str(key)
-            if _SENSITIVE_KEY.search(key_text) or _RAW_INPUT_KEY.search(key_text):
+            safe_prompt_identity = key_text.casefold() in _SAFE_PROMPT_IDENTITY_KEYS
+            if _SENSITIVE_KEY.search(key_text) or (
+                _RAW_INPUT_KEY.search(key_text) and not safe_prompt_identity
+            ):
                 raise ValueError(
                     f"sensitive or raw-input field is not cacheable: {path}.{key_text}"
                 )

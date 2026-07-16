@@ -85,8 +85,8 @@ def test_fan_out_fan_in_is_bounded_ordered_injection_safe_and_schema_valid(
     assert len(result.synthesis.conflicts) >= 1
     assert result.synthesis.markdown == _snapshot("synthesis.md")
     final_ids = {finding.finding_id for finding in result.synthesis.finding_set.findings}
-    assert "FND-SCOPE-MACRO" in final_ids
-    assert "FND-SCOPE-SYNTH" not in final_ids
+    assert "FND-MACRO-70319555C5E1E7E2" in final_ids
+    assert "FND-SYNTHESIS-520BA53E0454F7DD" not in final_ids
 
     branch_prompts = [
         str(call["prompt"]) for call in model.calls if call["stage"] != "finding_synthesizer"
@@ -249,15 +249,21 @@ def test_analysis_schema_adapters_are_stage_only_and_keep_full_pydantic_validati
     schema = gemini_schema(adapter)
 
     assert schema["type"] == "object"
-    assert set(schema["properties"]) == {
-        "document_id",
-        "source_digest",
-        "analyses",
-        "generated_at",
-    }
+    assert set(schema["properties"]) == {"analyses"}
     analyses = schema["properties"]["analyses"]
     assert "anyOf" not in analyses["items"]
     assert analyses["items"]["properties"]["analysis_type"]["enum"] == [analysis_type]
+    assert {
+        "analysis_id",
+        "created_at",
+        "document_id",
+        "model_route",
+        "prompt_id",
+        "source_digest",
+        "version_id",
+    }.isdisjoint(analyses["items"]["properties"])
+    finding = analyses["items"]["properties"]["findings"]["items"]
+    assert "finding_id" not in finding["properties"]
 
     unsupported = {
         "const",
@@ -288,14 +294,7 @@ def test_analysis_schema_adapters_are_stage_only_and_keep_full_pydantic_validati
 
     assert_supported(schema)
     with pytest.raises(StructuredOutputError, match="Pydantic validation"):
-        validate_artifact(
-            adapter,
-            {
-                "document_id": "invalid-lowercase-id",
-                "source_digest": "not-a-digest",
-                "analyses": [],
-            },
-        )
+        validate_artifact(adapter, {"analyses": "not-a-list"})
 
 
 def test_section_provider_schema_constrains_disposition_to_canonical_values() -> None:

@@ -41,7 +41,7 @@ class MacroReviewer:
             prompt_id=self.prompt_id,
             variables=prompt_variables(request),
             stage=self.name,
-            source_digest=request.source_digest,
+            request=request,
         )
         analysis = select_analysis(
             request,

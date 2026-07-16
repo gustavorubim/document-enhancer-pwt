@@ -1,6 +1,6 @@
 # Macro analysis
 
-- Analysis ID: `AN-MACRO-001`
+- Analysis ID: `ANA-MACRO-891BB2AEDCE7AF79`
 - Candidate document type: methodology
 - Candidate confidence: 0.91
 - Purpose: Describe monthly loss forecasting work.
@@ -22,4 +22,4 @@
 
 | ID | Severity | Type | Category | Evidence | Impact | Proposed disposition | Human answer |
 |---|---|---|---|---|---|---|---|
-| `FND-SCOPE-MACRO` | high | ambiguous | scope | `SPAN-ANALYSIS00000002`: “The Forecast Analyst runs the monthly forecast using CALC-LOSS-001.” | The operating scope is implied rather than bounded. | Ask the reviewer to define inclusions and exclusions. | yes |
+| `FND-MACRO-70319555C5E1E7E2` | high | ambiguous | scope | `SPAN-ANALYSIS00000002`: “The Forecast Analyst runs the monthly forecast using CALC-LOSS-001.” | The operating scope is implied rather than bounded. | Ask the reviewer to define inclusions and exclusions. | yes |

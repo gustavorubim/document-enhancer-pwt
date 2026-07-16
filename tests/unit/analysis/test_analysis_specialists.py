@@ -13,7 +13,6 @@ from document_enhancer.analysis.discovery import (
 )
 from document_enhancer.analysis.errors import (
     CandidateGraphError,
-    EvidenceResolutionError,
     SourceSpanCoverageError,
 )
 from document_enhancer.analysis.macro import MacroReviewer
@@ -35,6 +34,7 @@ from document_enhancer.domain.analysis import (
     SectionAnalysis,
 )
 from document_enhancer.domain.source import NormalizedDocument, StructuralSection, StructuralView
+from document_enhancer.errors import ProviderError
 from document_enhancer.llm.models import GeminiModelGateway
 from document_enhancer.llm.profiles import ROUTE_FLASH
 from document_enhancer.prompting import PromptPackComposer
@@ -309,5 +309,7 @@ def test_macro_rejects_unresolvable_exact_evidence(
     invalid["analyses"][0]["findings"][0]["evidence"][0]["quote"] = "not in source"
     gateway, _ = gateway_factory({"macro_reviewer": [invalid]})
 
-    with pytest.raises(EvidenceResolutionError, match="does not occur"):
+    # Exact-evidence validation runs inside promotion so invalid content receives the bounded
+    # gateway repair policy and can never be cached as a domain report.
+    with pytest.raises(ProviderError, match="structured output failed"):
         MacroReviewer(composer, gateway).review(analysis_request)

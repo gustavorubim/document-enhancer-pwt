@@ -1,8 +1,7 @@
 """Prompt-pack and Gemini gateway adapters for schema-valid analysis calls.
 
-Persisted stage reports use a Gemini-compatible projection of their complete domain schema.
-Discovery instead uses a deliberately small provider DTO; its separate deterministic promoter
-constructs and validates the persistence-grade ``DiscoveryAnalysis`` contract.
+All analysis calls use narrow provider DTOs. Separate deterministic promoters construct and
+validate persistence-grade reports inside the gateway's bounded repair/cache boundary.
 """
 
 from __future__ import annotations
@@ -12,10 +11,6 @@ from typing import Any
 from document_enhancer.domain.analysis import (
     AnalysisReport,
     DiscoveryAnalysis,
-    MacroAnalysis,
-    RagReadinessAnalysis,
-    SectionAnalysis,
-    SynthesisAnalysis,
 )
 from document_enhancer.llm.models import GeminiModelGateway
 from document_enhancer.llm.profiles import ROUTE_FLASH
@@ -25,73 +20,17 @@ from .errors import AnalysisPromptContractError
 from .models import AnalysisRequest, PromptCallRecord
 from .promotion import promote_discovery_candidate_batch
 from .provider_models import DiscoveryCandidateBatch
+from .stage_promotion import (
+    GeminiMacroAnalysisReport,
+    GeminiRagReadinessAnalysisReport,
+    GeminiSectionAnalysisReport,
+    GeminiSynthesisAnalysisReport,
+    promote_stage_report,
+)
 
 ANALYSIS_OUTPUT_SCHEMA = "analysis.schema.json"
 
-_UNSUPPORTED_VALIDATION_KEYS = {
-    "discriminator",
-    "exclusiveMaximum",
-    "exclusiveMinimum",
-    "maxLength",
-    "maximum",
-    "minLength",
-    "minimum",
-    "multipleOf",
-    "pattern",
-    "uniqueItems",
-}
-
-
-def _provider_schema(value: Any) -> Any:
-    """Return a semantics-preserving Gemini subset of the persisted JSON Schema."""
-
-    if isinstance(value, list):
-        return [_provider_schema(item) for item in value]
-    if not isinstance(value, dict):
-        return value
-    cleaned: dict[str, Any] = {}
-    for original_key, item in value.items():
-        if original_key in _UNSUPPORTED_VALIDATION_KEYS:
-            continue
-        if original_key == "const":
-            cleaned["enum"] = [item]
-            continue
-        key = "anyOf" if original_key == "oneOf" else original_key
-        if key == "additionalProperties" and item is True:
-            # Gemini cannot represent free-form dictionaries. These fields are optional in the
-            # candidate graph and remain fully validated if a provider returns them through a
-            # recorded/future adapter that supports them.
-            cleaned[key] = False
-        else:
-            cleaned[key] = _provider_schema(item)
-    return cleaned
-
-
-class _GeminiStageReport(AnalysisReport):
-    """Provider projection shared by exact stage report contracts."""
-
-    @classmethod
-    def model_json_schema(cls, *args: Any, **kwargs: Any) -> dict[str, Any]:
-        return _provider_schema(super().model_json_schema(*args, **kwargs))
-
-
-class GeminiMacroAnalysisReport(_GeminiStageReport):
-    analyses: list[MacroAnalysis]
-
-
-class GeminiSectionAnalysisReport(_GeminiStageReport):
-    analyses: list[SectionAnalysis]
-
-
-class GeminiRagReadinessAnalysisReport(_GeminiStageReport):
-    analyses: list[RagReadinessAnalysis]
-
-
-class GeminiSynthesisAnalysisReport(_GeminiStageReport):
-    analyses: list[SynthesisAnalysis]
-
-
-_STAGE_SCHEMAS: dict[str, type[_GeminiStageReport]] = {
+_STAGE_SCHEMAS = {
     "analysis.macro": GeminiMacroAnalysisReport,
     "analysis.sections": GeminiSectionAnalysisReport,
     "analysis.rag-readiness": GeminiRagReadinessAnalysisReport,
@@ -138,7 +77,7 @@ def invoke_analysis_report(
     prompt_id: str,
     variables: dict[str, Any],
     stage: str,
-    source_digest: str,
+    request: AnalysisRequest,
 ) -> tuple[AnalysisReport, PromptCallRecord]:
     """Invoke exactly one native-structured Flash call and record all prompt/model evidence."""
 
@@ -150,7 +89,7 @@ def invoke_analysis_report(
             f"analysis prompt has no exact provider schema: {prompt_id}"
         ) from exc
     reference_digests = sorted(
-        item.sha256 for item in composed.resolved_references if item.sha256 != source_digest
+        item.sha256 for item in composed.resolved_references if item.sha256 != request.source_digest
     )
     call = gateway.invoke(
         route=ROUTE_FLASH,
@@ -160,9 +99,15 @@ def invoke_analysis_report(
         prompt_id=prompt_id,
         prompt_version=composed.pack_version,
         prompt_digest=composed.digest,
-        input_digests=[source_digest, *reference_digests],
+        input_digests=[request.source_digest, *reference_digests],
         input_token_budget=composed.input_token_budget,
         output_token_budget=composed.output_token_budget,
+        promote=lambda provider_report: promote_stage_report(
+            request,
+            provider_report,
+            prompt_id=prompt_id,
+        ),
+        result_schema=AnalysisReport,
     )
     manifest = call.manifest
     if (

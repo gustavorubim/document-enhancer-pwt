@@ -1,6 +1,6 @@
 # RAG-readiness analysis
 
-- Analysis ID: `AN-RAG-001`
+- Analysis ID: `ANA-RAGREADINESS-B4E4FE37FD82419A`
 - Undefined acronyms: Not established
 - Vague references: SPAN-ANALYSIS00000004:this, SPAN-ANALYSIS00000005:as needed, SPAN-ANALYSIS00000005:it, as needed
 - Missing IDs: PROV-CALC-LOSS-CALCULATOR-E38D004B02, PROV-CTRL-THRESHOLD-BREACH-REVIEW-49A99B46EF, PROV-EVD-REVIEW-EVIDENCE-9327FA0F5A, PROV-RISK-UNREVIEWED-THRESHOLD-BREACH-4216A0E138, PROV-ROLE-FORECAST-ANALYST-35F9C2B7DB, PROV-STEP-RUN-MONTHLY-FORECAST-DA60AFEACB
@@ -18,7 +18,7 @@
 
 | ID | Severity | Type | Category | Evidence | Impact | Proposed disposition | Human answer |
 |---|---|---|---|---|---|---|---|
-| `FND-RAG-AS-NEEDED` | medium | vague | retrieval_ambiguity | `SPAN-ANALYSIS00000005`: “as needed” | The escalation condition is not independently retrievable. | Define the triggering condition. | yes |
+| `FND-RAGREADINESS-3A5F4EE016B70FB5` | medium | vague | retrieval_ambiguity | `SPAN-ANALYSIS00000005`: “as needed” | The escalation condition is not independently retrievable. | Define the triggering condition. | yes |
 | `FND-RAG-SEMANTIC-OBJECT-IDS-680CE0F75DC5E0` | high | missing | semantic_object_ids | `SPAN-ANALYSIS00000002`: “The Forecast Analyst runs the monthly forecast using CALC-LOSS-001.” | A provisional semantic object ID creates unstable retrieval references. | Assign or approve a permanent ontology-conformant ID. | yes |
 | `FND-RAG-SEMANTIC-OBJECT-IDS-190F2C7C6536D4` | high | missing | semantic_object_ids | `SPAN-ANALYSIS00000002`: “The Forecast Analyst runs the monthly forecast using CALC-LOSS-001.” | A provisional semantic object ID creates unstable retrieval references. | Assign or approve a permanent ontology-conformant ID. | yes |
 | `FND-RAG-SEMANTIC-OBJECT-IDS-573468FFAC8A65` | high | missing | semantic_object_ids | `SPAN-ANALYSIS00000002`: “The Forecast Analyst runs the monthly forecast using CALC-LOSS-001.” | A provisional semantic object ID creates unstable retrieval references. | Assign or approve a permanent ontology-conformant ID. | yes |

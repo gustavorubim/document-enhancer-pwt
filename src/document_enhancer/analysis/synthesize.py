@@ -251,7 +251,7 @@ class FindingSynthesizer:
             prompt_id=self.prompt_id,
             variables=variables,
             stage=self.name,
-            source_digest=request.source_digest,
+            request=request,
         )
         model_report = _canonicalize_model_report(
             request,
