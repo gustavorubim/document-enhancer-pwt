@@ -1,0 +1,80 @@
+{
+  "structure-scan.schema.json": {
+    "scan_id": "SCAN-TEST-001",
+    "document_id": "DOC-TEST-0001",
+    "source_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "parser_outline_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "decision": "accept_parser",
+    "confidence": 0.9,
+    "boundary_regions": [],
+    "evidence_span_ids": [],
+    "ambiguities": [],
+    "model": "fake",
+    "prompt_id": "structure.triage",
+    "prompt_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "structure-recovery.schema.json": {
+    "recovery_id": "RECOVERY-TEST-001",
+    "document_id": "DOC-TEST-0001",
+    "source_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "confidence": 0.9,
+    "sections": [],
+    "dispositions": [],
+    "associations": [],
+    "boundary_alternatives": [],
+    "disagreements": [],
+    "model": "fake",
+    "prompt_id": "structure.recover-window"
+  },
+  "analysis.schema.json": {
+    "document_id": "DOC-TEST-0001",
+    "source_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "analyses": []
+  },
+  "questions.schema.json": {"document_id": "DOC-TEST-0001", "questions": []},
+  "rewrite-checklist.schema.json": {"checklist_id": "CHECK-TEST-001", "document_id": "DOC-TEST-0001", "items": []},
+  "audit.schema.json": {"audit_id": "AUDIT-TEST-001", "document_id": "DOC-TEST-0001", "status": "pass", "deterministic_checks": [], "content_findings": [], "waivers": []},
+  "rag-query.schema.json": {"query_id": "QUERY-TEST-001", "question": "What is supported?", "embedding_profile": "gemini-embedding-2-768"},
+  "rag-answer.schema.json": {"answer_id": "ANSWER-TEST-001", "query_id": "QUERY-TEST-001", "status": "insufficient", "answer_markdown": "Insufficient evidence."},
+  "entity.schema.json": {
+    "id": "ROLE-OWNER",
+    "entity_type": "Role",
+    "name": "Owner",
+    "provenance": {
+      "document_id": "DOC-TEST-0001",
+      "source_span_id": "SPAN-ABCDEFGH",
+      "origin": "source",
+      "authority": "explicit",
+      "layer": "extracted",
+      "extraction_method": "golden_fixture"
+    }
+  },
+  "semantic-document.schema.json": {
+    "document": {
+      "id": "DOC-TEST-0001",
+      "entity_type": "DocumentIdentity",
+      "name": "Test document",
+      "document_type": "process",
+      "namespace": "enterprise_core",
+      "provenance": {"document_id": "DOC-TEST-0001", "source_span_id": "SPAN-ABCDEFGH", "origin": "source", "authority": "explicit", "layer": "authoritative", "extraction_method": "golden_fixture"},
+      "source_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "version": {
+      "id": "DOCV-TEST-0001-V1",
+      "entity_type": "DocumentVersion",
+      "name": "Version 1",
+      "document_id": "DOC-TEST-0001",
+      "version": "1.0",
+      "status": "draft",
+      "provenance": {"document_id": "DOC-TEST-0001", "document_version_id": "DOCV-TEST-0001-V1", "source_span_id": "SPAN-ABCDEFGH", "origin": "source", "authority": "explicit", "layer": "authoritative", "extraction_method": "golden_fixture"}
+    },
+    "objects": [],
+    "relationships": [],
+    "open_issues": [],
+    "provisional_ids": [],
+    "template_id": "process",
+    "template_version": "0.1.0",
+    "ontology_version": "0.1.0",
+    "validation_passed": true
+  }
+}
