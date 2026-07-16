@@ -20,14 +20,18 @@ from document_enhancer.llm.caching import ResponseCache
 class FakeEmbedder:
     def __init__(self) -> None:
         self.document_batches: list[list[str]] = []
+        self.document_kwargs: list[dict[str, object]] = []
         self.query_inputs: list[str] = []
+        self.query_kwargs: list[dict[str, object]] = []
 
-    def embed_documents(self, texts: list[str], **_: object) -> list[list[float]]:
+    def embed_documents(self, texts: list[str], **kwargs: object) -> list[list[float]]:
         self.document_batches.append(texts)
+        self.document_kwargs.append(kwargs)
         return [[float(index + 1)] + [0.0] * 767 for index, _ in enumerate(texts)]
 
-    def embed_query(self, text: str, **_: object) -> list[float]:
+    def embed_query(self, text: str, **kwargs: object) -> list[float]:
         self.query_inputs.append(text)
+        self.query_kwargs.append(kwargs)
         return [1.0] + [0.0] * 767
 
 
@@ -65,6 +69,8 @@ def test_embeddings_preserve_one_logical_input_per_vector_and_cache_metadata(
     assert adapter.last_manifest.batch_count == 2
     assert adapter.embed_query("what?")[0] == 1.0
     assert fake.query_inputs == ["task: search result | query: what?"]
+    assert all("task_type" not in kwargs for kwargs in fake.document_kwargs)
+    assert all("task_type" not in kwargs for kwargs in fake.query_kwargs)
     assert all(
         "one" not in path.read_text(encoding="utf-8")
         for path in (tmp_path / "cache").glob("*.json")

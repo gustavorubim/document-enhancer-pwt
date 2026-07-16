@@ -52,6 +52,7 @@ def test_chat_model_initialization_is_explicit_for_developer_and_vertex() -> Non
     assert developer_model.model == ROUTE_FLASH_LITE
     assert developer_model.max_retries == 0
     assert developer_model.timeout == 45.0
+    assert developer_model.model_dump()["seed"] == 7
     assert developer_model.response_mime_type == "application/json"
     assert developer.config.public_dict()["api_key_configured"] is True
     assert "fake-key" not in repr(developer.config.public_dict())

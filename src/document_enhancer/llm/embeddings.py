@@ -187,12 +187,12 @@ class GeminiEmbeddingAdapter:
 
     def embed_document_chunks(self, documents: Sequence[EmbeddingDocument]) -> list[list[float]]:
         formatted = [format_document(document) for document in documents]
-        return self._embed(formatted, task="document", task_type="RETRIEVAL_DOCUMENT")
+        return self._embed(formatted, task="document")
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
         """Embed already-formatted logical documents, preserving one vector per input."""
 
-        return self._embed(texts, task="document", task_type="RETRIEVAL_DOCUMENT")
+        return self._embed(texts, task="document")
 
     def embed_query(self, text: str) -> list[float]:
         formatted = format_query(text)
@@ -213,7 +213,6 @@ class GeminiEmbeddingAdapter:
         client = self._client()
         vector = client.embed_query(
             formatted,
-            task_type="RETRIEVAL_QUERY",
             output_dimensionality=self.profile.dimensions,
         )
         result = self._validate(vector)
@@ -230,7 +229,7 @@ class GeminiEmbeddingAdapter:
         )
         return result
 
-    def _embed(self, texts: Sequence[str], *, task: str, task_type: str) -> list[list[float]]:
+    def _embed(self, texts: Sequence[str], *, task: str) -> list[list[float]]:
         inputs = list(texts)
         for text in inputs:
             self._check_input(text)
@@ -265,7 +264,6 @@ class GeminiEmbeddingAdapter:
                 raw_vectors = client.embed_documents(
                     [text for _, text in batch],
                     batch_size=len(batch),
-                    task_type=task_type,
                     output_dimensionality=self.profile.dimensions,
                 )
                 if len(raw_vectors) != len(batch):
