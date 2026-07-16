@@ -17,7 +17,17 @@ def main() -> int:
     parser.add_argument("--registry", type=Path, default=Path("fixtures/public/sources.yaml"))
     parser.add_argument("--destination-root", type=Path, default=Path("fixtures/public/downloads"))
     parser.add_argument("--source-id", action="append", dest="source_ids")
-    parser.add_argument("--fetch", action="store_true", help="opt into downloading validated bytes")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="validate and print planned fetches without network or file writes (default)",
+    )
+    mode.add_argument(
+        "--fetch",
+        action="store_true",
+        help="opt into downloading and atomically promoting validated bytes",
+    )
     args = parser.parse_args()
     try:
         records = fetch_registry(

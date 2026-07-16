@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
+import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
+from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, BinaryIO
@@ -204,8 +207,7 @@ def fetch_registry(
         digest = hashlib.sha256(content).hexdigest()
         if source.get("sha256") and digest != source["sha256"]:
             raise PublicSourceError(f"digest mismatch for {source['source_id']}")
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_bytes(content)
+        _atomic_promote(destination, content)
         records.append(
             FetchRecord(
                 source["source_id"],
@@ -231,6 +233,32 @@ def _read_bounded(response: BinaryIO, maximum: int) -> bytes:
             raise PublicSourceError(f"response exceeds configured maximum of {maximum} bytes")
         chunks.append(chunk)
     return b"".join(chunks)
+
+
+def _atomic_promote(destination: Path, content: bytes) -> None:
+    """Promote validated bytes through a same-directory temporary file."""
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="wb",
+            prefix=f".{destination.name}.",
+            dir=destination.parent,
+            delete=False,
+        ) as handle:
+            temporary_path = Path(handle.name)
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        temporary_path.replace(destination)
+        temporary_path = None
+    except OSError as exc:
+        raise PublicSourceError(f"atomic promotion failed for {destination}") from exc
+    finally:
+        if temporary_path is not None:
+            with suppress(OSError):
+                temporary_path.unlink(missing_ok=True)
 
 
 def records_json(records: list[FetchRecord]) -> str:

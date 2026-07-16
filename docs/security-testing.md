@@ -6,12 +6,13 @@ Source text, retrieved chunks, fixture metadata, and reference files are untrust
 
 `fixtures/public/sources.yaml` is a fetch-on-demand registry. Every entry has an HTTPS URL, an allow-listed host, expected media types, a maximum byte size, provenance, license/terms review status, and an optional pinned SHA-256. No document is downloaded during ordinary tests.
 
-`scripts/fetch_public_sources.py` defaults to dry-run. An explicit `--fetch` is required to write bytes. The safe fetch path:
+`scripts/fetch_public_sources.py` defaults to dry-run. `--dry-run` makes that mode explicit, while `--fetch` is the only mutation opt-in. The safe fetch path:
 
 - rejects non-HTTPS URLs, credentials in URLs, off-list hosts, URL traversal, and unsafe destination paths;
 - disables redirects, including redirects to an otherwise off-list host;
 - checks the response media type and declared/actual size before writing;
 - streams with a hard byte bound and verifies a pinned digest when present;
+- writes validated bytes to a same-directory temporary file, flushes/syncs it, and atomically promotes it with `Path.replace`; failed promotions clean up the temporary file and preserve any prior destination;
 - stores bytes only; it never opens, imports, renders, executes, or sends the downloaded content onward.
 
 License review is for fetching only. A public document must not be committed or treated as organization-specific gold without a separate redistribution and authority review.
