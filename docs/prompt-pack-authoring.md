@@ -53,6 +53,12 @@ The pack must keep shell, browser, network, URL context, search, code execution,
 email, and external retrieval disabled. Structured stages return one JSON object matching the
 checked-in schema; they do not return prose or tool calls.
 
+Structure-stage templates must state the exact governed `prompt_id` and model route literals.
+They must require document/source/outline identities, span IDs, and source digests to be copied
+verbatim from governed inputs. Any split span must use contiguous Python-character offsets over
+the exact original text, SHA-256 of each UTF-8 slice, and the deterministic `SEG-` allocation
+contract. Version-like prompt aliases and normalized-text digests are invalid.
+
 ## Versioning and review lifecycle
 
 Use semantic versions. A patch release fixes wording or corrects reference composition while

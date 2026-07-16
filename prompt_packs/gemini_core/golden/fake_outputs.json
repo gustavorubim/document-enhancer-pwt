@@ -9,7 +9,7 @@
     "boundary_regions": [],
     "evidence_span_ids": [],
     "ambiguities": [],
-    "model": "fake",
+    "model": "gemini-3.1-flash-lite",
     "prompt_id": "structure.triage",
     "prompt_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
   },
@@ -23,7 +23,7 @@
     "associations": [],
     "boundary_alternatives": [],
     "disagreements": [],
-    "model": "fake",
+    "model": "gemini-3.1-flash-lite",
     "prompt_id": "structure.recover-window"
   },
   "analysis.schema.json": {
