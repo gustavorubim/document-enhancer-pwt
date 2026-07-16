@@ -1,0 +1,104 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "document-enhancer"
+version = "0.1.0"
+description = "Governed, Gemini-first document enhancement foundation"
+readme = "README.md"
+requires-python = ">=3.12,<3.14"
+license = { text = "MIT" }
+authors = [{ name = "Document Enhancer contributors" }]
+dependencies = [
+  "deepagents>=0.3,<1",
+  "langchain>=1.0,<2",
+  "langchain-google-genai>=4.0,<5",
+  "langgraph>=1.0,<2",
+  "markdown-it-py>=3.0,<5",
+  "numpy>=2.0,<3",
+  "pydantic>=2.10,<3",
+  "pypdf>=5.0,<7",
+  "python-docx>=1.1,<2",
+  "rich>=13.9,<15",
+  "ruamel.yaml>=0.18,<0.19",
+  "sqlite-vec==0.1.6",
+  "typer>=0.16,<1",
+  "typing-extensions>=4.12,<5",
+]
+
+[dependency-groups]
+dev = [
+  "build>=1.2,<2",
+  "pytest>=8.3,<9",
+  "pytest-cov>=6.0,<8",
+  "pytest-xdist>=3.6,<4",
+  "ruff>=0.12,<1",
+  "ty>=0.0.1,<1",
+]
+
+[project.scripts]
+docenhance = "document_enhancer.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/document_enhancer"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "/src",
+  "/tests",
+  "/README.md",
+  "/pyproject.toml",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["src", "tests", "scripts"]
+extend-exclude = ["plan.md"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "PTH"]
+ignore = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+[tool.ty.environment]
+python-version = "3.12"
+root = ["."]
+
+[tool.ty.src]
+include = ["src", "tests", "scripts"]
+exclude = ["plan.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["--strict-markers", "--strict-config"]
+markers = [
+  "unit: fast isolated unit tests",
+  "integration: local integration tests",
+  "live_model: opt-in tests that call a configured model provider",
+  "public_download: opt-in tests that download an allow-listed public source",
+  "security: security and redaction tests",
+  "e2e: end-to-end command and packaging tests",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["document_enhancer"]
+
+[tool.coverage.report]
+# WT0 keeps the scaffold floor modest; later implementation lanes raise it as behavior lands.
+fail_under = 70
+exclude_also = [
+  "if TYPE_CHECKING:",
+  "@overload",
+  "raise NotImplementedError",
+]
+
+[tool.uv]
+default-groups = ["dev"]
+resolution = "highest"
