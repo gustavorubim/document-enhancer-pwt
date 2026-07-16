@@ -4,19 +4,20 @@ Document Enhancer is a local-first, Gemini-first Python CLI for turning enterpri
 
 The repository now includes the foundational contracts, governed reference and prompt packs,
 source ingestion and structure recovery, the Gemini model gateway, four parallel analysis
-specialists, deterministic clarification artifacts, and a durable two-gate LangGraph workflow.
-Governed rewriting, audit/export, and RAG execution follow in the remaining milestones.
+specialists, deterministic clarification artifacts, a durable two-gate LangGraph workflow, and a
+governed rewrite pipeline that derives Markdown, Mermaid, and semantic outputs from one validated
+intermediate model. Audit/export and RAG execution follow in the remaining milestones.
 
 ## Verified status
 
-M5 (questions, reviewer inputs, checklist, and resumable graph) is formally complete as of
-2026-07-16. The complete offline gate passed on merged code commit `80cec30`: 220 tests passed and
-2 opt-in tests were deselected; frozen sync, Ruff format/check, ty, generated schemas, the
-enterprise reference pack, all 20 governed prompt routes across four document types, the synthetic
-corpus, package build, and diff checks also passed. Runs now pause with exit code 10 for review,
-persist durable state and idempotent side-effect receipts, validate reviewer edits fail-closed, and
-resume without replaying unchanged analysis. M6 (governed rewrite, Mermaid, and semantic sidecar)
-is the active next milestone.
+M6 (governed rewrite, Mermaid, and semantic sidecar) is formally complete as of 2026-07-16. The
+complete offline gate passed on merged code commit `a7af288`: 226 tests passed and 2 opt-in tests
+were deselected; frozen sync, Ruff format/check, ty, generated schemas, the enterprise reference
+and prompt packs, the synthetic corpus, package build, and diff checks also passed. Approved gate-2
+runs now continue through a complete source-span ledger, evidence-constrained rewrite inputs, a
+validated enhanced-document model, template-based Markdown, structured tables, Mermaid, explicit
+open issues, and an agreeing semantic sidecar. M7 (audit, diff, graph export, embeddings, SQLite,
+and CLI RAG) is the active next milestone.
 
 ## Quick start
 
@@ -44,9 +45,11 @@ docenhance prompts show PROMPT_ID [--composed] [--json]
 docenhance prompts validate [--json]
 ```
 
-The M5 workflow is offline-safe by default and writes editable clarification YAML plus readable
-Markdown under the selected run directory. Calling a later unsupported product command returns a
-clear configuration/contract error rather than pretending the capability is available.
+The workflow is offline-safe by default. It writes editable clarification artifacts first, then
+after the review gates writes the content ledger, rewrite inputs, enhanced model, enhanced
+Markdown, open issues, semantic sidecar, and Mermaid validation under the selected run directory.
+Calling a later unsupported product command returns a clear configuration/contract error rather
+than pretending the capability is available.
 
 ## Verification
 

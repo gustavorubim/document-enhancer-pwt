@@ -1548,17 +1548,17 @@ Acceptance: a CLI run pauses with reviewable files, exits with the waiting code,
 
 ### M6 — Governed rewrite, Mermaid, and semantic sidecar
 
-- [ ] M6.1 Implement complete content-ledger creation and coverage validation.
-- [ ] M6.2 Implement section-by-section rewrite inputs constrained to approved evidence/checklist items.
-- [ ] M6.3 Implement a validated intermediate enhanced-document model.
-- [ ] M6.4 Render target Markdown from the intermediate model and selected template.
-- [ ] M6.5 Build semantic nodes/edges from the same intermediate model.
-- [ ] M6.6 Implement tables for steps, rules, controls, risks, evidence, assumptions, limitations, exceptions, dependencies, calculators, inputs/outputs, and version history.
-- [ ] M6.7 Generate Mermaid from structured steps/decisions/dependencies and validate ID cross-references.
-- [ ] M6.8 Implement unknown/TBD/open-issue handling and exclusion from authoritative exports.
-- [ ] M6.9 Enforce bounded rewrite/audit revision counters in state.
+- [x] M6.1 Implement complete content-ledger creation and coverage validation.
+- [x] M6.2 Implement section-by-section rewrite inputs constrained to approved evidence/checklist items.
+- [x] M6.3 Implement a validated intermediate enhanced-document model.
+- [x] M6.4 Render target Markdown from the intermediate model and selected template.
+- [x] M6.5 Build semantic nodes/edges from the same intermediate model.
+- [x] M6.6 Implement tables for steps, rules, controls, risks, evidence, assumptions, limitations, exceptions, dependencies, calculators, inputs/outputs, and version history.
+- [x] M6.7 Generate Mermaid from structured steps/decisions/dependencies and validate ID cross-references.
+- [x] M6.8 Implement unknown/TBD/open-issue handling and exclusion from authoritative exports.
+- [x] M6.9 Enforce bounded rewrite/audit revision counters in state.
 
-Acceptance: every enhanced section and semantic object traces to approved evidence; Markdown and sidecar agree; no placeholder instruction leaks; all source spans have dispositions; unsupported facts remain open issues rather than asserted facts.
+Acceptance: every enhanced section and semantic object traces to approved evidence; Markdown and sidecar agree; no placeholder instruction leaks; all source spans have dispositions; unsupported facts remain open issues rather than asserted facts. **Verified 2026-07-16 on merged code commit `a7af288`: 226 passed, 2 opt-in tests deselected; frozen sync, Ruff format/check, ty, schemas, reference/prompt packs, fixture corpus, build, and diff checks passed.**
 
 ### M7 — Audit, diff, graph export, embeddings, and SQLite RAG package
 
