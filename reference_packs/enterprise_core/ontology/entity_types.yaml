@@ -1,0 +1,62 @@
+schema_version: "0.1"
+namespace: enterprise_core
+entity_types:
+  - {type_id: DocumentIdentity, group: document_structure, description: Stable identity shared by document versions}
+  - {type_id: DocumentVersion, group: document_structure, description: Governed version with lifecycle and effective dates}
+  - {type_id: Section, group: document_structure, description: Addressable rendered document section}
+  - {type_id: Statement, group: document_structure, description: Atomic prose statement with provenance}
+  - {type_id: Table, group: document_structure, description: Structured rows and columns with a title and source}
+  - {type_id: Figure, group: document_structure, description: Non-authoritative visual or Mermaid diagram}
+  - {type_id: Process, group: work, description: Repeatable controlled sequence of work}
+  - {type_id: ProcessStep, group: work, description: Atomic process action with outcome and next path}
+  - {type_id: Methodology, group: work, description: Governed approach for analysis or measurement}
+  - {type_id: DesktopProcedure, group: work, description: User-facing procedure for completing work in a desktop system}
+  - {type_id: MethodologyStep, group: work, description: Atomic methodological transformation or check}
+  - {type_id: Activity, group: work, description: Named unit of work not yet specialized as a step}
+  - {type_id: Decision, group: work, description: Explicit evaluation with branch outcomes}
+  - {type_id: Trigger, group: work, description: Event or schedule that starts an activity}
+  - {type_id: Requirement, group: governance, description: Normative or contractual obligation}
+  - {type_id: Control, group: governance, description: Action that reduces a stated risk}
+  - {type_id: Risk, group: governance, description: Potential event or condition with impact}
+  - {type_id: Policy, group: governance, description: Higher-authority governance rule}
+  - {type_id: Standard, group: governance, description: Governed implementation expectation}
+  - {type_id: Regulation, group: governance, description: External legal or regulatory obligation}
+  - {type_id: Approval, group: governance, description: Recorded authorization by a role}
+  - {type_id: Evidence, group: governance, description: Retained proof that work or control occurred}
+  - {type_id: Test, group: governance, description: Validation or test activity with an outcome}
+  - {type_id: Record, group: governance, description: Retained business record}
+  - {type_id: Role, group: people, description: Accountable or performing role}
+  - {type_id: Organization, group: people, description: Owning or participating organization}
+  - {type_id: EscalationPath, group: people, description: Ordered path for unresolved conditions}
+  - {type_id: System, group: technology_data, description: Approved system or service}
+  - {type_id: DataAsset, group: technology_data, description: Named data collection or dataset}
+  - {type_id: DataElement, group: technology_data, description: Atomic field or measure}
+  - {type_id: Input, group: technology_data, description: Input needed by a step or method}
+  - {type_id: Output, group: technology_data, description: Produced result}
+  - {type_id: Calculator, group: technology_data, description: Spreadsheet, script, worksheet, or other end-user computing artifact}
+  - {type_id: Model, group: technology_data, description: Statistical or decision model}
+  - {type_id: Parameter, group: logic_measurement, description: Configured model or rule parameter}
+  - {type_id: Rule, group: logic_measurement, description: Testable condition and outcome}
+  - {type_id: Metric, group: logic_measurement, description: Named measure with unit and period}
+  - {type_id: Threshold, group: logic_measurement, description: Value or range used by a rule}
+  - {type_id: Formula, group: logic_measurement, description: Human-readable calculation expression}
+  - {type_id: ServiceLevel, group: logic_measurement, description: Timeliness or quality target}
+  - {type_id: Assumption, group: conditions, description: Condition accepted for a bounded use}
+  - {type_id: Limitation, group: conditions, description: Known boundary on validity or use}
+  - {type_id: Exception, group: conditions, description: Authorized deviation from a requirement or path}
+  - {type_id: Dependency, group: conditions, description: Required upstream object or service}
+  - {type_id: Precondition, group: conditions, description: State required before an action}
+  - {type_id: CompletionCondition, group: conditions, description: Evidence-backed state that closes work}
+  - {type_id: GlossaryTerm, group: language, description: Canonical term and controlled definition}
+minimum_fields:
+  ProcessStep: [performer, trigger_or_precondition, inputs, action, outputs, dependencies, completion_condition, next_step_or_failure_path]
+  MethodologyStep: [objective, inputs, transformation_or_formula, parameters, assumptions, outputs, validation_checks, failure_conditions, limitations, implementation_reference]
+  Control: [objective, risk_mitigated, frequency_or_event, performer_or_owner, procedure_or_step, evidence, failure_response, escalation]
+  Rule: [condition, metric_or_data_element, operator, threshold, unit, evaluation_period, outcome, escalation, override_authority, evidence]
+  Decision: [conditions, outcomes, branch_targets, decision_owner, evidence]
+  Assumption: [statement, applies_to, risk_if_violated, validation_method, owner, review_frequency, status]
+  Limitation: [statement, affected_scope_or_outputs, impact, mitigation, disclosure_requirements]
+  Exception: [applies_to, authorized_role, justification, evidence, approval_required, valid_from, valid_to, review_status]
+  Calculator: [type, version, owner, location_or_reference, inputs, outputs, validation_status, criticality, recovery]
+  Dependency: [dependency_type, required_object_or_service, timing, provider_or_owner, readiness_condition, failure_impact, fallback_or_escalation]
+  Evidence: [evidence_type, producer, linked_object, storage_reference, retention, as_of_period, reviewer]

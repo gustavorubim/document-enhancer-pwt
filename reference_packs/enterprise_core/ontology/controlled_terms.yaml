@@ -1,0 +1,24 @@
+schema_version: "0.1"
+namespace: enterprise_core
+controlled_terms:
+  document_status: [draft, in_review, approved, effective, superseded, retired]
+  review_status: [unreviewed, proposed, reviewed, accepted, rejected, waived]
+  authority: [explicit, derived, inferred, reviewed]
+  provenance_origin: [source, answer, steering, reference, model]
+  graph_layer: [authoritative, governed, extracted, retrieval]
+  severity: [blocker, high, medium, low, informational]
+  evidence_type: [system_log, approval_record, reconciliation, test_result, signed_attestation, retained_report, screenshot_aid]
+  confidentiality: [public_internal, confidential, restricted]
+  normative_term: [MUST, MUST_NOT, SHOULD, SHOULD_NOT, MAY]
+  applicability_operator: [equals, not_equals, in, not_in, greater_than, greater_than_or_equal, less_than, less_than_or_equal]
+  calculator_type: [spreadsheet, script, worksheet, service, manual_calculation]
+  retention_basis: [policy, regulation, contract, operational_need, not_applicable]
+  source_disposition: [covered, transformed, excluded_with_reason, unresolved]
+  waiver_status: [requested, approved, expired, rejected]
+aliases:
+  SOP: Standard operating procedure
+  KPI: Key performance indicator
+  RACI: Responsible, accountable, consulted, informed
+  SLA: Service-level agreement
+  TBD: To be determined; not an assertion of fact
+forbidden_ambiguous_terms: [it, they, them, timely, material, appropriate, as needed, etc., regularly, soon]

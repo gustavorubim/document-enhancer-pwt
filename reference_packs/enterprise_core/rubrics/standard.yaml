@@ -1,0 +1,32 @@
+schema_version: "0.1"
+rubric_id: RUBRIC-STANDARD-001
+version: 1.0.0
+document_type: standard
+inherits: rubrics/common.yaml
+common_dimensions_retained: true
+criteria:
+  - {criterion_id: STD-NORMATIVE-001, dimension_id: executability, requirement: "Express each requirement with a normative term, stable ID, applicability, and evidence", evidence: [requirements table], severity: blocker, hard_blocker: true}
+  - {criterion_id: STD-APPLY-001, dimension_id: purpose_scope, requirement: "Define applicability, exclusions, accountable role, and exceptions for each requirement", evidence: [applicability table, exceptions], severity: high, hard_blocker: false}
+  - {criterion_id: STD-ENFORCE-001, dimension_id: controls, requirement: "State enforcement, control, evidence, escalation, and nonconformance handling", evidence: [enforcement table], severity: high, hard_blocker: false}
+  - {criterion_id: STD-GOV-001, dimension_id: governance, requirement: "Provide version, approval, review, supersession, and related standard governance", evidence: [metadata, version history], severity: high, hard_blocker: false}
+template_mappings:
+  - {requirement_id: SEC-STD-METADATA, criterion_ids: [COM-GOV-001, STD-GOV-001]}
+  - {requirement_id: SEC-STD-PURPOSE, criterion_ids: [COM-SCOPE-001]}
+  - {requirement_id: SEC-STD-SCOPE, criterion_ids: [COM-SCOPE-001, STD-APPLY-001]}
+  - {requirement_id: SEC-STD-TERMS, criterion_ids: [COM-RAG-001, COM-STYLE-001]}
+  - {requirement_id: SEC-STD-PRINCIPLES, criterion_ids: [COM-EXEC-001, STD-NORMATIVE-001]}
+  - {requirement_id: SEC-STD-REQUIREMENTS, criterion_ids: [STD-NORMATIVE-001, STD-APPLY-001]}
+  - {requirement_id: SEC-STD-ROLES, criterion_ids: [COM-DEPEND-001]}
+  - {requirement_id: SEC-STD-EVIDENCE, criterion_ids: [COM-CONTROL-001, STD-ENFORCE-001]}
+  - {requirement_id: SEC-STD-EXCEPTIONS, criterion_ids: [STD-APPLY-001, COM-CONTROL-001]}
+  - {requirement_id: SEC-STD-ENFORCEMENT, criterion_ids: [STD-ENFORCE-001]}
+  - {requirement_id: SEC-STD-CONTROLS, criterion_ids: [COM-CONTROL-001]}
+  - {requirement_id: SEC-STD-RELATED, criterion_ids: [COM-RAG-001]}
+  - {requirement_id: SEC-STD-IMPLEMENTATION, criterion_ids: [COM-EXEC-001, COM-DEPEND-001]}
+  - {requirement_id: SEC-STD-REVIEW, criterion_ids: [STD-GOV-001]}
+  - {requirement_id: SEC-STD-VERSION, criterion_ids: [COM-GOV-001, STD-GOV-001]}
+  - {requirement_id: TBL-STD-REQUIREMENTS, criterion_ids: [STD-NORMATIVE-001]}
+  - {requirement_id: TBL-STD-ROLES, criterion_ids: [COM-DEPEND-001]}
+  - {requirement_id: TBL-STD-EVIDENCE, criterion_ids: [STD-ENFORCE-001]}
+  - {requirement_id: TBL-STD-EXCEPTIONS, criterion_ids: [STD-APPLY-001]}
+  - {requirement_id: TBL-STD-VERSIONS, criterion_ids: [STD-GOV-001]}

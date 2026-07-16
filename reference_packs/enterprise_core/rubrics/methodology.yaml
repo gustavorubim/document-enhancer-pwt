@@ -1,0 +1,38 @@
+schema_version: "0.1"
+rubric_id: RUBRIC-METHODOLOGY-001
+version: 1.0.0
+document_type: methodology
+inherits: rubrics/common.yaml
+common_dimensions_retained: true
+criteria:
+  - {criterion_id: METH-DATA-001, dimension_id: executability, requirement: "Establish input lineage, preparation, transformations, and quality checks", evidence: [data lineage table, preparation steps], severity: high, hard_blocker: false}
+  - {criterion_id: METH-MODEL-001, dimension_id: executability, requirement: "State formulas, models, parameters, thresholds, and calculator references", evidence: [formula table, model table], severity: blocker, hard_blocker: true}
+  - {criterion_id: METH-VALIDATION-001, dimension_id: controls, requirement: "Define validation tests, tolerances, owners, evidence, and remediation", evidence: [validation table], severity: high, hard_blocker: false}
+  - {criterion_id: METH-LIMIT-001, dimension_id: purpose_scope, requirement: "State assumptions, limitations, exceptions, applicability boundaries, and implementation mapping", evidence: [assumptions, limitations, exceptions], severity: high, hard_blocker: false}
+template_mappings:
+  - {requirement_id: SEC-METH-METADATA, criterion_ids: [COM-GOV-001, COM-STRUCT-001]}
+  - {requirement_id: SEC-METH-OBJECTIVE, criterion_ids: [COM-SCOPE-001]}
+  - {requirement_id: SEC-METH-SCOPE, criterion_ids: [COM-SCOPE-001, METH-LIMIT-001]}
+  - {requirement_id: SEC-METH-FRAMEWORK, criterion_ids: [COM-EXEC-001, COM-RAG-001]}
+  - {requirement_id: SEC-METH-DEFINITIONS, criterion_ids: [COM-RAG-001, COM-STYLE-001]}
+  - {requirement_id: SEC-METH-DATA, criterion_ids: [METH-DATA-001, COM-DEPEND-001]}
+  - {requirement_id: SEC-METH-PREP, criterion_ids: [METH-DATA-001, COM-EXEC-001]}
+  - {requirement_id: SEC-METH-STEPS, criterion_ids: [COM-EXEC-001, METH-MODEL-001]}
+  - {requirement_id: SEC-METH-MODELS, criterion_ids: [METH-MODEL-001]}
+  - {requirement_id: SEC-METH-ASSUMPTIONS, criterion_ids: [METH-LIMIT-001]}
+  - {requirement_id: SEC-METH-PARAMETERS, criterion_ids: [METH-MODEL-001]}
+  - {requirement_id: SEC-METH-RULES, criterion_ids: [METH-MODEL-001]}
+  - {requirement_id: SEC-METH-LIMITATIONS, criterion_ids: [METH-LIMIT-001]}
+  - {requirement_id: SEC-METH-EXCEPTIONS, criterion_ids: [METH-LIMIT-001, COM-CONTROL-001]}
+  - {requirement_id: SEC-METH-VALIDATION, criterion_ids: [METH-VALIDATION-001, COM-CONTROL-001]}
+  - {requirement_id: SEC-METH-MONITORING, criterion_ids: [METH-VALIDATION-001, COM-EXEC-001]}
+  - {requirement_id: SEC-METH-GOVERNANCE, criterion_ids: [COM-GOV-001, COM-CONTROL-001]}
+  - {requirement_id: SEC-METH-IMPLEMENTATION, criterion_ids: [COM-DEPEND-001, COM-EXEC-001]}
+  - {requirement_id: SEC-METH-RELATED, criterion_ids: [COM-RAG-001]}
+  - {requirement_id: SEC-METH-VERSION, criterion_ids: [COM-GOV-001]}
+  - {requirement_id: TBL-METH-DATA, criterion_ids: [METH-DATA-001]}
+  - {requirement_id: TBL-METH-MODELS, criterion_ids: [METH-MODEL-001]}
+  - {requirement_id: TBL-METH-ASSUMPTIONS, criterion_ids: [METH-LIMIT-001]}
+  - {requirement_id: TBL-METH-VALIDATION, criterion_ids: [METH-VALIDATION-001]}
+  - {requirement_id: TBL-METH-GOVERNANCE, criterion_ids: [COM-GOV-001]}
+  - {requirement_id: TBL-METH-VERSIONS, criterion_ids: [COM-GOV-001]}

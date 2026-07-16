@@ -1,0 +1,130 @@
+schema_version: "1.0"
+pack_id: enterprise_core
+version: 1.0.0
+description: >-
+  Fictional, local-first enterprise reference context for governed process, methodology,
+  standard, and desktop-procedure documents. It contains no proprietary policy text.
+owner:
+  name: Enterprise Documentation Council
+  team: Governance Enablement
+  contact: documentation-council@example.invalid
+status: active
+effective_from: "2026-01-01"
+effective_to: null
+supported_document_types:
+  process:
+    template: templates/process/template.md
+    requirements: templates/process/requirements.yaml
+    example: templates/process/example.md
+  methodology:
+    template: templates/methodology/template.md
+    requirements: templates/methodology/requirements.yaml
+    example: templates/methodology/example.md
+  standard:
+    template: templates/standard/template.md
+    requirements: templates/standard/requirements.yaml
+    example: templates/standard/example.md
+  desktop_procedure:
+    template: templates/desktop_procedure/template.md
+    requirements: templates/desktop_procedure/requirements.yaml
+    example: templates/desktop_procedure/example.md
+applicability:
+  default_business_domain: enterprise_operations
+  supported_jurisdictions: [US, GLOBAL]
+  supported_confidentiality: [public_internal, confidential, restricted]
+  default_document_status: draft
+precedence:
+  order:
+    - reviewer_steering
+    - regulation
+    - policy
+    - standard
+    - template
+    - style_guide
+    - source
+  conflict_policy:
+    same_precedence: error
+    higher_precedence: wins_with_notice
+    lower_precedence: surface_for_review
+    reviewer_steering: explicit_only
+context_sources:
+  - reference_id: STYLE-CORE-001
+    kind: style_guide
+    path: context/style_guides/enterprise_style.md
+    applies_when: {}
+  - reference_id: POL-DOC-GOV-001
+    kind: policy
+    path: context/policies/document-governance.md
+    applies_when:
+      tags: [governed_document]
+  - reference_id: POL-REC-001
+    kind: policy
+    path: context/policies/records-retention.md
+    applies_when:
+      tags: [records]
+  - reference_id: STD-OPS-DOC-001
+    kind: standard
+    path: context/standards/operational-documentation.md
+    applies_when:
+      document_types: [process, methodology, standard, desktop_procedure]
+  - reference_id: STD-CONTROL-EVID-001
+    kind: standard
+    path: context/standards/control-evidence.md
+    applies_when:
+      tags: [controlled_activity]
+ontology:
+  entity_types: ontology/entity_types.yaml
+  relationship_types: ontology/relationship_types.yaml
+  id_patterns: ontology/id_patterns.yaml
+  controlled_terms: ontology/controlled_terms.yaml
+glossary: context/glossary/glossary.yaml
+style_guide: context/style_guides/enterprise_style.md
+rubrics:
+  common: rubrics/common.yaml
+  process: rubrics/process.yaml
+  methodology: rubrics/methodology.yaml
+  standard: rubrics/standard.yaml
+  desktop_procedure: rubrics/desktop_procedure.yaml
+required_acknowledgements:
+  - "This pack is fictional reference context and is not a substitute for legal, policy, or control-owner approval."
+conflicts:
+  - conflict_id: CONFLICT-001
+    left: POL-DOC-GOV-001
+    right: STD-OPS-DOC-001
+    resolution: higher_precedence_wins
+    rationale: Policy governance controls the minimum lifecycle fields; the standard supplies executable formatting.
+  - conflict_id: CONFLICT-002
+    left: POL-REC-001
+    right: STD-CONTROL-EVID-001
+    resolution: higher_precedence_wins
+    rationale: Retention policy controls the minimum retention period when an evidence standard is less specific.
+files:
+  - {path: ontology/entity_types.yaml, sha256: 028d32889c2a7b1474d5b5ddfc8fe80d3e661883ac08b37cbdbb4022689aaeb1, kind: ontology, required: true}
+  - {path: ontology/relationship_types.yaml, sha256: bd4e598f7139665eafdcbe9e6137b4be6b535c46d65174bbc6cb605985563b2d, kind: ontology, required: true}
+  - {path: ontology/id_patterns.yaml, sha256: 43bc760b77bd4d84b30c56cf5a93051346d982388dec419c76cc63fdeac9b73b, kind: ontology, required: true}
+  - {path: ontology/controlled_terms.yaml, sha256: 8445544a2487c4e40cd979fffb473f6f5b04e5f85c4f4251a1401c0f40e9fdf3, kind: ontology, required: true}
+  - {path: context/glossary/glossary.yaml, sha256: c962a278ab9b819097cf7a9532b8a20148636be4597b7b9fe9d8f7596aa75da5, kind: glossary, required: true}
+  - {path: context/style_guides/enterprise_style.md, sha256: 5fa8f4d3c8839eb152d14ab61a52866b4ebb56a204b0da89b5c88dd44b76830f, kind: style_guide, required: true}
+  - {path: context/policies/document-governance.md, sha256: 23bd14837273add15de6c80249208bb5c4fe33b0758e2a3c78308210063752c1, kind: policy, required: true}
+  - {path: context/policies/records-retention.md, sha256: ac375a866ebacd63a18cd7ab2565c71b67686081ab00c1ebbf17e5cbd9c720ca, kind: policy, required: true}
+  - {path: context/standards/operational-documentation.md, sha256: 82d4084c22f1b3d62bdcaec47c5bd092b8ed946bb98a72c915049f2eaa535991, kind: standard, required: true}
+  - {path: context/standards/control-evidence.md, sha256: 5338aa762fbd56d79eac43bf9fdb325be1a6f74f4f6d8d572a699c7755bab157, kind: standard, required: true}
+  - {path: rubrics/common.yaml, sha256: d0088d8204fa09c6e3ea669efedc7255e6787d6b03733fca33e258e449bc0aee, kind: rubric, required: true}
+  - {path: rubrics/process.yaml, sha256: 90c8ef3305b42edd23ea33e3c51d26647991b1a136419863792f01e471fdab7a, kind: rubric, required: true}
+  - {path: rubrics/methodology.yaml, sha256: 73e5d471a7c90cb10b400289d52f1e52e16b783438f881ad6d7813e315203a8d, kind: rubric, required: true}
+  - {path: rubrics/standard.yaml, sha256: 80a45afbcc9c3fdbf33760926b96fa4992e5de09bd6b9463ba3405c5e51e00d9, kind: rubric, required: true}
+  - {path: rubrics/desktop_procedure.yaml, sha256: d2fd176c05431aa6fe7f1b5752e85f0ec831e223098467f40bfa561fd862c129, kind: rubric, required: true}
+  - {path: templates/process/template.md, sha256: 88699a38e5a36210de0a9060955984ccfd00549265e35ce0c76c338e88e92cea, kind: template, required: true}
+  - {path: templates/process/requirements.yaml, sha256: 0c3147042ec6be459330aa533558d1976341d09a2ad3011d0402d6f330ccc196, kind: requirements, required: true}
+  - {path: templates/process/example.md, sha256: 6ad8f8953089cde5403314300b6ad9a594583689da39d6d628df496439f0ebf2, kind: example, required: true}
+  - {path: templates/methodology/template.md, sha256: c0b7d68dc4c10b4a1a8dfec02e55bff25e11268f5853e5d7af817a045fd07261, kind: template, required: true}
+  - {path: templates/methodology/requirements.yaml, sha256: 2c774be9ced0d0de7c8bf8569c7ab03dbb24f62a9087dd46a36263df8183aed4, kind: requirements, required: true}
+  - {path: templates/methodology/example.md, sha256: 39ef6816a75c33761f6b4e348dc17e4cad07ed5fa839f94401836f31dff90415, kind: example, required: true}
+  - {path: templates/standard/template.md, sha256: db55f8b65dc8f3264e975032ac72496601afa5ca8af362b9d9eb4709d967b4a1, kind: template, required: true}
+  - {path: templates/standard/requirements.yaml, sha256: 53b9687b6061594517c33f198af0d3cb40711aaa289df0a2a5f3ae0af5bc6f9a, kind: requirements, required: true}
+  - {path: templates/standard/example.md, sha256: 4df2b3d30055edbce73125bf4259d630ed3cf07a7e4e80ef6ca0085e7116da2e, kind: example, required: true}
+  - {path: templates/desktop_procedure/template.md, sha256: 1da3f4dd117307d703d13305333ef560dac2ca35809bd51f4c34a4a3a6c33694, kind: template, required: true}
+  - {path: templates/desktop_procedure/requirements.yaml, sha256: 36e338977d6cdd4e951407da5b43eb5bdfd147f6baedede1a6ebab806cbe648a, kind: requirements, required: true}
+  - {path: templates/desktop_procedure/example.md, sha256: 42306fef345cf990890e2751fab66b63cde61ab4a594527cab494e5bc1cac772, kind: example, required: true}
+manifest_sha256: e099632a4851712f0e0e88acb1e3de43af5d432e96bcf2e595a51ea8ad7a7fb5
+pack_sha256: afa24eb813cfc33a060b6cf44e421abdfeefd967ae0e313691785db903e3c1ca
