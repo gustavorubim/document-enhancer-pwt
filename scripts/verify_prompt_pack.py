@@ -68,12 +68,28 @@ def _verify_compositions(pack_root: Path, reference_pack: Any) -> tuple[list[str
         return [f"golden/compositions.yaml is invalid: {exc}"], {}
     if not isinstance(value, dict) or not isinstance(value.get("document_types"), dict):
         return ["golden/compositions.yaml must contain document_types"], {}
+    expected_scopes = value.get("reference_scopes")
+    if not isinstance(expected_scopes, dict):
+        return ["golden/compositions.yaml must contain reference_scopes"], {}
     try:
         pack = load_prompt_pack(pack_root, reference_pack=reference_pack)
     except PromptPackValidationError as exc:
         return list(exc.errors), {}
+    prompt_ids = {prompt.prompt_id for prompt in pack.manifest.prompts}
+    missing_scopes = sorted(prompt_ids - set(expected_scopes))
+    unknown_scopes = sorted(set(expected_scopes) - prompt_ids)
+    if missing_scopes:
+        errors = [
+            "golden/compositions.yaml is missing reference scopes for: " + ", ".join(missing_scopes)
+        ]
+    else:
+        errors = []
+    if unknown_scopes:
+        errors.append(
+            "golden/compositions.yaml has unknown reference scopes for: "
+            + ", ".join(unknown_scopes)
+        )
     composer = PromptPackComposer(pack, reference_pack=reference_pack)
-    errors: list[str] = []
     counts: dict[str, int] = {}
     for document_type, entry in value["document_types"].items():
         if not isinstance(entry, dict) or not isinstance(entry.get("prompt_ids"), list):
@@ -94,6 +110,11 @@ def _verify_compositions(pack_root: Path, reference_pack: Any) -> tuple[list[str
                     for variable in spec.variables
                 }
                 composed = composer.compose_with_metadata(prompt_id, variables)
+                expected_scope = expected_scopes.get(prompt_id)
+                if expected_scope != list(composed.reference_scope):
+                    errors.append(
+                        f"golden {document_type}/{prompt_id}: reference scope does not match"
+                    )
                 required_markers = (
                     "BEGIN GOVERNED INSTRUCTIONS",
                     "BEGIN GOVERNED CONTEXT",

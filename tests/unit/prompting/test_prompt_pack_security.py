@@ -105,3 +105,42 @@ def test_unlisted_regular_prompt_like_file_is_rejected(tmp_path: Path) -> None:
         "every regular prompt-pack file" in error and ".hidden-prompt.md" in error
         for error in report.errors
     )
+
+
+def test_reference_scope_missing_prompt_is_rejected(tmp_path: Path) -> None:
+    pack = _copy_pack(tmp_path)
+    manifest = _read_manifest(pack)
+    scopes = cast(dict[str, object], manifest["prompt_reference_scopes"])
+    scopes.pop("structure.triage")
+    _dump_manifest(pack, manifest)
+
+    report = validate_prompt_pack(pack)
+
+    assert not report.ok
+    assert any("prompt_reference_scopes is missing prompt" in error for error in report.errors)
+
+
+def test_reference_scope_unknown_name_is_rejected(tmp_path: Path) -> None:
+    pack = _copy_pack(tmp_path)
+    manifest = _read_manifest(pack)
+    scopes = cast(dict[str, object], manifest["prompt_reference_scopes"])
+    scopes["structure.triage"] = ["not_a_bound_reference"]
+    _dump_manifest(pack, manifest)
+
+    report = validate_prompt_pack(pack)
+
+    assert not report.ok
+    assert any("has unbound name(s)" in error for error in report.errors)
+
+
+def test_reference_scope_duplicate_name_is_rejected(tmp_path: Path) -> None:
+    pack = _copy_pack(tmp_path)
+    manifest = _read_manifest(pack)
+    scopes = cast(dict[str, object], manifest["prompt_reference_scopes"])
+    scopes["analysis.macro"] = ["common_rubric", "common_rubric"]
+    _dump_manifest(pack, manifest)
+
+    report = validate_prompt_pack(pack)
+
+    assert not report.ok
+    assert any("contains duplicate names" in error for error in report.errors)

@@ -73,6 +73,7 @@ class ComposedPrompt:
     pack_version: str
     pack_manifest_sha256: str
     pack_sha256: str
+    reference_scope: tuple[str, ...]
     text: str
     resolution: PromptResolution
     resolved_references: tuple[ResolvedReferenceInput, ...]
@@ -185,17 +186,19 @@ class PromptPackComposer:
                 )
         body = self._replace_body_variables(body, spec, values)
 
+        reference_scope = self.pack.reference_scope(prompt_id)
         references: tuple[ResolvedReferenceInput, ...] = ()
-        if self.pack.manifest.required_references:
+        if reference_scope:
             if self.reference_pack is None:
                 raise PromptPackValidationError(
-                    f"prompt {prompt_id} requires a resolved reference pack before composition"
+                    f"prompt {prompt_id} requires a reference pack for its declared scope"
                 )
             references = resolve_reference_inputs(
                 self.pack,
                 self.reference_pack,
                 document_type=str(values.get("document_type", self.document_type)),
                 context=self.reference_context,
+                logical_names=reference_scope,
             )
 
         shared = self._shared_fragments(spec)
@@ -272,6 +275,7 @@ class PromptPackComposer:
             pack_version=self.pack.version,
             pack_manifest_sha256=self.pack.manifest_sha256,
             pack_sha256=self.pack.pack_sha256,
+            reference_scope=reference_scope,
             text=rendered,
             resolution=resolution,
             resolved_references=references,

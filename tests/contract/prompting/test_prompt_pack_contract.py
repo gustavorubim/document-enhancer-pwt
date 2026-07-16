@@ -21,6 +21,12 @@ def test_gemini_core_prompt_inventory_matches_frozen_routes_and_schemas() -> Non
         reference_pack=load_reference_pack(ROOT / "reference_packs" / "enterprise_core"),
     )
     assert {prompt.prompt_id for prompt in pack.manifest.prompts} == set(EXPECTED_ROUTES)
+    assert set(pack.prompt_reference_scopes) == set(EXPECTED_ROUTES)
+    assert all(
+        not pack.reference_scope(prompt.prompt_id)
+        for prompt in pack.manifest.prompts
+        if prompt.prompt_id.startswith("structure.")
+    )
     for prompt in pack.manifest.prompts:
         assert prompt.model_route == EXPECTED_ROUTES[prompt.prompt_id]
         assert prompt.output_schema == EXPECTED_SCHEMAS[prompt.prompt_id]

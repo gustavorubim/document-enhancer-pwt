@@ -324,6 +324,55 @@ def _load_reference_specs(
     return result
 
 
+def _load_prompt_reference_scopes(
+    raw: Mapping[str, Any],
+    prompt_ids: Sequence[str],
+    required_references: Sequence[str],
+) -> dict[str, tuple[str, ...]]:
+    value = raw.get("prompt_reference_scopes")
+    if not isinstance(value, Mapping):
+        raise PromptPackValidationError(
+            "manifest.prompt_reference_scopes must map every prompt ID to an ordered list"
+        )
+    prompt_id_set = set(prompt_ids)
+    configured_ids = set(value)
+    missing = sorted(prompt_id_set - configured_ids)
+    unknown = sorted(configured_ids - prompt_id_set)
+    if missing:
+        raise PromptPackValidationError(
+            "manifest.prompt_reference_scopes is missing prompt(s): " + ", ".join(missing)
+        )
+    if unknown:
+        raise PromptPackValidationError(
+            "manifest.prompt_reference_scopes has unknown prompt(s): " + ", ".join(unknown)
+        )
+    bound_names = set(required_references)
+    scopes: dict[str, tuple[str, ...]] = {}
+    for prompt_id in prompt_ids:
+        scope = value[prompt_id]
+        if isinstance(scope, str) or not isinstance(scope, (list, tuple)):
+            raise PromptPackValidationError(
+                f"manifest.prompt_reference_scopes.{prompt_id} must be a list"
+            )
+        names = tuple(scope)
+        if not all(isinstance(name, str) for name in names):
+            raise PromptPackValidationError(
+                f"manifest.prompt_reference_scopes.{prompt_id} names must be strings"
+            )
+        if len(names) != len(set(names)):
+            raise PromptPackValidationError(
+                f"manifest.prompt_reference_scopes.{prompt_id} contains duplicate names"
+            )
+        unbound = sorted(set(names) - bound_names)
+        if unbound:
+            raise PromptPackValidationError(
+                f"manifest.prompt_reference_scopes.{prompt_id} has unbound name(s): "
+                + ", ".join(unbound)
+            )
+        scopes[prompt_id] = names
+    return scopes
+
+
 def _manifest_model(raw: Mapping[str, Any]) -> PromptPackManifest:
     # ``reference_inputs`` is deliberately a loader concern. It is kept in the raw manifest
     # while the frozen cross-lane Pydantic contract remains dependency-light.
@@ -334,6 +383,7 @@ def _manifest_model(raw: Mapping[str, Any]) -> PromptPackManifest:
         "required_runtime_inputs",
         "composition_contract",
         "document_types",
+        "prompt_reference_scopes",
         "manifest_sha256",
         "pack_sha256",
         "description",
@@ -415,6 +465,11 @@ def _load(location: Path) -> PromptPack:
 
     required = manifest.required_references
     reference_specs = _load_reference_specs(raw, required)
+    reference_scopes = _load_prompt_reference_scopes(
+        raw,
+        [prompt.prompt_id for prompt in manifest.prompts],
+        required,
+    )
     templates: dict[str, PromptTemplate] = {}
     for prompt in manifest.prompts:
         if prompt.template_path not in file_digests:
@@ -464,6 +519,7 @@ def _load(location: Path) -> PromptPack:
         file_digests=file_digests,
         file_contents=file_contents,
         reference_inputs=reference_specs,
+        prompt_reference_scopes=reference_scopes,
         templates=templates,
         manifest_sha256=manifest_sha256,
         pack_sha256=pack_sha256,
@@ -551,6 +607,7 @@ def resolve_reference_inputs(
     *,
     document_type: str = "process",
     context: ApplicabilityContext | Mapping[str, Any] | None = None,
+    logical_names: Sequence[str] | None = None,
 ) -> tuple[ResolvedReferenceInput, ...]:
     """Resolve all required governed inputs and retain exact pack/file metadata."""
 
@@ -570,11 +627,26 @@ def resolve_reference_inputs(
         tags=context_obj.tags or frozenset({"governed_document", "controlled_activity"}),
         effective_on=context_obj.effective_on,
     )
+    selected_names = (
+        tuple(pack.manifest.required_references) if logical_names is None else tuple(logical_names)
+    )
+    if not all(isinstance(name, str) for name in selected_names):
+        raise PromptPackValidationError("reference resolution scope names must be strings")
+    if len(selected_names) != len(set(selected_names)):
+        raise PromptPackValidationError("reference resolution scope contains duplicate names")
+    bound_names = set(pack.manifest.required_references) & set(pack.reference_inputs)
+    unbound = sorted(set(selected_names) - bound_names)
+    if unbound:
+        raise PromptPackValidationError(
+            "reference resolution scope has unbound name(s): " + ", ".join(unbound)
+        )
     results: list[ResolvedReferenceInput] = []
-    for logical_name in pack.manifest.required_references:
+    for logical_name in selected_names:
         spec = pack.reference_inputs[logical_name]
         if spec.source == "runtime":
-            continue
+            raise PromptPackValidationError(
+                f"reference resolution scope cannot include runtime input: {logical_name}"
+            )
         selected: list[tuple[str, str | None, str]] = []
         if spec.source == "applicable_context":
             resolution = reference_pack.resolve_context(context_obj)

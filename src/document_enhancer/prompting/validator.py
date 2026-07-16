@@ -150,6 +150,15 @@ def _prompt_errors(
             "template_path": prompt.template_path,
         }
         details["prompts"].append(entry)
+        scope = pack.prompt_reference_scopes.get(prompt.prompt_id)
+        if scope is None:
+            errors.append(f"prompt {prompt.prompt_id}: reference scope is missing")
+            scope = ()
+        entry["reference_scope"] = list(scope)
+        if prompt.prompt_id.startswith("structure.") and scope:
+            errors.append(
+                f"prompt {prompt.prompt_id}: structure stages must not receive governed references"
+            )
         template = pack.template_for(prompt)
         placeholders = set(_VARIABLE_RE.findall(template.body))
         definitions = {variable.name: variable for variable in prompt.variables}

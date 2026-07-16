@@ -1,6 +1,6 @@
 schema_version: "1.0"
 pack_id: gemini_core
-version: "1.0.0"
+version: "1.0.1"
 description: >-
   Versioned, Gemini-first prompt pack for governed document enhancement and grounded local RAG.
 owner: Document Enhancer Prompt Governance
@@ -75,6 +75,27 @@ reference_inputs:
   glossary:
     path: context/glossary/glossary.yaml
     kind: glossary
+prompt_reference_scopes:
+  structure.triage: []
+  structure.recover-window: []
+  structure.reconcile-boundaries: []
+  analysis.macro: [common_rubric, document_type_rubric, template, template_requirements, style_guide, applicable_policies, glossary]
+  analysis.sections: [common_rubric, document_type_rubric, template, template_requirements, style_guide, applicable_policies, glossary]
+  analysis.process-methodology-discovery: [common_rubric, document_type_rubric, template, template_requirements, applicable_policies, glossary]
+  analysis.rag-readiness: [common_rubric, document_type_rubric, template, template_requirements, ontology_entity_types, ontology_relationship_types, applicable_policies, glossary]
+  analysis.synthesize-findings: [common_rubric, document_type_rubric, template, template_requirements, applicable_policies, glossary]
+  clarification.questions: [common_rubric, document_type_rubric, template, template_requirements, style_guide, applicable_policies, glossary]
+  clarification.rewrite-checklist: [common_rubric, document_type_rubric, template, template_requirements, style_guide, applicable_policies, glossary]
+  rewrite.section: [common_rubric, document_type_rubric, template, template_requirements, style_guide, applicable_policies, glossary]
+  rewrite.semantic-objects: [common_rubric, document_type_rubric, template, template_requirements, ontology_entity_types, ontology_relationship_types, style_guide, applicable_policies, glossary]
+  rewrite.revision: [common_rubric, document_type_rubric, template, template_requirements, style_guide, applicable_policies, glossary]
+  audit.content-fidelity: [common_rubric, document_type_rubric, template, template_requirements, applicable_policies, glossary]
+  audit.remediation-routing: [common_rubric, document_type_rubric, template, template_requirements, applicable_policies, glossary]
+  rag.history-aware-query: []
+  rag.entity-linking: [ontology_entity_types, ontology_relationship_types, glossary]
+  rag.retrieval-grading: [glossary]
+  rag.grounded-answer: [glossary]
+  rag.citation-audit: []
 file_digests:
   analysis/macro.md: d74c0b63d0ab9ef31576a36dec07ad78ec2e5348da2fc4ef2e07d1ab0380f58b
   analysis/process-methodology-discovery.md: 83d3b7ed9878324d0dbb501f13d3a7af696167315f59c2c4a359203a5e8729fc
@@ -85,7 +106,7 @@ file_digests:
   audit/remediation-routing.md: aad1588c9bd94cd173e8d23a2ad70c860721da474af30cc2009fbcf997a61118
   clarification/questions.md: 5f99be2b4e90b811d572ed503b8d0a21a67dc1c24eb005889c6a6835dbb45371
   clarification/rewrite-checklist.md: 356a6a5cc0060c461fe6dcb58577f770be2d45c190a1262da15a68833d97e4a0
-  golden/compositions.yaml: 47f559929e921055f2c88a2b4c12290dde01d3dcb1d4cec37b79a32e38547d1a
+  golden/compositions.yaml: d6db2625f502ea4a2b6a21e29f4c599672533cede5819ee6dc245e4143f8985d
   golden/fake_outputs.json: 3eb0bfcd4850ff91cc708775ce7cc4d66edc1fcdbf1b29668e5c6d50ee7ba6fc
   rag/citation-audit.md: 60a64d31aa960cbf280c3954fe9aeb3cbbde6f99cf7280cfcc605748d947b4c5
   rag/entity-linking.md: 579717547253ccf0e0399423c3dbb92ba1c594e16031534a5e69618c66a6d4dd

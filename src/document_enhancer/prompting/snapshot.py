@@ -71,6 +71,7 @@ def build_prompt_snapshot(
         "prompt_pack_version": composed.pack_version,
         "prompt_pack_manifest_sha256": composed.pack_manifest_sha256,
         "prompt_pack_sha256": composed.pack_sha256,
+        "reference_scope": list(composed.reference_scope),
         "rendered_prompt_digest": composed.resolution.rendered_prompt_digest,
         "template_digest": composed.resolution.template_digest,
         "shared_fragment_digests": dict(composed.resolution.shared_fragment_digests),

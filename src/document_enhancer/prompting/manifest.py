@@ -84,6 +84,7 @@ class PromptPack:
     file_digests: Mapping[str, str]
     file_contents: Mapping[str, bytes]
     reference_inputs: Mapping[str, ReferenceInputSpec]
+    prompt_reference_scopes: Mapping[str, tuple[str, ...]]
     templates: Mapping[str, PromptTemplate]
     manifest_sha256: str
     pack_sha256: str
@@ -94,6 +95,13 @@ class PromptPack:
         object.__setattr__(self, "file_digests", MappingProxyType(dict(self.file_digests)))
         object.__setattr__(self, "file_contents", MappingProxyType(dict(self.file_contents)))
         object.__setattr__(self, "reference_inputs", MappingProxyType(dict(self.reference_inputs)))
+        object.__setattr__(
+            self,
+            "prompt_reference_scopes",
+            MappingProxyType(
+                {str(key): tuple(value) for key, value in self.prompt_reference_scopes.items()}
+            ),
+        )
         object.__setattr__(self, "templates", MappingProxyType(dict(self.templates)))
 
     @property
@@ -123,3 +131,11 @@ class PromptPack:
             return self.file_contents[relative]
         except KeyError as exc:  # pragma: no cover - guarded at load time
             raise KeyError(f"file {relative!r} is not loaded") from exc
+
+    def reference_scope(self, prompt_id: str) -> tuple[str, ...]:
+        """Return the ordered governed-reference scope for one prompt."""
+
+        try:
+            return self.prompt_reference_scopes[prompt_id]
+        except KeyError as exc:  # pragma: no cover - guarded at load time
+            raise KeyError(f"reference scope for prompt {prompt_id!r} is not loaded") from exc

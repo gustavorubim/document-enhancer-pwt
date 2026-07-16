@@ -26,6 +26,7 @@ def list_prompts(
             "model_route": prompt.model_route,
             "output_schema": prompt.output_schema,
             "template_path": prompt.template_path,
+            "reference_scope": list(pack.reference_scope(prompt.prompt_id)),
             "pack_id": pack.pack_id,
             "pack_version": pack.version,
         }
@@ -52,6 +53,7 @@ def show_prompt(
             "output_schema": prompt.output_schema,
             "template_path": prompt.template_path,
             "shared_fragments": list(prompt.shared_fragments),
+            "reference_scope": list(pack.reference_scope(prompt_id)),
             "variables": [item.model_dump(mode="json") for item in prompt.variables],
             "pack_id": pack.pack_id,
             "pack_version": pack.version,

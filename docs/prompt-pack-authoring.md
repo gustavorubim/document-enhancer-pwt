@@ -24,6 +24,14 @@ prose. Each resolved file is recorded with logical name, pack ID/version/digest,
 kind, file digest, and byte size. Runtime reviewer answers, steering, waivers, and source text
 are inputs, not reference-pack files.
 
+The manifest must also contain `prompt_reference_scopes`, with exactly one ordered list for
+every prompt ID. A scope names only the governed reference inputs needed by that stage; names
+must be unique and bound in `required_references`/`reference_inputs`. The global required
+reference registry is still resolved and compatibility-checked for every supported document
+type, while composition inserts only the selected scope. Structure triage, window recovery, and
+boundary reconciliation use an empty scope so target rubrics, templates, policies, and ontology
+cannot steer source-boundary recovery. RAG stages use similarly narrow scopes where appropriate.
+
 ## Composition and input boundaries
 
 The composer emits the following visible order:
@@ -47,16 +55,17 @@ checked-in schema; they do not return prose or tool calls.
 
 ## Versioning and review lifecycle
 
-Use semantic versions. A patch release fixes wording without changing behavior; a minor release
-adds prompts or compatible variables; a major release changes output meaning, required inputs,
-composition semantics, or compatibility. Reviewers should inspect the rendered prompt, route,
-schema, reference metadata, diff, security lint, and golden fake output before activation.
+Use semantic versions. A patch release fixes wording or corrects reference composition while
+preserving output contracts; a minor release adds prompts or compatible variables; a major release
+changes output meaning, required inputs, composition semantics, or compatibility. Reviewers should
+inspect the rendered prompt, route, schema, reference scope and selected metadata, diff, security
+lint, and golden fake output before activation.
 
 The normal lifecycle is `draft` → `active` → `deprecated` → `retired`. Retiring a pack requires
 an integrator migration plan and preserved run-artifact readability. A run snapshot stores only
-template/fragment digests, resolved reference metadata/digests, variable names and redacted
-variable metadata, composition order, output schema/digest, and rendered prompt digest. It never
-stores credentials or unnecessary raw source text.
+template/fragment digests, the ordered reference scope, resolved reference metadata/digests,
+variable names and redacted variable metadata, composition order, output schema/digest, and
+rendered prompt digest. It never stores credentials or unnecessary raw source text.
 
 ## Validation and service API
 
@@ -71,6 +80,7 @@ The service API used by the future CLI is available from
 `document_enhancer.prompting.services`:
 
 - `list_prompts(pack)` returns prompt ID, stage, route, schema, path, and pack version.
+- `list_prompts(pack)` also returns the ordered governed reference scope for each prompt.
 - `show_prompt(pack, prompt_id)` returns manifest metadata; `composed=True` returns the exact
   bounded composition after reference resolution.
 - `validate(pack, reference_pack=...)` returns a JSON-safe precise report.
