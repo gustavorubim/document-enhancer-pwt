@@ -6,6 +6,9 @@ The operator needs access to Beacon Monitor, the Incident Console, and the servi
 
 **ATOMIC ACTIONS**
 
+| Misplaced summary | Value |
+| review note | See prior section |
+
 Open the alert, acknowledge it, and assign the incident to the on-call role. If it is customer-impacting, notify the communications lead. See the table below.
 
 **SEVERITY DECISION**

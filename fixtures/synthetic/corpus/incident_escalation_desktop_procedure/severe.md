@@ -40,3 +40,6 @@ Save the alert ID and notification timestamp. The procedure does not define the 
 Incident Escalation Desktop Procedure | Internal fictional fixture | Page 1 of 2
 
 Incident Escalation Desktop Procedure | Internal fictional fixture | Page 1 of 2
+
+PAGE 2
+continued without a styled boundary

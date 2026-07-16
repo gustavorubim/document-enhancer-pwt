@@ -1,7 +1,40 @@
 {
   "dataset_id": "cross-document-knowledge-network-v1",
-  "note": "Expected evidence and graph paths are contracts; answers and retrieval ranks are not passing gold before M7R.",
+  "note": "Stable logical chunk IDs and source spans form deterministic offline evaluation contracts; they are not claims of live-model performance.",
   "questions": [
+    {
+      "acceptable_graph_paths": [
+        [
+          "METHSTEP-LOSS-001",
+          "USES_CALCULATOR",
+          "CALC-LOSS-ALLOC-001"
+        ]
+      ],
+      "answerability": "answerable",
+      "category": "direct_fact",
+      "contract_status": "gold",
+      "current_version_behavior": "use current approved versions only",
+      "expected_chunk_ids": [
+        "CHK-M8-FORECAST-METHOD"
+      ],
+      "expected_status": "answered",
+      "follow_up_of": null,
+      "forbidden_claims": [
+        "The calculator is an online service."
+      ],
+      "history": [],
+      "metadata_filters": {
+        "current_versions_only": true
+      },
+      "question": "Who owns the offline loss calculator?",
+      "question_id": "RAG-Q-001",
+      "required_citations": [
+        "SPN-FORECAST-007"
+      ],
+      "required_facts": [
+        "FACT-FORECAST-003"
+      ]
+    },
     {
       "acceptable_graph_paths": [
         [
@@ -16,16 +49,24 @@
         ]
       ],
       "answerability": "answerable",
-      "contract_status": "pending_m7r",
+      "category": "multi_section_synthesis",
+      "contract_status": "gold",
+      "current_version_behavior": "use current approved versions only",
       "expected_chunk_ids": [
-        "pending:chunk-model-change-approval",
-        "pending:chunk-model-change-evidence"
+        "CHK-M8-MCG-APPROVAL",
+        "CHK-M8-MCG-EVIDENCE"
       ],
+      "expected_status": "answered",
+      "follow_up_of": null,
       "forbidden_claims": [
         "The committee approves every change regardless of impact."
       ],
+      "history": [],
+      "metadata_filters": {
+        "current_versions_only": true
+      },
       "question": "Which committee approves a high-impact model change, and what evidence is stored?",
-      "question_id": "RAG-Q-001",
+      "question_id": "RAG-Q-002",
       "required_citations": [
         "SPN-MCG-006",
         "SPN-MCG-008"
@@ -38,22 +79,63 @@
     {
       "acceptable_graph_paths": [
         [
+          "CTRL-ACCESS-014",
+          "MITIGATES",
+          "RISK-ACCESS-EXCESS-001"
+        ]
+      ],
+      "answerability": "answerable",
+      "category": "control_to_risk_graph",
+      "contract_status": "gold",
+      "current_version_behavior": "use current approved versions only",
+      "expected_chunk_ids": [
+        "CHK-M8-ACCESS-CONTROL"
+      ],
+      "expected_status": "answered",
+      "follow_up_of": null,
+      "forbidden_claims": [
+        "CTRL-ACCESS-014 mitigates incident response risk."
+      ],
+      "history": [],
+      "metadata_filters": {
+        "current_versions_only": true
+      },
+      "question": "Which risk does CTRL-ACCESS-014 mitigate?",
+      "question_id": "RAG-Q-003",
+      "required_citations": [
+        "SPN-ACCESS-008"
+      ],
+      "required_facts": [
+        "FACT-ACCESS-003"
+      ]
+    },
+    {
+      "acceptable_graph_paths": [
+        [
           "PROC-MODEL-CHANGE-001",
           "DEPENDS_ON",
           "DEP-MCG-LOSS-METH-001"
         ]
       ],
-      "answerability": "answerable_after_version_resolution",
-      "contract_status": "pending_m7r",
+      "answerability": "partial",
+      "category": "process_dependency_graph",
+      "contract_status": "gold",
+      "current_version_behavior": "use current approved versions only",
       "expected_chunk_ids": [
-        "pending:chunk-model-change-intake",
-        "pending:chunk-loss-method"
+        "CHK-M8-MCG-INTAKE",
+        "CHK-M8-FORECAST-METHOD"
       ],
+      "expected_status": "partial",
+      "follow_up_of": null,
       "forbidden_claims": [
-        "The loss methodology version is already resolved."
+        "The exact governed methodology version is resolved."
       ],
-      "question": "What is the relationship between the model-change process and the monthly loss methodology?",
-      "question_id": "RAG-Q-002",
+      "history": [],
+      "metadata_filters": {
+        "current_versions_only": true
+      },
+      "question": "What is the governed dependency between model change and loss forecasting?",
+      "question_id": "RAG-Q-004",
       "required_citations": [
         "SPN-MCG-002",
         "SPN-FORECAST-006"
@@ -66,22 +148,137 @@
     {
       "acceptable_graph_paths": [],
       "answerability": "unanswerable",
-      "contract_status": "pending_m7r",
+      "category": "current_vs_superseded",
+      "contract_status": "gold",
+      "current_version_behavior": "current-only retrieval must not infer a version; history is visible only when explicitly requested",
+      "expected_abstention": "The source states when the prior version is superseded but does not identify a current version.",
+      "expected_chunk_ids": [
+        "CHK-M8-MCG-LIFECYCLE"
+      ],
+      "expected_status": "insufficient",
+      "follow_up_of": null,
+      "forbidden_claims": [
+        "Version 2.0 is current."
+      ],
+      "history": [],
+      "metadata_filters": {
+        "current_versions_only": true
+      },
+      "question": "Which model version is current after production monitoring begins?",
+      "question_id": "RAG-Q-005",
+      "required_citations": [
+        "SPN-MCG-010"
+      ],
+      "required_facts": []
+    },
+    {
+      "acceptable_graph_paths": [],
+      "answerability": "answerable_with_history",
+      "category": "ambiguous_follow_up",
+      "contract_status": "gold",
+      "current_version_behavior": "use current approved versions only",
+      "expected_chunk_ids": [
+        "CHK-M8-ACCESS-CONTROL"
+      ],
+      "expected_status": "answered",
+      "follow_up_of": "RAG-Q-003",
+      "forbidden_claims": [
+        "The process retains approval minutes."
+      ],
+      "history": [
+        "Which process contains CTRL-ACCESS-014?"
+      ],
+      "metadata_filters": {
+        "current_versions_only": true
+      },
+      "question": "What evidence does that process retain?",
+      "question_id": "RAG-Q-006",
+      "required_citations": [
+        "SPN-ACCESS-009"
+      ],
+      "required_facts": [
+        "FACT-ACCESS-004"
+      ]
+    },
+    {
+      "acceptable_graph_paths": [],
+      "answerability": "answerable",
+      "category": "metadata_filter",
+      "contract_status": "gold",
+      "current_version_behavior": "use current approved versions only",
+      "expected_chunk_ids": [
+        "CHK-M8-TPRM-SCOPE"
+      ],
+      "expected_status": "answered",
+      "follow_up_of": null,
+      "forbidden_claims": [
+        "The methodology applies to all suppliers."
+      ],
+      "history": [],
+      "metadata_filters": {
+        "current_versions_only": true,
+        "document_type": [
+          "standard"
+        ]
+      },
+      "question": "Which standard applies to suppliers handling controlled data?",
+      "question_id": "RAG-Q-007",
+      "required_citations": [
+        "SPN-TPRM-002"
+      ],
+      "required_facts": [
+        "FACT-TPRM-001"
+      ]
+    },
+    {
+      "acceptable_graph_paths": [],
+      "answerability": "unanswerable",
+      "category": "unanswerable",
+      "contract_status": "gold",
+      "current_version_behavior": "use current approved versions only",
       "expected_abstention": "The source says quarterly but does not define a calendar trigger or deadline.",
       "expected_chunk_ids": [
-        "pending:chunk-access-trigger"
+        "CHK-M8-ACCESS-TRIGGER"
       ],
+      "expected_status": "insufficient",
+      "follow_up_of": null,
       "forbidden_claims": [
         "The review starts on the first business day of each quarter."
       ],
-      "question": "What is the current review trigger for the access process?",
-      "question_id": "RAG-Q-003",
+      "history": [],
+      "metadata_filters": {
+        "current_versions_only": true
+      },
+      "question": "What calendar-day trigger starts the quarterly access review?",
+      "question_id": "RAG-Q-008",
       "required_citations": [
         "SPN-ACCESS-002"
       ],
       "required_facts": []
+    },
+    {
+      "acceptable_graph_paths": [],
+      "answerability": "unanswerable",
+      "category": "unanswerable_out_of_domain",
+      "contract_status": "gold",
+      "current_version_behavior": "use current approved versions only",
+      "expected_abstention": "No source in the catalog addresses a satellite or orbital mass.",
+      "expected_chunk_ids": [],
+      "expected_status": "insufficient",
+      "follow_up_of": null,
+      "forbidden_claims": [
+        "The satellite mass is 500 kilograms."
+      ],
+      "history": [],
+      "metadata_filters": {
+        "current_versions_only": true
+      },
+      "question": "What is the orbital mass of the Northstar satellite?",
+      "question_id": "RAG-Q-009",
+      "required_citations": [],
+      "required_facts": []
     }
   ],
-  "schema_version": "0.1",
-  "status": "pending_m7r"
+  "schema_version": "1.0",
+  "status": "gold"
 }

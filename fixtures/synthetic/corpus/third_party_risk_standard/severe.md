@@ -40,3 +40,6 @@ Version 1.0 is effective 2026-04-01. It supersedes a document called Vendor Assu
 Third-Party Risk Standard | Internal fictional fixture | Page 1 of 2
 
 Third-Party Risk Standard | Internal fictional fixture | Page 1 of 2
+
+PAGE 2
+continued without a styled boundary

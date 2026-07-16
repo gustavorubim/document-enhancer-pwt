@@ -6,6 +6,9 @@ This standard defines minimum due-diligence requirements for fictional Meridian 
 
 **NORMATIVE REQUIREMENTS**
 
+| Misplaced summary | Value |
+| review note | See prior section |
+
 REQ-TPRM-001 says a supplier MUST have a named owner and evidence package. REQ-TPRM-002 says a supplier SHOULD complete annual review, while a later sentence calls annual review mandatory. See the table below.
 
 **EXCEPTIONS AND EVIDENCE**

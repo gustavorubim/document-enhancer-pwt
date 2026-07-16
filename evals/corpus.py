@@ -8,19 +8,39 @@ reviewable while still exercising the structural and governance defects describe
 from __future__ import annotations
 
 import hashlib
+import io
 import json
+import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from xml.sax.saxutils import escape
 
-CORPUS_SCHEMA_VERSION = "0.1"
-GENERATOR_VERSION = "0.1.0"
+CORPUS_SCHEMA_VERSION = "1.0"
+GENERATOR_VERSION = "1.0.0"
+DEGRADATION_LEVELS = ("clean", "mild", "medium", "severe")
 FAMILY_PREFIXES = {
     "monthly_loss_forecasting_methodology": "FORECAST",
     "quarterly_user_access_review_process": "ACCESS",
     "incident_escalation_desktop_procedure": "INCIDENT",
     "third_party_risk_standard": "TPRM",
     "model_change_governance_process": "MCG",
+}
+GOLD_ANSWERS = {
+    "Q-FORECAST-001": "The stress multiplier is dimensionless and the observed rate is a percentage over the three complete calendar months ending at the as-of date.",
+    "Q-FORECAST-002": "Pause use when managed-portfolio composition changes by more than ten percent and obtain Forecasting Lead approval with the limitation recorded.",
+    "Q-ACCESS-001": "The review opens on the first business day after quarter end and evidence is due within ten business days.",
+    "Q-ACCESS-002": "The Access Governance Chair approves time-bounded exceptions; overdue decisions escalate to the Control Owner after two business days.",
+    "Q-ACCESS-003": "Store the CSV, screenshot, and approval record in the fictional Harbor Evidence Vault for seven years.",
+    "Q-INCIDENT-001": "In Beacon Monitor, open the alert detail, copy the alert ID, severity, affected service, and first-observed timestamp into Incident Console.",
+    "Q-INCIDENT-002": "When Incident Console is unavailable, the operator opens the offline worksheet, activates the phone tree, and reconciles entries after service restoration.",
+    "Q-INCIDENT-003": "The procedure completes only when the alert is acknowledged, required notifications are timestamped, ownership is assigned, and the record is reconciled.",
+    "Q-TPRM-001": "Annual supplier review is mandatory under REQ-TPRM-001; advisory language describes implementation guidance only.",
+    "Q-TPRM-002": "Risk Committee exceptions expire after ninety days and compensating evidence is stored in the fictional Meridian Assurance Vault.",
+    "Q-TPRM-003": "The stable governed dependency is STD-VENDOR-ASSURANCE-002 version 2.0; version 1.0 is superseded.",
+    "Q-MCG-001": "A change is material at a five-percent expected monthly-loss impact, subject to Model Risk Committee approval.",
+    "Q-MCG-002": "The governed dependency is Monthly Loss Forecasting Methodology version 1.0.",
+    "Q-MCG-003": "The approved version becomes current when the production-monitoring ticket is approved; the prior version becomes historical at that point.",
 }
 
 
@@ -74,7 +94,7 @@ def _objects(
 
 
 def _edges(
-    family_id: str, entries: tuple[tuple[str, str, str, str], ...]
+    family_id: str, entries: tuple[tuple[str, str, str, str, str], ...]
 ) -> tuple[dict[str, Any], ...]:
     return tuple(
         {
@@ -1057,6 +1077,19 @@ def _variant_blocks(family: FamilySpec, variant: str) -> list[dict[str, Any]]:
             }
         )
         ordinal += 1
+        if variant == "medium" and section_index == 2:
+            blocks.append(
+                {
+                    "span_id": f"SPN-{prefix}-{ordinal + 1:03d}",
+                    "ordinal": ordinal,
+                    "block_type": "table",
+                    "text": "| Misplaced summary | Value |\n| review note | See prior section |",
+                    "substantive": False,
+                    "section_id": section.section_id,
+                    "untrusted": False,
+                }
+            )
+            ordinal += 1
         body_span = f"SPN-{prefix}-{ordinal + 1:03d}"
         body = section.body
         if variant == "medium" and section_index == 2:
@@ -1089,6 +1122,18 @@ def _variant_blocks(family: FamilySpec, variant: str) -> list[dict[str, Any]]:
                 }
             )
             ordinal += 1
+    if variant == "severe":
+        blocks.append(
+            {
+                "span_id": f"SPN-{_span_prefix(family)}-{ordinal + 1:03d}",
+                "ordinal": ordinal,
+                "block_type": "footer",
+                "text": "PAGE 2\ncontinued without a styled boundary",
+                "substantive": False,
+                "section_id": None,
+                "untrusted": False,
+            }
+        )
     return blocks
 
 
@@ -1097,6 +1142,96 @@ def _render_block(block: dict[str, Any], variant: str) -> str:
     if variant == "severe" and block["block_type"] == "table" and "|" in text:
         return f"{text}\n| layout artifact | not a data table |"
     return text
+
+
+def _zip_bytes(entries: dict[str, bytes]) -> bytes:
+    """Create a byte-stable ZIP container suitable for deterministic DOCX fixtures."""
+
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+        for name, content in sorted(entries.items()):
+            info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.external_attr = 0o600 << 16
+            archive.writestr(info, content)
+    return output.getvalue()
+
+
+def render_docx(family: FamilySpec, variant: str) -> bytes:
+    """Render the same controlled blocks into a minimal, macro-free deterministic DOCX."""
+
+    paragraphs: list[str] = []
+    for block in _variant_blocks(family, variant):
+        style = ""
+        if variant == "clean" and block["block_type"] == "heading":
+            style = '<w:pPr><w:pStyle w:val="Heading1"/></w:pPr>'
+        # Deliberately leave degraded headings as normal paragraphs. A table-like source marker
+        # remains text so parsers cannot rely on Word heading styles.
+        runs = "".join(
+            f'<w:r><w:t xml:space="preserve">{escape(line)}</w:t></w:r>'
+            for line in str(block["text"]).splitlines() or [""]
+        )
+        paragraphs.append(f"<w:p>{style}{runs}</w:p>")
+    document = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        f"<w:body>{''.join(paragraphs)}<w:sectPr/></w:body></w:document>"
+    ).encode()
+    return _zip_bytes(
+        {
+            "[Content_Types].xml": b'<?xml version="1.0" encoding="UTF-8"?>'
+            b'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+            b'<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+            b'<Default Extension="xml" ContentType="application/xml"/>'
+            b'<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+            b"</Types>",
+            "_rels/.rels": b'<?xml version="1.0" encoding="UTF-8"?>'
+            b'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            b'<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>'
+            b"</Relationships>",
+            "word/_rels/document.xml.rels": b'<?xml version="1.0" encoding="UTF-8"?>'
+            b'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>',
+            "word/document.xml": document,
+        }
+    )
+
+
+def render_pdf(family: FamilySpec, variant: str) -> bytes:
+    """Render a compact text-based PDF without timestamps, scripts, or external relationships."""
+
+    lines: list[str] = []
+    for block in _variant_blocks(family, variant):
+        lines.extend(str(block["text"]).replace("\t", " ").splitlines())
+    commands = ["BT", "/F1 8 Tf", "36 760 Td", "10 TL"]
+    for line in lines[:68]:
+        safe = line.encode("ascii", "replace").decode().replace("\\", "\\\\")
+        safe = safe.replace("(", "\\(").replace(")", "\\)")[:150]
+        commands.extend([f"({safe}) Tj", "T*"])
+    commands.append("ET")
+    stream = ("\n".join(commands) + "\n").encode("ascii")
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>",
+        f"<< /Length {len(stream)} >>\nstream\n".encode() + stream + b"endstream",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    ]
+    payload = bytearray(b"%PDF-1.4\n%DE-M8\n")
+    offsets = [0]
+    for index, body in enumerate(objects, start=1):
+        offsets.append(len(payload))
+        payload.extend(f"{index} 0 obj\n".encode())
+        payload.extend(body)
+        payload.extend(b"\nendobj\n")
+    xref = len(payload)
+    payload.extend(f"xref\n0 {len(objects) + 1}\n".encode())
+    payload.extend(b"0000000000 65535 f \n")
+    for offset in offsets[1:]:
+        payload.extend(f"{offset:010d} 00000 n \n".encode())
+    payload.extend(
+        f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n".encode()
+    )
+    return bytes(payload)
 
 
 def render_variant(family: FamilySpec, variant: str) -> tuple[str, dict[str, Any]]:
@@ -1172,18 +1307,53 @@ def render_variant(family: FamilySpec, variant: str) -> tuple[str, dict[str, Any
         "degradations": degradations,
         "structure_routing": routing,
         "lossy_metadata": {
-            "binary_fixture_deferred": True,
+            "binary_fixture_deferred": False,
             "scanned_or_lossy_variant": variant == "severe",
-            "text_fidelity": "bounded_text_fixture",
-            "note": "DOCX/PDF binary generation is deferred to M3; this metadata preserves the evaluation contract.",
+            "text_fidelity": "same_facts_format_specific_layout",
+            "note": "Markdown and DOCX are generated for every level; selected families also have text PDFs.",
         },
     }
 
 
+def _enhanced_target(family: FamilySpec) -> str:
+    lines = [f"# {family.title}", "", "Status: fictional evaluation target", ""]
+    for section in family.sections:
+        lines.extend([f"## {section.title}", "", section.body, ""])
+    lines.extend(["## Reviewer-approved fixture clarifications", ""])
+    for question in family.questions:
+        lines.append(
+            f"- {question['question_id']}: {GOLD_ANSWERS[question['question_id']]} "
+            f"(provenance: answer://fixture/{question['question_id']})"
+        )
+    return "\n".join(lines) + "\n"
+
+
 def family_gold(family: FamilySpec) -> dict[str, Any]:
     variants: dict[str, Any] = {}
-    for variant in ("clean", "mild", "medium", "severe"):
+    for variant in DEGRADATION_LEVELS:
         _, variant_gold = render_variant(family, variant)
+        artifacts = {
+            "markdown": {
+                "path": f"{variant}.md",
+                "sha256": variant_gold["source_digest"],
+                "media_type": "text/markdown",
+            },
+            "docx": {
+                "path": f"{variant}.docx",
+                "sha256": hashlib.sha256(render_docx(family, variant)).hexdigest(),
+                "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            },
+        }
+        if family.family_id in {
+            "monthly_loss_forecasting_methodology",
+            "incident_escalation_desktop_procedure",
+        }:
+            artifacts["pdf"] = {
+                "path": f"{variant}.pdf",
+                "sha256": hashlib.sha256(render_pdf(family, variant)).hexdigest(),
+                "media_type": "application/pdf",
+            }
+        variant_gold["format_artifacts"] = artifacts
         variants[variant] = variant_gold
     facts = [
         {
@@ -1215,6 +1385,21 @@ def family_gold(family: FamilySpec) -> dict[str, Any]:
         }
         for defect in family.defects
     ]
+    defect_spans = {item["source_span_id"] for item in family.defects}
+    clean_blocks = variants["clean"]["raw_blocks"]
+    dispositions = [
+        {
+            "source_span_id": block["span_id"],
+            "disposition": "clarify" if block["span_id"] in defect_spans else "preserve",
+            "target_section_id": block["section_id"],
+            "rationale": "seeded defect requires bounded reviewer clarification"
+            if block["span_id"] in defect_spans
+            else "source-backed substantive content remains represented",
+        }
+        for block in clean_blocks
+        if block["substantive"]
+    ]
+    enhanced = _enhanced_target(family)
     return {
         "schema_version": CORPUS_SCHEMA_VERSION,
         "family_id": family.family_id,
@@ -1224,78 +1409,167 @@ def family_gold(family: FamilySpec) -> dict[str, Any]:
         "related_documents": list(family.related_documents),
         "gold_source_facts": facts,
         "gold_questions": list(family.questions),
+        "gold_answers": [
+            {
+                "question_id": question["question_id"],
+                "status": "answered",
+                "answer": GOLD_ANSWERS[question["question_id"]],
+                "provenance": f"answer://fixture/{question['question_id']}",
+                "reviewer": "fictional-fixture-reviewer",
+            }
+            for question in family.questions
+        ],
         "gold_semantic_objects": objects,
         "gold_semantic_edges": edges,
         "seeded_defects": defects,
-        "content_dispositions": {
-            "status": "pending_m6",
-            "source": "gold_contract_only",
-            "note": "Approved enhanced output is not seeded before rewrite contracts merge.",
-        },
+        "content_dispositions": dispositions,
         "enhanced_output": {
-            "status": "pending_m6_m7",
-            "gold_artifact": None,
-            "reason": "No fabricated Markdown, sidecar, export, or audit output before downstream lanes exist.",
+            "status": "gold_source_backed_target",
+            "gold_artifact": "enhanced_target.md",
+            "sha256": hashlib.sha256(enhanced.encode()).hexdigest(),
+            "policy": "Preserve explicit facts and surface unresolved questions; do not infer answers.",
         },
         "variants": variants,
     }
 
 
 def cross_document_questions() -> dict[str, Any]:
+    questions: list[dict[str, Any]] = [
+        {
+            "question_id": "RAG-Q-001",
+            "category": "direct_fact",
+            "question": "Who owns the offline loss calculator?",
+            "answerability": "answerable",
+            "expected_status": "answered",
+            "expected_chunk_ids": ["CHK-M8-FORECAST-METHOD"],
+            "acceptable_graph_paths": [
+                ["METHSTEP-LOSS-001", "USES_CALCULATOR", "CALC-LOSS-ALLOC-001"]
+            ],
+            "required_facts": ["FACT-FORECAST-003"],
+            "required_citations": ["SPN-FORECAST-007"],
+            "forbidden_claims": ["The calculator is an online service."],
+        },
+        {
+            "question_id": "RAG-Q-002",
+            "category": "multi_section_synthesis",
+            "question": "Which committee approves a high-impact model change, and what evidence is stored?",
+            "answerability": "answerable",
+            "expected_status": "answered",
+            "expected_chunk_ids": ["CHK-M8-MCG-APPROVAL", "CHK-M8-MCG-EVIDENCE"],
+            "acceptable_graph_paths": [
+                ["PROC-MODEL-CHANGE-001", "APPROVED_BY", "APPROVAL-MRC-001"],
+                ["PROC-MODEL-CHANGE-001", "PRODUCES_EVIDENCE", "EVID-MCG-VALIDATION-001"],
+            ],
+            "required_facts": ["FACT-MCG-003", "FACT-MCG-004"],
+            "required_citations": ["SPN-MCG-006", "SPN-MCG-008"],
+            "forbidden_claims": ["The committee approves every change regardless of impact."],
+        },
+        {
+            "question_id": "RAG-Q-003",
+            "category": "control_to_risk_graph",
+            "question": "Which risk does CTRL-ACCESS-014 mitigate?",
+            "answerability": "answerable",
+            "expected_status": "answered",
+            "expected_chunk_ids": ["CHK-M8-ACCESS-CONTROL"],
+            "acceptable_graph_paths": [["CTRL-ACCESS-014", "MITIGATES", "RISK-ACCESS-EXCESS-001"]],
+            "required_facts": ["FACT-ACCESS-003"],
+            "required_citations": ["SPN-ACCESS-008"],
+            "forbidden_claims": ["CTRL-ACCESS-014 mitigates incident response risk."],
+        },
+        {
+            "question_id": "RAG-Q-004",
+            "category": "process_dependency_graph",
+            "question": "What is the governed dependency between model change and loss forecasting?",
+            "answerability": "partial",
+            "expected_status": "partial",
+            "expected_chunk_ids": ["CHK-M8-MCG-INTAKE", "CHK-M8-FORECAST-METHOD"],
+            "acceptable_graph_paths": [
+                ["PROC-MODEL-CHANGE-001", "DEPENDS_ON", "DEP-MCG-LOSS-METH-001"]
+            ],
+            "required_facts": ["FACT-MCG-001", "FACT-FORECAST-002"],
+            "required_citations": ["SPN-MCG-002", "SPN-FORECAST-006"],
+            "forbidden_claims": ["The exact governed methodology version is resolved."],
+        },
+        {
+            "question_id": "RAG-Q-005",
+            "category": "current_vs_superseded",
+            "question": "Which model version is current after production monitoring begins?",
+            "answerability": "unanswerable",
+            "expected_status": "insufficient",
+            "expected_chunk_ids": ["CHK-M8-MCG-LIFECYCLE"],
+            "acceptable_graph_paths": [],
+            "required_facts": [],
+            "required_citations": ["SPN-MCG-010"],
+            "forbidden_claims": ["Version 2.0 is current."],
+            "expected_abstention": "The source states when the prior version is superseded but does not identify a current version.",
+            "current_version_behavior": "current-only retrieval must not infer a version; history is visible only when explicitly requested",
+        },
+        {
+            "question_id": "RAG-Q-006",
+            "category": "ambiguous_follow_up",
+            "question": "What evidence does that process retain?",
+            "answerability": "answerable_with_history",
+            "expected_status": "answered",
+            "follow_up_of": "RAG-Q-003",
+            "history": ["Which process contains CTRL-ACCESS-014?"],
+            "expected_chunk_ids": ["CHK-M8-ACCESS-CONTROL"],
+            "acceptable_graph_paths": [],
+            "required_facts": ["FACT-ACCESS-004"],
+            "required_citations": ["SPN-ACCESS-009"],
+            "forbidden_claims": ["The process retains approval minutes."],
+        },
+        {
+            "question_id": "RAG-Q-007",
+            "category": "metadata_filter",
+            "question": "Which standard applies to suppliers handling controlled data?",
+            "answerability": "answerable",
+            "expected_status": "answered",
+            "metadata_filters": {"document_type": ["standard"], "current_versions_only": True},
+            "expected_chunk_ids": ["CHK-M8-TPRM-SCOPE"],
+            "acceptable_graph_paths": [],
+            "required_facts": ["FACT-TPRM-001"],
+            "required_citations": ["SPN-TPRM-002"],
+            "forbidden_claims": ["The methodology applies to all suppliers."],
+        },
+        {
+            "question_id": "RAG-Q-008",
+            "category": "unanswerable",
+            "question": "What calendar-day trigger starts the quarterly access review?",
+            "answerability": "unanswerable",
+            "expected_status": "insufficient",
+            "expected_chunk_ids": ["CHK-M8-ACCESS-TRIGGER"],
+            "acceptable_graph_paths": [],
+            "required_facts": [],
+            "required_citations": ["SPN-ACCESS-002"],
+            "forbidden_claims": ["The review starts on the first business day of each quarter."],
+            "expected_abstention": "The source says quarterly but does not define a calendar trigger or deadline.",
+        },
+        {
+            "question_id": "RAG-Q-009",
+            "category": "unanswerable_out_of_domain",
+            "question": "What is the orbital mass of the Northstar satellite?",
+            "answerability": "unanswerable",
+            "expected_status": "insufficient",
+            "expected_chunk_ids": [],
+            "acceptable_graph_paths": [],
+            "required_facts": [],
+            "required_citations": [],
+            "forbidden_claims": ["The satellite mass is 500 kilograms."],
+            "expected_abstention": "No source in the catalog addresses a satellite or orbital mass.",
+        },
+    ]
+    for question in questions:
+        question.setdefault("metadata_filters", {"current_versions_only": True})
+        question.setdefault("follow_up_of", None)
+        question.setdefault("history", [])
+        question.setdefault("current_version_behavior", "use current approved versions only")
+        question["contract_status"] = "gold"
     return {
         "schema_version": CORPUS_SCHEMA_VERSION,
         "dataset_id": "cross-document-knowledge-network-v1",
-        "status": "pending_m7r",
-        "note": "Expected evidence and graph paths are contracts; answers and retrieval ranks are not passing gold before M7R.",
-        "questions": [
-            {
-                "question_id": "RAG-Q-001",
-                "question": "Which committee approves a high-impact model change, and what evidence is stored?",
-                "answerability": "answerable",
-                "expected_chunk_ids": [
-                    "pending:chunk-model-change-approval",
-                    "pending:chunk-model-change-evidence",
-                ],
-                "acceptable_graph_paths": [
-                    ["PROC-MODEL-CHANGE-001", "APPROVED_BY", "APPROVAL-MRC-001"],
-                    ["PROC-MODEL-CHANGE-001", "PRODUCES_EVIDENCE", "EVID-MCG-VALIDATION-001"],
-                ],
-                "required_facts": ["FACT-MCG-003", "FACT-MCG-004"],
-                "required_citations": ["SPN-MCG-006", "SPN-MCG-008"],
-                "forbidden_claims": ["The committee approves every change regardless of impact."],
-                "contract_status": "pending_m7r",
-            },
-            {
-                "question_id": "RAG-Q-002",
-                "question": "What is the relationship between the model-change process and the monthly loss methodology?",
-                "answerability": "answerable_after_version_resolution",
-                "expected_chunk_ids": [
-                    "pending:chunk-model-change-intake",
-                    "pending:chunk-loss-method",
-                ],
-                "acceptable_graph_paths": [
-                    ["PROC-MODEL-CHANGE-001", "DEPENDS_ON", "DEP-MCG-LOSS-METH-001"]
-                ],
-                "required_facts": ["FACT-MCG-001", "FACT-FORECAST-002"],
-                "required_citations": ["SPN-MCG-002", "SPN-FORECAST-006"],
-                "forbidden_claims": ["The loss methodology version is already resolved."],
-                "contract_status": "pending_m7r",
-            },
-            {
-                "question_id": "RAG-Q-003",
-                "question": "What is the current review trigger for the access process?",
-                "answerability": "unanswerable",
-                "expected_chunk_ids": ["pending:chunk-access-trigger"],
-                "acceptable_graph_paths": [],
-                "required_facts": [],
-                "required_citations": ["SPN-ACCESS-002"],
-                "forbidden_claims": [
-                    "The review starts on the first business day of each quarter."
-                ],
-                "contract_status": "pending_m7r",
-                "expected_abstention": "The source says quarterly but does not define a calendar trigger or deadline.",
-            },
-        ],
+        "status": "gold",
+        "note": "Stable logical chunk IDs and source spans form deterministic offline evaluation contracts; they are not claims of live-model performance.",
+        "questions": questions,
     }
 
 
@@ -1307,17 +1581,30 @@ def generated_files() -> dict[Path, bytes]:
         gold = family_gold(family)
         gold_bytes = json.dumps(gold, indent=2, sort_keys=True) + "\n"
         files[family_dir / "gold.json"] = gold_bytes.encode("utf-8")
+        files[family_dir / "enhanced_target.md"] = _enhanced_target(family).encode("utf-8")
         variants: list[dict[str, Any]] = []
-        for variant in ("clean", "mild", "medium", "severe"):
+        for variant in DEGRADATION_LEVELS:
             source, variant_gold = render_variant(family, variant)
             source_path = family_dir / f"{variant}.md"
             files[source_path] = source.encode("utf-8")
+            docx_path = family_dir / f"{variant}.docx"
+            files[docx_path] = render_docx(family, variant)
+            formats = ["markdown", "docx"]
+            if family.family_id in {
+                "monthly_loss_forecasting_methodology",
+                "incident_escalation_desktop_procedure",
+            }:
+                pdf_path = family_dir / f"{variant}.pdf"
+                files[pdf_path] = render_pdf(family, variant)
+                formats.append("pdf")
             variants.append(
                 {
                     "variant": variant,
                     "source": str(source_path),
                     "sha256": variant_gold["source_digest"],
                     "expected_mode": variant_gold["structure_routing"]["expected_mode"],
+                    "formats": formats,
+                    "format_artifacts": gold["variants"][variant]["format_artifacts"],
                 }
             )
         manifest_families.append(

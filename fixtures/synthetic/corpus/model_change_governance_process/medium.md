@@ -6,6 +6,9 @@ The model owner submits a change ticket with the affected methodology, model ver
 
 **IMPACT ASSESSMENT**
 
+| Misplaced summary | Value |
+| review note | See prior section |
+
 The validator assesses data, formula, control, and downstream reporting impact. A materiality threshold is mentioned without a unit or approving role. See the table below.
 
 **APPROVAL AND IMPLEMENTATION**

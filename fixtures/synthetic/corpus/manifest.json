@@ -9,25 +9,113 @@
       "variants": [
         {
           "expected_mode": "parser",
+          "format_artifacts": {
+            "docx": {
+              "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+              "path": "clean.docx",
+              "sha256": "739b06181118585a41893b4558f8f3dbeb4ecf800f82d0d7b7bc7c51f6100f1d"
+            },
+            "markdown": {
+              "media_type": "text/markdown",
+              "path": "clean.md",
+              "sha256": "39057e390220399b8713f388ab1a8cfd200c6856a0c08024dd8451d137e5219b"
+            },
+            "pdf": {
+              "media_type": "application/pdf",
+              "path": "clean.pdf",
+              "sha256": "e9e342e952ac01782f6c126fb149555d08f38765b847f9287198d1424dfd8e9c"
+            }
+          },
+          "formats": [
+            "markdown",
+            "docx",
+            "pdf"
+          ],
           "sha256": "39057e390220399b8713f388ab1a8cfd200c6856a0c08024dd8451d137e5219b",
           "source": "monthly_loss_forecasting_methodology/clean.md",
           "variant": "clean"
         },
         {
           "expected_mode": "llm_recovery",
+          "format_artifacts": {
+            "docx": {
+              "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+              "path": "mild.docx",
+              "sha256": "0e0ee0abf183e97777ae08c417960a28c572ac9d6cd0a10fc28ffbe0cd1b692c"
+            },
+            "markdown": {
+              "media_type": "text/markdown",
+              "path": "mild.md",
+              "sha256": "f082357f63d4814b91c5ebedbe1da5eb483d64d3ae0d1cc0435db201e4d2fcfa"
+            },
+            "pdf": {
+              "media_type": "application/pdf",
+              "path": "mild.pdf",
+              "sha256": "0492a902d196d2c8fc45f2728b15342f89abb312f884e8c24bd3fda208b006c8"
+            }
+          },
+          "formats": [
+            "markdown",
+            "docx",
+            "pdf"
+          ],
           "sha256": "f082357f63d4814b91c5ebedbe1da5eb483d64d3ae0d1cc0435db201e4d2fcfa",
           "source": "monthly_loss_forecasting_methodology/mild.md",
           "variant": "mild"
         },
         {
           "expected_mode": "llm_recovery",
-          "sha256": "edacbea70ff27408afd92e253a03b702f331b6dbf65bf655ec3d856e7dc2a1da",
+          "format_artifacts": {
+            "docx": {
+              "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+              "path": "medium.docx",
+              "sha256": "909c60cee4fd2180dfc683f697e1b190aa058713b025635b44a36bd11babdf43"
+            },
+            "markdown": {
+              "media_type": "text/markdown",
+              "path": "medium.md",
+              "sha256": "59cd594053f4619651ae181fabf62e1cb68d7d586a47aca5ea575886e0e87dc7"
+            },
+            "pdf": {
+              "media_type": "application/pdf",
+              "path": "medium.pdf",
+              "sha256": "b95f04d18a90880622b7110b8d579b478a1aa07ff5d9f0b6f06e3db3386480e3"
+            }
+          },
+          "formats": [
+            "markdown",
+            "docx",
+            "pdf"
+          ],
+          "sha256": "59cd594053f4619651ae181fabf62e1cb68d7d586a47aca5ea575886e0e87dc7",
           "source": "monthly_loss_forecasting_methodology/medium.md",
           "variant": "medium"
         },
         {
           "expected_mode": "llm_recovery",
-          "sha256": "72e637761f8d4ae7e9a02e79e8ce9281462c187f1d94100e49d3a542ef3e1398",
+          "format_artifacts": {
+            "docx": {
+              "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+              "path": "severe.docx",
+              "sha256": "b9526e229db81c10d520120076f6b8a0507da9cfcc3547210ff32f9d2d435261"
+            },
+            "markdown": {
+              "media_type": "text/markdown",
+              "path": "severe.md",
+              "sha256": "ce864dfbca10a09de125572c8ac136da871f270c6c5d68e24cfab9ad9e4cc469"
+            },
+            "pdf": {
+              "media_type": "application/pdf",
+              "path": "severe.pdf",
+              "sha256": "818d934d530f49ed5c885dd8464c2a49195622b60ca2b317036bc63294ceb590"
+            }
+          },
+          "formats": [
+            "markdown",
+            "docx",
+            "pdf"
+          ],
+          "sha256": "ce864dfbca10a09de125572c8ac136da871f270c6c5d68e24cfab9ad9e4cc469",
           "source": "monthly_loss_forecasting_methodology/severe.md",
           "variant": "severe"
         }
@@ -41,25 +129,89 @@
       "variants": [
         {
           "expected_mode": "parser",
+          "format_artifacts": {
+            "docx": {
+              "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+              "path": "clean.docx",
+              "sha256": "6899817e586197855bdc46ba8d9d1e9bc4433a09b84613bcc7d7f87227ebe81d"
+            },
+            "markdown": {
+              "media_type": "text/markdown",
+              "path": "clean.md",
+              "sha256": "b9827fe65c9647f32f874a6d6b6d512d3aaa93746cc404ffdc4a1bfbd27db395"
+            }
+          },
+          "formats": [
+            "markdown",
+            "docx"
+          ],
           "sha256": "b9827fe65c9647f32f874a6d6b6d512d3aaa93746cc404ffdc4a1bfbd27db395",
           "source": "quarterly_user_access_review_process/clean.md",
           "variant": "clean"
         },
         {
           "expected_mode": "llm_recovery",
+          "format_artifacts": {
+            "docx": {
+              "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+              "path": "mild.docx",
+              "sha256": "965330de35b62760ffe9ef6a0dae77740e98e151220181da7a1683f043031255"
+            },
+            "markdown": {
+              "media_type": "text/markdown",
+              "path": "mild.md",
+              "sha256": "79c4b1016ade2f90df84c6b556fc276b9842bb2cf4ea8790d8adc967718cdd89"
+            }
+          },
+          "formats": [
+            "markdown",
+            "docx"
+          ],
           "sha256": "79c4b1016ade2f90df84c6b556fc276b9842bb2cf4ea8790d8adc967718cdd89",
           "source": "quarterly_user_access_review_process/mild.md",
           "variant": "mild"
         },
         {
           "expected_mode": "llm_recovery",
-          "sha256": "818903b9bbd26d4e86f447b2af28967ef1319dbf9c2b560bc348f2f6cb33d8fe",
+          "format_artifacts": {
+            "docx": {
+              "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+              "path": "medium.docx",
+              "sha256": "d3caf3b787586757feac81c79072751e78c006903b66cce51ab0cabb0f3582c1"
+            },
+            "markdown": {
+              "media_type": "text/markdown",
+              "path": "medium.md",
+              "sha256": "02bfc291b32edebfc598c395728335a378d0839149ecd6a9f816d7161ec7da4a"
+            }
+          },
+          "formats": [
+            "markdown",
+            "docx"
+          ],
+          "sha256": "02bfc291b32edebfc598c395728335a378d0839149ecd6a9f816d7161ec7da4a",
           "source": "quarterly_user_access_review_process/medium.md",
           "variant": "medium"
         },
         {
           "expected_mode": "llm_recovery",
-          "sha256": "bacab529fc6f97ddb1714009c2b3b65e2d89b1a85c037d82147ee3717dd095f6",
+          "format_artifacts": {
+            "docx": {
+              "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+              "path": "severe.docx",
+              "sha256": "8d13228c976c1b34db032c7656974ae8c4925966858dd9ffc40d486e74e290fe"
+            },
+            "markdown": {
+              "media_type": "text/markdown",
+              "path": "severe.md",
+              "sha256": "c390843aa3c3be8f3d3fc9b0a83e437d11ee561a0d1f8aa93690c01adf584dd3"
+            }
+          },
+          "formats": [
+            "markdown",
+            "docx"
+          ],
+          "sha256": "c390843aa3c3be8f3d3fc9b0a83e437d11ee561a0d1f8aa93690c01adf584dd3",
           "source": "quarterly_user_access_review_process/severe.md",
           "variant": "severe"
         }
@@ -73,25 +225,113 @@
       "variants": [
         {
           "expected_mode": "parser",
+          "format_artifacts": {
+            "docx": {
+              "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+              "path": "clean.docx",
+              "sha256": "f0e211c842e7b1dfa7b00d20b33bc84964c0f9a677ef65ce67e4508d1a58a6d0"
+            },
+            "markdown": {
+              "media_type": "text/markdown",
+              "path": "clean.md",
+              "sha256": "f20457577d4b565f2a8a6e2f66ceb9f1fbe63f12fa4557dd54a8a5408d449c41"
+            },
+            "pdf": {
+              "media_type": "application/pdf",
+              "path": "clean.pdf",
+              "sha256": "8fbf3c7249f5fc52d0898907ac9a36660d3fe010cbf58ae9254750cd61943b68"
+            }
+          },
+          "formats": [
+            "markdown",
+            "docx",
+            "pdf"
+          ],
           "sha256": "f20457577d4b565f2a8a6e2f66ceb9f1fbe63f12fa4557dd54a8a5408d449c41",
           "source": "incident_escalation_desktop_procedure/clean.md",
           "variant": "clean"
         },
         {
           "expected_mode": "llm_recovery",
+          "format_artifacts": {
+            "docx": {
+              "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+              "path": "mild.docx",
+              "sha256": "7f6b92804a4af9cc40bd6d6fd270c4edf7583075467d903d2f40cd272fe5123f"
+            },
+            "markdown": {
+              "media_type": "text/markdown",
+              "path": "mild.md",
+              "sha256": "5b5ff6ac94da50bb815fd6143e1fe3a38a35c3dba876e64bdd7caf7bb263d090"
+            },
+            "pdf": {
+              "media_type": "application/pdf",
+              "path": "mild.pdf",
+              "sha256": "f4a461338bb2ae2114cad82e030d419c1c5d36245551684e1e0e14bbf09a9480"
+            }
+          },
+          "formats": [
+            "markdown",
+            "docx",
+            "pdf"
+          ],
           "sha256": "5b5ff6ac94da50bb815fd6143e1fe3a38a35c3dba876e64bdd7caf7bb263d090",
           "source": "incident_escalation_desktop_procedure/mild.md",
           "variant": "mild"
         },
         {
           "expected_mode": "llm_recovery",
-          "sha256": "adb6d83ec0b38d2184587b130b7a029f8e260c77ce2a5bbef061c2b087667b75",
+          "format_artifacts": {
+            "docx": {
+              "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+              "path": "medium.docx",
+              "sha256": "c5ece7f00a0404d78aa4f629bdeec5470418c439180863fda9b46653b502f5de"
+            },
+            "markdown": {
+              "media_type": "text/markdown",
+              "path": "medium.md",
+              "sha256": "28029172a8128e25277b750d48e41d16e4bf992317385ed6a3ff159d773a2466"
+            },
+            "pdf": {
+              "media_type": "application/pdf",
+              "path": "medium.pdf",
+              "sha256": "2b05cfdb127c28ed13d988295b8cc988a499224021f8ffc1b1e0019162a61e37"
+            }
+          },
+          "formats": [
+            "markdown",
+            "docx",
+            "pdf"
+          ],
+          "sha256": "28029172a8128e25277b750d48e41d16e4bf992317385ed6a3ff159d773a2466",
           "source": "incident_escalation_desktop_procedure/medium.md",
           "variant": "medium"
         },
         {
           "expected_mode": "llm_recovery",
-          "sha256": "4a1e4a425fc7899624a94816e098b97edc262bc5cbff8d512f526551aed4225a",
+          "format_artifacts": {
+            "docx": {
+              "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+              "path": "severe.docx",
+              "sha256": "d1c1b96855d919e56dfefe059108adffd211c92054217fb10906fe361b1adbb6"
+            },
+            "markdown": {
+              "media_type": "text/markdown",
+              "path": "severe.md",
+              "sha256": "0884ab534c22410e448a3220d893a23f78fb49a5fbc668202fae20eed9045a6a"
+            },
+            "pdf": {
+              "media_type": "application/pdf",
+              "path": "severe.pdf",
+              "sha256": "c734c6283ee7a586a9682c1b8cf82af55c218db6f74da4e3194fed4e8e27578b"
+            }
+          },
+          "formats": [
+            "markdown",
+            "docx",
+            "pdf"
+          ],
+          "sha256": "0884ab534c22410e448a3220d893a23f78fb49a5fbc668202fae20eed9045a6a",
           "source": "incident_escalation_desktop_procedure/severe.md",
           "variant": "severe"
         }
@@ -105,25 +345,89 @@
       "variants": [
         {
           "expected_mode": "parser",
+          "format_artifacts": {
+            "docx": {
+              "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+              "path": "clean.docx",
+              "sha256": "639d29e1f8efa1942172b071b956066bbe668f8a4d1750e7d383841560331d7a"
+            },
+            "markdown": {
+              "media_type": "text/markdown",
+              "path": "clean.md",
+              "sha256": "b872941eacffefb12d6cf3d104b43c73aeebd9b1b594c95b438d2471886f1ed5"
+            }
+          },
+          "formats": [
+            "markdown",
+            "docx"
+          ],
           "sha256": "b872941eacffefb12d6cf3d104b43c73aeebd9b1b594c95b438d2471886f1ed5",
           "source": "third_party_risk_standard/clean.md",
           "variant": "clean"
         },
         {
           "expected_mode": "llm_recovery",
+          "format_artifacts": {
+            "docx": {
+              "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+              "path": "mild.docx",
+              "sha256": "2db4810cfa9a55ae86f19a6da513a0b7f8886b93d01800ef8d6ff915ecedef67"
+            },
+            "markdown": {
+              "media_type": "text/markdown",
+              "path": "mild.md",
+              "sha256": "c290465b9f6a36f9e8c791d4bfc1d048c796b6a1001163824e9fab5c7094592b"
+            }
+          },
+          "formats": [
+            "markdown",
+            "docx"
+          ],
           "sha256": "c290465b9f6a36f9e8c791d4bfc1d048c796b6a1001163824e9fab5c7094592b",
           "source": "third_party_risk_standard/mild.md",
           "variant": "mild"
         },
         {
           "expected_mode": "llm_recovery",
-          "sha256": "88ecc612331571757f7174255208cd91c3360acf17b76150c074e186fe65787b",
+          "format_artifacts": {
+            "docx": {
+              "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+              "path": "medium.docx",
+              "sha256": "b02cac8160130aa193f4043d90ddd47fc7450c80eb120cf97e31d15b8919f018"
+            },
+            "markdown": {
+              "media_type": "text/markdown",
+              "path": "medium.md",
+              "sha256": "ff4ed96c62fc4911387ef513120cb188c8930200cfcad1985d96db5db35d6e25"
+            }
+          },
+          "formats": [
+            "markdown",
+            "docx"
+          ],
+          "sha256": "ff4ed96c62fc4911387ef513120cb188c8930200cfcad1985d96db5db35d6e25",
           "source": "third_party_risk_standard/medium.md",
           "variant": "medium"
         },
         {
           "expected_mode": "llm_recovery",
-          "sha256": "41e9fa1f71a79dc9636a2c46b72bb910930b56c6a3d6a0b72eefb2d45024e89f",
+          "format_artifacts": {
+            "docx": {
+              "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+              "path": "severe.docx",
+              "sha256": "35e569d8bc1bb0c41506172c81c4e33e318445bd9ec40b3c11822e96ce660ef4"
+            },
+            "markdown": {
+              "media_type": "text/markdown",
+              "path": "severe.md",
+              "sha256": "0221880cf5018ccb8ba46301a54a11fbc0a1a5a91c732435419a85a3aff4be39"
+            }
+          },
+          "formats": [
+            "markdown",
+            "docx"
+          ],
+          "sha256": "0221880cf5018ccb8ba46301a54a11fbc0a1a5a91c732435419a85a3aff4be39",
           "source": "third_party_risk_standard/severe.md",
           "variant": "severe"
         }
@@ -137,32 +441,96 @@
       "variants": [
         {
           "expected_mode": "parser",
+          "format_artifacts": {
+            "docx": {
+              "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+              "path": "clean.docx",
+              "sha256": "1902c8011dc017dc54a41f8d36826de4e1982ff60669e0540d46bc24d2e7a496"
+            },
+            "markdown": {
+              "media_type": "text/markdown",
+              "path": "clean.md",
+              "sha256": "4ba79ff365417fe2583a7708b55d2aa4600935a3c91bb80870feaf3484c6009c"
+            }
+          },
+          "formats": [
+            "markdown",
+            "docx"
+          ],
           "sha256": "4ba79ff365417fe2583a7708b55d2aa4600935a3c91bb80870feaf3484c6009c",
           "source": "model_change_governance_process/clean.md",
           "variant": "clean"
         },
         {
           "expected_mode": "llm_recovery",
+          "format_artifacts": {
+            "docx": {
+              "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+              "path": "mild.docx",
+              "sha256": "e4c1e25ba2f9c180a8e24479429db97ced0b5d2b0e24ece40077a5a8b83dcea9"
+            },
+            "markdown": {
+              "media_type": "text/markdown",
+              "path": "mild.md",
+              "sha256": "a143c96741b5cc4519a13b96a967ce95bb32e5c5a216c5745ffc0b6b28b752e5"
+            }
+          },
+          "formats": [
+            "markdown",
+            "docx"
+          ],
           "sha256": "a143c96741b5cc4519a13b96a967ce95bb32e5c5a216c5745ffc0b6b28b752e5",
           "source": "model_change_governance_process/mild.md",
           "variant": "mild"
         },
         {
           "expected_mode": "llm_recovery",
-          "sha256": "7b9537a935e77a6ddc19cc63d5cfdad842c277b2e141f7981849b2a5a9ae7e2e",
+          "format_artifacts": {
+            "docx": {
+              "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+              "path": "medium.docx",
+              "sha256": "55e0fc9dc0d44f9baa3d803e309b75126eefd4a87923866d003c8fb435117965"
+            },
+            "markdown": {
+              "media_type": "text/markdown",
+              "path": "medium.md",
+              "sha256": "affbdf3669c4f37146e0165e6d14a16d3182eb6019fde8becd7c1fa2dc84a6cd"
+            }
+          },
+          "formats": [
+            "markdown",
+            "docx"
+          ],
+          "sha256": "affbdf3669c4f37146e0165e6d14a16d3182eb6019fde8becd7c1fa2dc84a6cd",
           "source": "model_change_governance_process/medium.md",
           "variant": "medium"
         },
         {
           "expected_mode": "llm_recovery",
-          "sha256": "5d51b04cb48c9dd12091b9c3b0efc4132f8b246cbdf5317d238c59af07420080",
+          "format_artifacts": {
+            "docx": {
+              "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+              "path": "severe.docx",
+              "sha256": "ae515fe1eb1ede125f065ae591d3eb2ca13acf9907516cd8b5d2c1c4ed8e0ac3"
+            },
+            "markdown": {
+              "media_type": "text/markdown",
+              "path": "severe.md",
+              "sha256": "230172030ffc0798d767685d9d8fe92916ee51b9903e0b5a1a1fc42f9044c960"
+            }
+          },
+          "formats": [
+            "markdown",
+            "docx"
+          ],
+          "sha256": "230172030ffc0798d767685d9d8fe92916ee51b9903e0b5a1a1fc42f9044c960",
           "source": "model_change_governance_process/severe.md",
           "variant": "severe"
         }
       ]
     }
   ],
-  "generated_file_count": 27,
-  "generator_version": "0.1.0",
-  "schema_version": "0.1"
+  "generated_file_count": 60,
+  "generator_version": "1.0.0",
+  "schema_version": "1.0"
 }

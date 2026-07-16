@@ -57,8 +57,8 @@ def load_registry(path: Path) -> dict[str, Any]:
             data = _yaml().load(handle)
     except (OSError, ValueError, YAMLError) as exc:
         raise PublicSourceError(f"unable to read public-source registry: {path}") from exc
-    if not isinstance(data, dict) or data.get("schema_version") != "0.1":
-        raise PublicSourceError("registry schema_version must be 0.1")
+    if not isinstance(data, dict) or data.get("schema_version") != "1.0":
+        raise PublicSourceError("registry schema_version must be 1.0")
     hosts = data.get("allowlisted_hosts")
     sources = data.get("sources")
     if not isinstance(hosts, list) or not hosts or not all(isinstance(host, str) for host in hosts):
@@ -80,7 +80,13 @@ def _validate_source(source: Any, allowlisted_hosts: set[str]) -> None:
         "publisher",
         "expected_media_types",
         "max_bytes",
+        "sha256",
+        "version_or_date",
+        "retrieved_at",
         "license",
+        "provenance",
+        "usefulness",
+        "destination",
     }
     missing = sorted(required - set(source))
     if missing:
@@ -96,20 +102,18 @@ def _validate_source(source: Any, allowlisted_hosts: set[str]) -> None:
     media_types = source["expected_media_types"]
     if (
         not isinstance(media_types, list)
-        or not media_types
+        or len(media_types) != 1
         or not all(isinstance(item, str) for item in media_types)
     ):
         raise PublicSourceError(
-            f"expected_media_types must be a non-empty list: {source['source_id']}"
+            f"expected_media_types must pin exactly one type: {source['source_id']}"
         )
     if not isinstance(source["max_bytes"], int) or source["max_bytes"] <= 0:
         raise PublicSourceError(f"max_bytes must be positive: {source['source_id']}")
     digest = source.get("sha256")
-    if digest is not None and (
-        not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None
-    ):
+    if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
         raise PublicSourceError(
-            f"sha256 must be a lowercase 64-character digest or null: {source['source_id']}"
+            f"sha256 must be a pinned lowercase 64-character digest: {source['source_id']}"
         )
     license_info = source["license"]
     if (
@@ -120,6 +124,8 @@ def _validate_source(source: Any, allowlisted_hosts: set[str]) -> None:
         raise PublicSourceError(
             f"license must include terms and review_status: {source['source_id']}"
         )
+    if license_info["review_status"] not in {"fetch_only_reviewed", "redistribution_reviewed"}:
+        raise PublicSourceError(f"license review is incomplete: {source['source_id']}")
 
 
 def _safe_destination(root: Path, relative: str) -> Path:
@@ -135,13 +141,14 @@ def _safe_destination(root: Path, relative: str) -> Path:
 class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
     def redirect_request(
         self,
-        request: urllib.request.Request,
+        req: urllib.request.Request,
         fp: Any,
         code: int,
         msg: str,
         headers: Any,
         newurl: str,
-    ) -> None:
+    ) -> urllib.request.Request | None:
+        del req, fp, code, msg, headers
         raise PublicSourceError(f"redirect blocked: {newurl}")
 
 
@@ -205,7 +212,7 @@ def fetch_registry(
                 raise
             raise PublicSourceError(f"fetch failed for {source['source_id']}: {exc}") from exc
         digest = hashlib.sha256(content).hexdigest()
-        if source.get("sha256") and digest != source["sha256"]:
+        if digest != source["sha256"]:
             raise PublicSourceError(f"digest mismatch for {source['source_id']}")
         _atomic_promote(destination, content)
         records.append(

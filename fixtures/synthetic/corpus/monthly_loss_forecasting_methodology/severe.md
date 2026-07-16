@@ -40,3 +40,6 @@ The source assumes stable reporting definitions. It does not state how a structu
 Monthly Loss Forecasting Methodology | Internal fictional fixture | Page 1 of 2
 
 Monthly Loss Forecasting Methodology | Internal fictional fixture | Page 1 of 2
+
+PAGE 2
+continued without a styled boundary

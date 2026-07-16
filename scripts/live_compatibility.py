@@ -3,13 +3,11 @@
 from __future__ import annotations
 
 import json
-import os
 import sys
-from pathlib import Path
 
 from pydantic import BaseModel
 
-from document_enhancer.compatibility import load_external_env, run_live_spikes
+from document_enhancer.compatibility import run_live_spikes
 
 
 class _Probe(BaseModel):
@@ -18,11 +16,11 @@ class _Probe(BaseModel):
 
 
 def main() -> int:
+    import os
+
     if os.getenv("DOCENHANCE_RUN_LIVE") != "1":
         print("live checks are opt-in: set DOCENHANCE_RUN_LIVE=1", file=sys.stderr)
         return 2
-    env_file = Path("/Users/gvrubim/Documents/document-enhancer/.env")
-    load_external_env(env_file)
     results = run_live_spikes(_Probe)
     json.dump(results, sys.stdout, indent=2, sort_keys=True)
     sys.stdout.write("\n")

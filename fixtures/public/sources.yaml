@@ -1,4 +1,4 @@
-schema_version: "0.1"
+schema_version: "1.0"
 registry_id: "document-enhancer-public-sources"
 registry_version: "1.0.0"
 purpose: "Fetch-on-demand references for extraction and generalization tests; never synthetic gold."
@@ -12,14 +12,15 @@ allowlisted_hosts:
   - nvlpubs.nist.gov
 sources:
   - source_id: PUBLIC-CISA-INCIDENT-PLAYBOOKS
-    url: https://www.cisa.gov/sites/default/files/2023-01/federal_government_cybersecurity_incident_and_vulnerability_response_playbooks_508c.pdf
+    url: https://www.cisa.gov/sites/default/files/2024-08/Federal_Government_Cybersecurity_Incident_and_Vulnerability_Response_Playbooks_508C.pdf
     publisher: Cybersecurity and Infrastructure Security Agency
     title: Federal Government Cybersecurity Incident and Vulnerability Response Playbooks
     version_or_date: "2021-08"
-    retrieved_at: null
+    retrieved_at: "2026-07-16T00:00:00Z"
     expected_media_types: [application/pdf]
     max_bytes: 25000000
-    sha256: null
+    sha256: 0c04113d5c3f6ff089a976c449632d4bbefca7a202c14aaf506858ae5cae51bc
+    digest_verification: "Byte digest verified against a government-hosted copy after the official host returned HTTP 403 to the verification client; fetch remains fail-closed until the official bytes match."
     license:
       terms: "U.S. government publication; confirm current CISA terms before redistribution."
       review_status: "fetch_only_reviewed"
@@ -28,14 +29,15 @@ sources:
     usefulness: "Process/playbook structure, response stages, roles, and escalation language."
     destination: cisa/federal-incident-playbooks.pdf
   - source_id: PUBLIC-EPA-SOP-GUIDANCE
-    url: https://www.epa.gov/sites/default/files/2015-06/documents/guidance-preparing-sops.pdf
+    url: https://www.epa.gov/sites/default/files/2015-06/documents/g6-final.pdf
     publisher: U.S. Environmental Protection Agency
     title: Guidance for Preparing Standard Operating Procedures
     version_or_date: "2007-08"
-    retrieved_at: null
+    retrieved_at: "2026-07-16T00:00:00Z"
     expected_media_types: [application/pdf]
     max_bytes: 15000000
-    sha256: null
+    sha256: 5979164568a888c8af67a7652bf4e4633bb39aae2b9876b4666e52238fb45f63
+    digest_verification: "Fetched directly from the canonical official URL."
     license:
       terms: "U.S. government publication; confirm EPA reuse terms before redistribution."
       review_status: "fetch_only_reviewed"
@@ -44,14 +46,15 @@ sources:
     usefulness: "SOP organization, approvals, revision history, and execution detail comparison."
     destination: epa/qa-g6-sop-guidance.pdf
   - source_id: PUBLIC-NASA-SE-HANDBOOK
-    url: https://www.nasa.gov/wp-content/uploads/2018/06/nasa_systems_engineering_handbook_0.pdf
+    url: https://www.nasa.gov/wp-content/uploads/2018/09/nasa_systems_engineering_handbook_0.pdf
     publisher: National Aeronautics and Space Administration
     title: NASA Systems Engineering Handbook
     version_or_date: "2016-12"
-    retrieved_at: null
+    retrieved_at: "2026-07-16T00:00:00Z"
     expected_media_types: [application/pdf]
     max_bytes: 40000000
-    sha256: null
+    sha256: 8eeb4887a4dc57a23049da7dd2ed556833cf98e214b240468d987873164ff688
+    digest_verification: "Fetched directly from the canonical official URL."
     license:
       terms: "U.S. government publication; confirm NASA reuse terms before redistribution."
       review_status: "fetch_only_reviewed"
@@ -64,10 +67,11 @@ sources:
     publisher: National Institute of Standards and Technology
     title: Cybersecurity Framework 2.0
     version_or_date: "2024-02"
-    retrieved_at: null
+    retrieved_at: "2026-07-16T00:00:00Z"
     expected_media_types: [application/pdf]
     max_bytes: 20000000
-    sha256: null
+    sha256: 3c31f46fee98cac0c4323453e5109291a213b4de7fef8c058af9bf67f717433c
+    digest_verification: "Fetched directly from the canonical official URL."
     license:
       terms: "U.S. government publication; confirm NIST terms and any incorporated material before redistribution."
       review_status: "fetch_only_reviewed"
