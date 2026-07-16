@@ -47,6 +47,7 @@ cp "$clone/fixtures/synthetic/corpus/monthly_loss_forecasting_methodology/clean.
   uv run --isolated --with "$wheel" docenhance prompts validate --json >prompts.json
   set +e
   uv run --isolated --with "$wheel" docenhance run source.md \
+    --execution-mode offline \
     --document-type methodology \
     --run-dir "$install_root/runs" \
     --until questions \

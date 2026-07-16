@@ -16,10 +16,21 @@ raw_ingest -> normalize -> structure_quality -> structure_scan
   -> question_synthesis -> gate1 -> checklist -> gate2 -> complete
 ```
 
-M3 owns parser normalization and structure recovery. M4 owns the injected analysis runner. M5
-does not replace either port. In offline mode the CLI selects parser structure and produces no
-model-derived findings; a configured model gateway and analysis runner can be injected by an
-application integration.
+Normal CLI execution is live and defaults to `--structure-mode auto`. It constructs the complete
+source-controlled Gemini service graph before reading source content: Flash-Lite structure scan,
+the four Flash analysis specialists, model-backed clarification/checklist generation, governed
+Pro section rewrite, independent Flash content audit, and at most one Pro audit revision. The
+exact supported routes are `gemini-3.1-flash-lite`, `gemini-3.5-flash`, and
+`gemini-3.1-pro-preview`; the retired Flash-Lite preview route is not accepted.
+
+`--execution-mode offline` is the explicit network-free test/demo mode. It defaults to parser
+structure, uses deterministic adapters, and does not ingest into the production catalog. Offline
+catalog ingestion requires both `--catalog-ingest` and an explicit `--catalog PATH`.
+
+Live Developer API execution requires `GOOGLE_API_KEY` or `GEMINI_API_KEY` in the process
+environment. Live Vertex AI execution requires configured project and location plus native ADC.
+The CLI does not load a dotenv file. It validates credentials, model routes, prompt/reference
+packs, and their digests before source content can be sent to a provider.
 
 ## Human gates
 
@@ -50,6 +61,7 @@ and resolving or waiving every blocking item. `--no-gate2` is an explicit local/
 
 ```bash
 docenhance run source.md --until questions
+docenhance run source.md --execution-mode offline --until questions
 docenhance status RUN_ID --json
 docenhance current-stage RUN_ID --json
 docenhance next-action RUN_ID --json
@@ -59,6 +71,12 @@ docenhance resume RUN_ID --json
 Human-readable output goes to stdout. `--json` emits a stable object with `schema_version`,
 `run_id`, `status`, `current_stage`, `next_action`, `completed_stages`, `cache_keys`, `errors`,
 and `exit_code`. JSON output contains no ANSI sequences.
+
+The execution mode, structure mode, provider/backend identity, credential source category,
+embedding identity, catalog policy, and configuration/pack digests are stored as secret-free
+metadata. `resume` reconstructs the same service graph from that metadata and the currently
+validated packs/configuration. A requested mode change or incompatible configuration/profile
+change fails closed before the source is read.
 
 The waiting exit code is deliberately non-zero so shell automation cannot mistake a paused run
 for a completed enhancement. `resume` checks that the source digest still matches before

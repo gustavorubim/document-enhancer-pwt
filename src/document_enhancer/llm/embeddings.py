@@ -12,6 +12,10 @@ from typing import Any
 from .caching import CacheKey, ResponseCache, digest_bytes
 from .profiles import EMBEDDING_MODEL
 
+OFFLINE_EMBEDDING_MODEL = "offline-deterministic-sha256-v1"
+OFFLINE_EMBEDDING_IMPLEMENTATION = "document-enhancer-offline-v1"
+LIVE_EMBEDDING_IMPLEMENTATION = "langchain-google-genai"
+
 
 class EmbeddingValidationError(ValueError):
     """An embedding response is malformed, non-finite, or in another vector space."""
@@ -28,21 +32,57 @@ class EmbeddingProfile:
     document_format_version: str = "gemini-embedding-2-document-v1"
     query_format_version: str = "gemini-embedding-2-query-v1"
     max_input_characters: int = 100_000
+    provider: str = "google"
     backend: str = "developer_api"
+    implementation: str = LIVE_EMBEDDING_IMPLEMENTATION
 
     def __post_init__(self) -> None:
-        if self.model != EMBEDDING_MODEL:
-            raise ValueError(f"embedding profile must use {EMBEDDING_MODEL!r}")
+        if self.provider == "google":
+            if self.model != EMBEDDING_MODEL:
+                raise ValueError(f"live embedding profile must use {EMBEDDING_MODEL!r}")
+            if self.backend not in {"developer_api", "vertex_ai"}:
+                raise ValueError("live embedding backend must be developer_api or vertex_ai")
+            if not self.implementation.strip() or len(self.implementation) > 128:
+                raise ValueError("live embedding implementation identity is invalid")
+        elif self.provider == "offline":
+            if self.model != OFFLINE_EMBEDDING_MODEL:
+                raise ValueError(f"offline embedding profile must use {OFFLINE_EMBEDDING_MODEL!r}")
+            if self.backend != "local" or self.implementation != OFFLINE_EMBEDDING_IMPLEMENTATION:
+                raise ValueError(
+                    "offline embedding profile must use the local deterministic adapter"
+                )
+        else:
+            raise ValueError("embedding provider must be google or offline")
         if self.dimensions not in {768, 1536, 3072}:
             raise ValueError("Gemini Embedding 2 dimensions must be 768, 1536, or 3072")
         if self.max_input_characters < 1:
             raise ValueError("max_input_characters must be positive")
-        if self.backend not in {"developer_api", "vertex_ai"}:
-            raise ValueError("backend must be developer_api or vertex_ai")
+
+    @classmethod
+    def offline(cls, *, dimensions: int = 768) -> EmbeddingProfile:
+        return cls(
+            model=OFFLINE_EMBEDDING_MODEL,
+            dimensions=dimensions,
+            document_format_version="offline-deterministic-document-v1",
+            query_format_version="offline-deterministic-query-v1",
+            provider="offline",
+            backend="local",
+            implementation=OFFLINE_EMBEDDING_IMPLEMENTATION,
+        )
 
     @property
     def identity(self) -> str:
-        return f"{self.model}:{self.dimensions}:{self.document_format_version}:{self.query_format_version}:{self.backend}"
+        return ":".join(
+            (
+                self.provider,
+                self.backend,
+                self.implementation,
+                self.model,
+                str(self.dimensions),
+                self.document_format_version,
+                self.query_format_version,
+            )
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,6 +95,9 @@ class EmbeddingDocument:
 @dataclass(frozen=True, slots=True)
 class EmbeddingManifest:
     profile: str
+    provider: str
+    backend: str
+    implementation: str
     model: str
     dimensions: int
     batch_count: int
@@ -112,6 +155,14 @@ class GeminiEmbeddingAdapter:
         if self._embedder_factory is not None:
             self._embedder = self._embedder_factory(self.profile)
             return self._embedder
+        if self.profile.provider != "google":
+            raise RuntimeError(
+                "offline embedding profiles require an explicit deterministic embedder"
+            )
+        if self.profile.implementation != LIVE_EMBEDDING_IMPLEMENTATION:
+            raise RuntimeError(
+                "non-default live embedding implementations require an explicit embedder"
+            )
         from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
         api_key = self._api_key or os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
@@ -139,11 +190,12 @@ class GeminiEmbeddingAdapter:
 
     def _key(self, text: str, *, task: str) -> CacheKey:
         return CacheKey(
-            provider="google",
+            provider=self.profile.provider,
             backend=self.profile.backend,
             model=self.profile.model,
             parameters={
                 "dimensions": self.profile.dimensions,
+                "profile_identity": self.profile.identity,
                 "format_version": (
                     self.profile.document_format_version
                     if task == "document"
@@ -201,6 +253,9 @@ class GeminiEmbeddingAdapter:
         if cached is not None:
             self.last_manifest = EmbeddingManifest(
                 profile=self.profile.identity,
+                provider=self.profile.provider,
+                backend=self.profile.backend,
+                implementation=self.profile.implementation,
                 model=self.profile.model,
                 dimensions=self.profile.dimensions,
                 batch_count=0,
@@ -219,6 +274,9 @@ class GeminiEmbeddingAdapter:
         self._store(formatted, result, task="query")
         self.last_manifest = EmbeddingManifest(
             profile=self.profile.identity,
+            provider=self.profile.provider,
+            backend=self.profile.backend,
+            implementation=self.profile.implementation,
             model=self.profile.model,
             dimensions=self.profile.dimensions,
             batch_count=1,
@@ -236,6 +294,9 @@ class GeminiEmbeddingAdapter:
         if not inputs:
             self.last_manifest = EmbeddingManifest(
                 profile=self.profile.identity,
+                provider=self.profile.provider,
+                backend=self.profile.backend,
+                implementation=self.profile.implementation,
                 model=self.profile.model,
                 dimensions=self.profile.dimensions,
                 batch_count=0,
@@ -280,6 +341,9 @@ class GeminiEmbeddingAdapter:
         input_digests = tuple(digest_bytes(text.encode("utf-8")) for text in inputs)
         self.last_manifest = EmbeddingManifest(
             profile=self.profile.identity,
+            provider=self.profile.provider,
+            backend=self.profile.backend,
+            implementation=self.profile.implementation,
             model=self.profile.model,
             dimensions=self.profile.dimensions,
             batch_count=batch_count,

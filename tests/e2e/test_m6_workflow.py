@@ -16,6 +16,8 @@ def test_offline_cli_writes_m6_then_fails_closed_at_strict_m7_audit(tmp_path: Pa
         [
             "run",
             "docs/architecture.md",
+            "--execution-mode",
+            "offline",
             "--no-gate2",
             "--run-dir",
             str(tmp_path / "runs"),

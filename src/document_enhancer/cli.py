@@ -22,6 +22,7 @@ from .domain.enums import DocumentType
 from .domain.run import ExportBundleManifest
 from .errors import DocumentEnhancerError
 from .export import validate_export_bundle
+from .ingest.recovery import StructureMode
 from .llm import (
     EmbeddingProfile,
     GeminiEmbeddingAdapter,
@@ -61,9 +62,10 @@ from .rag.retrievers import GraphRetriever
 from .references.loader import bundled_reference_pack_path, load_reference_pack
 from .workflow import (
     DocumentWorkflow,
-    WorkflowServices,
+    ExecutionMetadata,
+    ExecutionMode,
     WorkflowSnapshot,
-    workflow_input_fingerprints,
+    build_configured_workflow_services,
 )
 
 app = typer.Typer(
@@ -175,8 +177,19 @@ def run_workflow(
         str, typer.Option("--document-type", help="Target document type.")
     ] = "process",
     structure_mode: Annotated[
-        str, typer.Option("--structure-mode", help="parser, auto, recover, force, or off.")
-    ] = "parser",
+        str | None,
+        typer.Option(
+            "--structure-mode",
+            help="parser, auto, recover, force, or off; defaults to auto live and parser offline.",
+        ),
+    ] = None,
+    execution_mode: Annotated[
+        str,
+        typer.Option(
+            "--execution-mode",
+            help="live uses configured Gemini services; offline is deterministic and network-free.",
+        ),
+    ] = "live",
     until: Annotated[
         str, typer.Option("--until", help="Stop at questions, checklist, or complete.")
     ] = "complete",
@@ -185,12 +198,19 @@ def run_workflow(
         bool, typer.Option("--gate2/--no-gate2", help="Enable the second human gate.")
     ] = True,
     catalog_ingest: Annotated[
-        bool,
+        bool | None,
         typer.Option(
             "--catalog-ingest/--no-catalog-ingest",
-            help="Ingest the validated package into the cumulative catalog.",
+            help="Ingest the validated package; defaults on live and off offline.",
         ),
-    ] = True,
+    ] = None,
+    catalog: Annotated[
+        Path | None,
+        typer.Option(
+            "--catalog",
+            help="Explicit cumulative catalog path; required for offline catalog ingestion.",
+        ),
+    ] = None,
     json_output: Annotated[
         bool, typer.Option("--json", help="Emit stable machine-readable JSON.")
     ] = False,
@@ -204,32 +224,38 @@ def run_workflow(
             raise DocumentEnhancerError(f"unsupported document type: {document_type}")
         if until not in {"questions", "checklist", "complete"}:
             raise DocumentEnhancerError("--until must be questions, checklist, or complete")
+        if execution_mode not in {"live", "offline"}:
+            raise DocumentEnhancerError("--execution-mode must be live or offline")
+        selected_structure_mode = structure_mode or (
+            "auto" if execution_mode == "live" else "parser"
+        )
+        selected_catalog_ingest = (
+            execution_mode == "live" if catalog_ingest is None else catalog_ingest
+        )
+        if execution_mode == "offline" and selected_catalog_ingest and catalog is None:
+            raise DocumentEnhancerError(
+                "offline catalog ingestion requires an explicit --catalog path"
+            )
         config = load_config()
         root = (run_dir or config.workspace.run_dir).expanduser()
         prompt_pack, reference_pack = _resolve_pack_paths(
             config.references.prompt_pack, config.references.reference_pack
         )
-        services = WorkflowServices(
+        services = build_configured_workflow_services(
+            config=config,
             run_root=root,
             source=source.expanduser().resolve(),
             document_type=DocumentType(document_type),
-            structure_mode=structure_mode,
-            stop_after=until if until in {"questions", "checklist"} else None,
-            gate2_enabled=gate2,
-            offline=True,
-            input_fingerprints=workflow_input_fingerprints(
-                prompt_pack=prompt_pack,
-                reference_pack=reference_pack,
-            ),
+            structure_mode=cast(StructureMode, selected_structure_mode),
+            execution_mode=cast(ExecutionMode, execution_mode),
             prompt_pack=prompt_pack,
             reference_pack=reference_pack,
-            auto_catalog_ingest=catalog_ingest,
-            catalog_path=config.workspace.catalog_path,
-            embedding_profile=EmbeddingProfile(
-                model=config.gemini.embedding_model,
-                dimensions=config.gemini.embedding_dimensions,
-                backend=config.gemini.backend,
-            ),
+            stop_after=until if until in {"questions", "checklist"} else None,
+            gate2_enabled=gate2,
+            auto_catalog_ingest=selected_catalog_ingest,
+            catalog_path=(catalog or config.workspace.catalog_path)
+            if selected_catalog_ingest
+            else None,
         )
         result = DocumentWorkflow(services).run()
         payload = result.model_dump(mode="json")
@@ -336,6 +362,13 @@ def workflow_next_action(
 def resume_workflow(
     run_id: Annotated[str, typer.Argument(help="Persisted run ID to resume.")],
     run_dir: Annotated[Path | None, typer.Option("--run-dir", help="Run artifact root.")] = None,
+    execution_mode: Annotated[
+        str | None,
+        typer.Option(
+            "--execution-mode",
+            help="Assert live or offline; omitted reuses the persisted execution mode.",
+        ),
+    ] = None,
     json_output: Annotated[
         bool, typer.Option("--json", help="Emit stable machine-readable JSON.")
     ] = False,
@@ -343,33 +376,41 @@ def resume_workflow(
     """Validate edited reviewer artifacts and resume a waiting run."""
 
     try:
-        root = (run_dir or load_config().workspace.run_dir).expanduser()
-        snapshot = _load_snapshot(root, run_id)
         config = load_config()
+        root = (run_dir or config.workspace.run_dir).expanduser()
+        snapshot = _load_snapshot(root, run_id)
+        persisted = (
+            ExecutionMetadata.model_validate(snapshot.execution_metadata)
+            if snapshot.execution_metadata is not None
+            else None
+        )
+        persisted_mode = (
+            persisted.mode if persisted is not None else ("offline" if snapshot.offline else "live")
+        )
+        if execution_mode is not None and execution_mode not in {"live", "offline"}:
+            raise DocumentEnhancerError("--execution-mode must be live or offline")
+        if execution_mode is not None and execution_mode != persisted_mode:
+            raise DocumentEnhancerError("resume execution mode differs from the persisted run")
+        selected_mode = persisted_mode
         prompt_pack, reference_pack = _resolve_pack_paths(
             config.references.prompt_pack, config.references.reference_pack
         )
-        services = WorkflowServices(
+        selected_catalog = (
+            Path(persisted.catalog_path) if persisted and persisted.catalog_path else None
+        )
+        services = build_configured_workflow_services(
+            config=config,
             run_root=root,
             source=Path(),
             run_id=run_id,
             document_type=DocumentType(snapshot.document_type),
-            structure_mode="parser",
-            gate2_enabled=snapshot.gate2_enabled,
-            offline=True,
-            input_fingerprints=workflow_input_fingerprints(
-                prompt_pack=prompt_pack,
-                reference_pack=reference_pack,
-            ),
+            structure_mode=cast(StructureMode, snapshot.structure_mode),
+            execution_mode=selected_mode,
             prompt_pack=prompt_pack,
             reference_pack=reference_pack,
-            auto_catalog_ingest=True,
-            catalog_path=config.workspace.catalog_path,
-            embedding_profile=EmbeddingProfile(
-                model=config.gemini.embedding_model,
-                dimensions=config.gemini.embedding_dimensions,
-                backend=config.gemini.backend,
-            ),
+            gate2_enabled=snapshot.gate2_enabled,
+            auto_catalog_ingest=persisted.auto_catalog_ingest if persisted else True,
+            catalog_path=selected_catalog,
         )
         result = DocumentWorkflow(services).resume()
         if json_output:
@@ -493,10 +534,14 @@ def rag_build(
 
     config = load_config()
     root = (run_dir or config.workspace.run_dir).expanduser()
-    profile = EmbeddingProfile(
-        model=config.gemini.embedding_model,
-        dimensions=config.gemini.embedding_dimensions,
-        backend=config.gemini.backend,
+    profile = (
+        EmbeddingProfile.offline(dimensions=config.gemini.embedding_dimensions)
+        if offline
+        else EmbeddingProfile(
+            model=config.gemini.embedding_model,
+            dimensions=config.gemini.embedding_dimensions,
+            backend=config.gemini.backend,
+        )
     )
     adapter = None
     if offline:
@@ -652,6 +697,10 @@ def _rag_retriever(
     offline: bool,
 ):
     profile, _identity = catalog_embedding_profile(catalog)
+    if offline and profile.provider != "offline":
+        raise CatalogReadError("offline query mode rejects a live Google/Gemini index")
+    if not offline and profile.provider != "google":
+        raise CatalogReadError("live query mode rejects an offline deterministic index")
     embedder = OfflineDeterministicEmbedder(profile.dimensions) if offline else None
     embedding = GeminiEmbeddingAdapter(profile=profile, embedder=embedder)
     return build_hybrid_retriever(

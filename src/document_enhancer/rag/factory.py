@@ -18,20 +18,28 @@ def catalog_embedding_profile(path: Path) -> tuple[EmbeddingProfile, str]:
     try:
         rows = list(
             connection.execute(
-                """SELECT DISTINCT embedding_profile, embedding_model, embedding_dimension,
-                                  embedding_backend
+                """SELECT DISTINCT embedding_profile, embedding_provider, embedding_model,
+                                  embedding_dimension, embedding_backend,
+                                  embedding_format_version
                    FROM rag_builds WHERE status='validated' ORDER BY embedding_profile"""
             )
         )
         if len(rows) != 1:
             raise CatalogReadError("catalog must have one validated query embedding profile")
-        profile = EmbeddingProfile(
-            model=str(rows[0]["embedding_model"]),
-            dimensions=int(rows[0]["embedding_dimension"]),
-            backend=str(rows[0]["embedding_backend"]),
+        provider = str(rows[0]["embedding_provider"])
+        profile = (
+            EmbeddingProfile.offline(dimensions=int(rows[0]["embedding_dimension"]))
+            if provider == "offline"
+            else EmbeddingProfile(
+                model=str(rows[0]["embedding_model"]),
+                dimensions=int(rows[0]["embedding_dimension"]),
+                backend=str(rows[0]["embedding_backend"]),
+            )
         )
         identity = str(rows[0]["embedding_profile"])
-        if profile.identity != identity:
+        if profile.identity != identity or profile.document_format_version != str(
+            rows[0]["embedding_format_version"]
+        ):
             raise CatalogReadError("catalog embedding profile metadata does not reconcile")
         return profile, identity
     finally:

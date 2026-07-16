@@ -7,7 +7,7 @@ import json
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from langgraph.types import interrupt
 
@@ -50,7 +50,11 @@ from document_enhancer.export import (
 from document_enhancer.ingest.models import NormalizedDocument, RawDocument
 from document_enhancer.ingest.normalize import normalize_document
 from document_enhancer.ingest.pipeline import ParserRegistry, parse_source
-from document_enhancer.ingest.recovery import StructureRecoveryConfig, StructureRecoveryService
+from document_enhancer.ingest.recovery import (
+    StructureRecoveryConfig,
+    StructureRecoveryResult,
+    StructureRecoveryService,
+)
 from document_enhancer.llm import EmbeddingProfile, GeminiEmbeddingAdapter
 from document_enhancer.rag import OfflineDeterministicEmbedder, build_package, ingest_package
 from document_enhancer.references.loader import load_reference_pack
@@ -73,11 +77,48 @@ from .cache import WorkflowCache, stage_inputs_for
 from .checkpoint import WorkflowCheckpoint
 from .prompts import resolved_prompt_artifact
 from .routing import gate1_required, gate1_satisfied, gate2_required, gate2_satisfied, next_action
-from .state import WorkflowState, state_json
+from .state import WorkflowSnapshot, WorkflowState, state_json
+
+if TYPE_CHECKING:
+    from .execution import ExecutionMetadata
 
 AnalysisRunner = Callable[[AnalysisRequest], object]
 RewriteRunner = Callable[[tuple[SectionRewriteInput, ...]], object]
 AuditRevisionRunner = Callable[[EnhancedDocumentModel, Audit], object]
+
+
+class QuestionGenerator(Protocol):
+    def generate(
+        self,
+        *,
+        baseline: QuestionsArtifact,
+        analysis_result: object,
+        normalized: NormalizedDocument,
+        document_type: DocumentType,
+    ) -> QuestionsArtifact: ...
+
+
+class ChecklistGenerator(Protocol):
+    def generate(
+        self,
+        *,
+        baseline: RewriteChecklist,
+        questions: QuestionsArtifact,
+        answers: AnswersArtifact,
+        steering: Steering | None,
+        waivers: WaiversArtifact,
+        document_type: DocumentType,
+    ) -> RewriteChecklist: ...
+
+
+class StructureRunner(Protocol):
+    def run(
+        self,
+        document: NormalizedDocument,
+        *,
+        repository: Any | None = None,
+        run_id: str | None = None,
+    ) -> StructureRecoveryResult: ...
 
 
 @dataclass
@@ -89,11 +130,13 @@ class WorkflowServices:
     run_id: str | None = None
     document_type: DocumentType = DocumentType.PROCESS
     parser_registry: ParserRegistry | None = None
-    structure_service: StructureRecoveryService | None = None
+    structure_service: StructureRunner | None = None
     analysis_runner: AnalysisRunner | None = None
-    rewrite_runner: RewriteRunner | None = None
+    question_generator: QuestionGenerator | None = None
+    checklist_generator: ChecklistGenerator | None = None
+    rewrite_runner: object | None = None
     content_auditor: ContentAuditor | None = None
-    audit_revision_runner: AuditRevisionRunner | None = None
+    audit_revision_runner: object | None = None
     structure_mode: str = "parser"
     gate2_enabled: bool = True
     stop_after: str | None = None
@@ -115,11 +158,45 @@ class WorkflowServices:
     catalog_path: Path | None = None
     embedding_profile: EmbeddingProfile = field(default_factory=EmbeddingProfile)
     embedding_adapter: GeminiEmbeddingAdapter | None = None
+    execution_metadata: ExecutionMetadata | None = None
+
+    def __post_init__(self) -> None:
+        if self.offline and self.embedding_profile.provider != "offline":
+            if self.embedding_adapter is not None:
+                raise ValueError("offline workflow cannot use a live embedding adapter identity")
+            self.embedding_profile = EmbeddingProfile.offline(
+                dimensions=self.embedding_profile.dimensions
+            )
+        if not self.offline and self.embedding_profile.provider != "google":
+            raise ValueError("live workflow requires a Google/Gemini embedding profile")
 
     def attach_run(self, raw: RawDocument, *, run_id: str | None = None) -> None:
         resolved_run_id = run_id or self.run_id or content_addressed_run_id(raw.source_digest)
         self.run_id = resolved_run_id
         paths = RunPaths(self.run_root, resolved_run_id)
+        state_path = paths.artifact_path("workflow-state.json")
+        if state_path.is_file():
+            try:
+                existing = WorkflowSnapshot.model_validate_json(
+                    state_path.read_text(encoding="utf-8")
+                )
+            except ValueError as exc:
+                raise ValidationError(
+                    "existing content-addressed run has an invalid workflow snapshot"
+                ) from exc
+            current_execution = (
+                self.execution_metadata.model_dump(mode="json")
+                if self.execution_metadata is not None
+                else None
+            )
+            if (
+                existing.offline != self.offline
+                or existing.structure_mode != self.structure_mode
+                or existing.execution_metadata != current_execution
+            ):
+                raise ValidationError(
+                    "content-addressed run already exists with an incompatible execution profile"
+                )
         self.storage = RunStorage(paths)
         self.checkpoint = WorkflowCheckpoint(paths)
 
@@ -334,6 +411,12 @@ def raw_ingest_node(state: WorkflowState, services: WorkflowServices) -> Workflo
             "status": "running",
             "gate2_enabled": services.gate2_enabled,
             "offline": services.offline,
+            "structure_mode": services.structure_mode,
+            "execution_metadata": (
+                services.execution_metadata.model_dump(mode="json")
+                if services.execution_metadata is not None
+                else None
+            ),
             "stop_after": services.stop_after,
         }
     )
@@ -448,6 +531,13 @@ def question_synthesis_node(state: WorkflowState, services: WorkflowServices) ->
         strict_blocking=True,
     )
     questions = _as_questions(result.questions)
+    if services.question_generator is not None:
+        questions = services.question_generator.generate(
+            baseline=questions,
+            analysis_result=state.get("analysis_result"),
+            normalized=_as_normalized(state["normalized"]),
+            document_type=services.document_type,
+        )
     state["questions"] = questions
     answers = AnswersArtifact(document_id=questions.document_id, version_id=questions.version_id)
     steering = Steering(steering_id="STEER-REVIEW-001", document_id=questions.document_id)
@@ -583,6 +673,15 @@ def checklist_node(state: WorkflowState, services: WorkflowServices) -> Workflow
         steering=steering,
         waivers=waivers,
     )
+    if services.checklist_generator is not None:
+        checklist = services.checklist_generator.generate(
+            baseline=checklist,
+            questions=questions,
+            answers=answers,
+            steering=steering,
+            waivers=waivers,
+            document_type=services.document_type,
+        )
     # Gate 2 edits are human-owned once approval exists; otherwise regeneration is safe and
     # reflects changed reviewer inputs without duplicating side effects.
     if existing.exists():
@@ -772,7 +871,23 @@ def rewrite_model_node(state: WorkflowState, services: WorkflowServices) -> Work
     )
     counters = _as_revision_counters(state.get("revision_counters"), services).consume_rewrite()
     if services.rewrite_runner is not None:
-        candidate = services.rewrite_runner(inputs)
+        from .model_services import GovernedRewriteRequest
+
+        request = GovernedRewriteRequest(
+            inputs=inputs,
+            ledger=ledger,
+            document_id=str(state["document_id"]),
+            document_type=services.document_type,
+            reference_pack_id=pack_id,
+            reference_pack_version=pack_version,
+            template_id=template_id,
+            template_version=template_version,
+            counters=counters,
+        )
+        if hasattr(services.rewrite_runner, "rewrite"):
+            candidate = cast(Any, services.rewrite_runner).rewrite(request)
+        else:
+            candidate = cast(RewriteRunner, services.rewrite_runner)(inputs)
         if isinstance(candidate, Mapping) and "model" in candidate:
             candidate = cast(Mapping[str, object], candidate)["model"]
         model = _as_enhanced_model(candidate)
@@ -953,7 +1068,10 @@ def audit_node(state: WorkflowState, services: WorkflowServices) -> WorkflowStat
             state["audit_route"] = "human_review"
         else:
             counters = counters.consume_audit()
-            candidate = services.audit_revision_runner(model, audit)
+            if hasattr(services.audit_revision_runner, "revise"):
+                candidate = cast(Any, services.audit_revision_runner).revise(model, audit)
+            else:
+                candidate = cast(AuditRevisionRunner, services.audit_revision_runner)(model, audit)
             revised = _as_enhanced_model(candidate)
             revised = revised.model_copy(update={"revision_counters": counters})
             state["enhanced_model"] = revised
