@@ -1,0 +1,10 @@
+{
+  "expected_route": "llm_recovery",
+  "expected_substantive_facts": [
+    "purpose, scope, and audience",
+    "load the extract",
+    "apply the formula",
+    "route exceptions"
+  ],
+  "expected_parser_warning_signals": ["no_headings", "repeated_page_furniture_candidate", "layout_table_candidate"]
+}

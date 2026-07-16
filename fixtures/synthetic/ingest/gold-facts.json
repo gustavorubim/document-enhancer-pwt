@@ -1,0 +1,10 @@
+{
+  "title": "Monthly Loss Forecasting",
+  "facts": [
+    "approved data extract",
+    "documented transformation",
+    "offline calculator",
+    "loss = exposure * rate"
+  ],
+  "formats": ["markdown", "docx", "pdf"]
+}
