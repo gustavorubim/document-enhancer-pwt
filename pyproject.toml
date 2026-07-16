@@ -51,6 +51,10 @@ packages = ["src/document_enhancer"]
 include = [
   "/src",
   "/tests",
+  "/scripts",
+  "/fixtures",
+  "/evals",
+  "/docs",
   "/reference_packs",
   "/prompt_packs",
   "/README.md",
@@ -77,7 +81,7 @@ python-version = "3.12"
 root = ["."]
 
 [tool.ty.src]
-include = ["src", "tests", "scripts"]
+include = ["src", "tests", "scripts", "evals"]
 exclude = ["plan.md"]
 
 [tool.pytest.ini_options]

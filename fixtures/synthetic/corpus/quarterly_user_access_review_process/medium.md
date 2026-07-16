@@ -6,6 +6,9 @@ The review is described as quarterly, but no calendar-day trigger is named. It c
 
 **INPUTS AND SYSTEMS**
 
+| Misplaced summary | Value |
+| review note | See prior section |
+
 The reviewer receives an access extract from Harbor IAM, manager attestations, and the prior quarter evidence folder. See the table below.
 
 **REVIEW STEPS**

@@ -6,6 +6,9 @@ The method estimates monthly portfolio loss for the fictional Northstar Cooperat
 
 **DATA INPUTS AND PREPARATION**
 
+| Misplaced summary | Value |
+| review note | See prior section |
+
 The analyst loads the Northstar ledger extract and delinquency history, removes duplicate account rows, and records the as-of date before modeling. See the table below.
 
 **METHOD AND CALCULATOR**

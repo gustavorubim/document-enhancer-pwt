@@ -33,6 +33,7 @@ from .prompting import (
     ComposedPrompt,
     PromptPack,
     PromptPackComposer,
+    bundled_prompt_pack_path,
     list_prompts,
     load_prompt_pack,
     show_prompt,
@@ -57,7 +58,7 @@ from .rag import (
 )
 from .rag.catalog_reader import CatalogReadError
 from .rag.retrievers import GraphRetriever
-from .references.loader import load_reference_pack
+from .references.loader import bundled_reference_pack_path, load_reference_pack
 from .workflow import (
     DocumentWorkflow,
     WorkflowServices,
@@ -79,6 +80,20 @@ rag_app = typer.Typer(help="Build and inspect sealed SQLite RAG packages and cat
 app.add_typer(rag_app, name="rag")
 console = Console()
 logger = get_logger("cli")
+
+
+def _resolve_pack_paths(prompt_pack: Path, reference_pack: Path) -> tuple[Path, Path]:
+    """Resolve shipped defaults from wheel data without masking invalid custom paths."""
+
+    selected_prompt = prompt_pack.expanduser()
+    selected_reference = reference_pack.expanduser()
+    if not selected_prompt.is_dir() and selected_prompt == Path("prompt_packs/gemini_core"):
+        selected_prompt = bundled_prompt_pack_path("gemini_core")
+    if not selected_reference.is_dir() and selected_reference == Path(
+        "reference_packs/enterprise_core"
+    ):
+        selected_reference = bundled_reference_pack_path("enterprise_core")
+    return selected_prompt, selected_reference
 
 
 def _emit_error(error: DocumentEnhancerError) -> None:
@@ -191,6 +206,9 @@ def run_workflow(
             raise DocumentEnhancerError("--until must be questions, checklist, or complete")
         config = load_config()
         root = (run_dir or config.workspace.run_dir).expanduser()
+        prompt_pack, reference_pack = _resolve_pack_paths(
+            config.references.prompt_pack, config.references.reference_pack
+        )
         services = WorkflowServices(
             run_root=root,
             source=source.expanduser().resolve(),
@@ -200,11 +218,11 @@ def run_workflow(
             gate2_enabled=gate2,
             offline=True,
             input_fingerprints=workflow_input_fingerprints(
-                prompt_pack=config.references.prompt_pack,
-                reference_pack=config.references.reference_pack,
+                prompt_pack=prompt_pack,
+                reference_pack=reference_pack,
             ),
-            prompt_pack=config.references.prompt_pack,
-            reference_pack=config.references.reference_pack,
+            prompt_pack=prompt_pack,
+            reference_pack=reference_pack,
             auto_catalog_ingest=catalog_ingest,
             catalog_path=config.workspace.catalog_path,
             embedding_profile=EmbeddingProfile(
@@ -328,6 +346,9 @@ def resume_workflow(
         root = (run_dir or load_config().workspace.run_dir).expanduser()
         snapshot = _load_snapshot(root, run_id)
         config = load_config()
+        prompt_pack, reference_pack = _resolve_pack_paths(
+            config.references.prompt_pack, config.references.reference_pack
+        )
         services = WorkflowServices(
             run_root=root,
             source=Path(),
@@ -337,11 +358,11 @@ def resume_workflow(
             gate2_enabled=snapshot.gate2_enabled,
             offline=True,
             input_fingerprints=workflow_input_fingerprints(
-                prompt_pack=config.references.prompt_pack,
-                reference_pack=config.references.reference_pack,
+                prompt_pack=prompt_pack,
+                reference_pack=reference_pack,
             ),
-            prompt_pack=config.references.prompt_pack,
-            reference_pack=config.references.reference_pack,
+            prompt_pack=prompt_pack,
+            reference_pack=reference_pack,
             auto_catalog_ingest=True,
             catalog_path=config.workspace.catalog_path,
             embedding_profile=EmbeddingProfile(
@@ -654,10 +675,13 @@ def _rag_runtime(
         model = DeterministicRagModel()
     else:
         config = load_config()
-        pack = load_prompt_pack(config.references.prompt_pack)
+        prompt_pack, reference_pack = _resolve_pack_paths(
+            config.references.prompt_pack, config.references.reference_pack
+        )
+        pack = load_prompt_pack(prompt_pack)
         composer = PromptPackComposer(
             pack,
-            reference_pack=load_reference_pack(config.references.reference_pack),
+            reference_pack=load_reference_pack(reference_pack),
         )
         gateway = GeminiModelGateway(
             GeminiGatewayConfig.from_env(
@@ -1114,8 +1138,10 @@ def prompts_list(
     """List prompt IDs, routes, schemas, and governed reference scope."""
 
     config = load_config()
-    pack_path = prompt_pack or config.references.prompt_pack
-    ref_path = reference_pack or config.references.reference_pack
+    pack_path, ref_path = _resolve_pack_paths(
+        prompt_pack or config.references.prompt_pack,
+        reference_pack or config.references.reference_pack,
+    )
     values = list_prompts(pack_path, reference_pack=ref_path)
     if json_output:
         _emit_json({"schema_version": "m5.prompts.v1", "prompts": values})
@@ -1141,8 +1167,10 @@ def prompts_show(
     """Show prompt metadata or a deterministic resolved prompt composition."""
 
     config = load_config()
-    pack_path = prompt_pack or config.references.prompt_pack
-    ref_path = reference_pack or config.references.reference_pack
+    pack_path, ref_path = _resolve_pack_paths(
+        prompt_pack or config.references.prompt_pack,
+        reference_pack or config.references.reference_pack,
+    )
     pack = load_prompt_pack(pack_path)
     variables = _prompt_variables(pack, prompt_id, document_type)
     value = show_prompt(
@@ -1182,9 +1210,13 @@ def prompts_validate(
     """Validate the selected prompt pack before any provider call."""
 
     config = load_config()
-    report = validate_prompts(
+    pack_path, ref_path = _resolve_pack_paths(
         prompt_pack or config.references.prompt_pack,
-        reference_pack=reference_pack or config.references.reference_pack,
+        reference_pack or config.references.reference_pack,
+    )
+    report = validate_prompts(
+        pack_path,
+        reference_pack=ref_path,
     )
     if json_output:
         _emit_json(report)

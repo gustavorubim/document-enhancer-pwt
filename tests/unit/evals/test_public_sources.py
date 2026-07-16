@@ -90,7 +90,7 @@ class _Opener:
 def _fetch_registry(tmp_path: Path) -> Path:
     registry = tmp_path / "test.yaml"
     registry.write_text(
-        """schema_version: '0.1'\nallowlisted_hosts: [example.org]\nsources:\n  - source_id: TEST\n    url: https://example.org/file.pdf\n    title: test\n    publisher: test\n    expected_media_types: [application/pdf]\n    max_bytes: 100\n    sha256: null\n    license: {terms: fetch, review_status: pending}\n    destination: file.pdf\n""",
+        """schema_version: '1.0'\nallowlisted_hosts: [example.org]\nsources:\n  - source_id: TEST\n    url: https://example.org/file.pdf\n    title: test\n    publisher: test\n    version_or_date: '1'\n    retrieved_at: '2026-07-16T00:00:00Z'\n    expected_media_types: [application/pdf]\n    max_bytes: 100\n    sha256: 42b8cc383b0a1ea4fc9b5ff967d743af7274a52ddfe07cac62487e30f00fa505\n    license: {terms: fetch, review_status: fetch_only_reviewed}\n    provenance: test\n    usefulness: test\n    destination: file.pdf\n""",
         encoding="utf-8",
     )
     return registry
@@ -151,7 +151,7 @@ def test_failed_atomic_promotion_preserves_prior_target_and_cleans_temp(
 def test_registry_rejects_off_list_host(tmp_path: Path) -> None:
     registry = tmp_path / "bad.yaml"
     registry.write_text(
-        """schema_version: '0.1'\nallowlisted_hosts: [example.org]\nsources:\n  - source_id: BAD\n    url: https://evil.example.net/file.pdf\n    title: bad\n    publisher: bad\n    expected_media_types: [application/pdf]\n    max_bytes: 10\n    sha256: null\n    license: {terms: fetch, review_status: pending}\n    destination: file.pdf\n""",
+        """schema_version: '1.0'\nallowlisted_hosts: [example.org]\nsources:\n  - source_id: BAD\n    url: https://evil.example.net/file.pdf\n    title: bad\n    publisher: bad\n    version_or_date: '1'\n    retrieved_at: '2026-07-16T00:00:00Z'\n    expected_media_types: [application/pdf]\n    max_bytes: 10\n    sha256: 42b8cc383b0a1ea4fc9b5ff967d743af7274a52ddfe07cac62487e30f00fa505\n    license: {terms: fetch, review_status: fetch_only_reviewed}\n    provenance: test\n    usefulness: test\n    destination: file.pdf\n""",
         encoding="utf-8",
     )
     with pytest.raises(PublicSourceError, match="not allow-listed"):

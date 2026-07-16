@@ -53,7 +53,7 @@ def test_safe_yaml_loader_does_not_construct_python_objects(tmp_path: Path) -> N
 def test_fetch_rejects_destination_traversal_and_off_list_mutation(tmp_path: Path) -> None:
     registry = tmp_path / "bad.yaml"
     registry.write_text(
-        """schema_version: '0.1'\nallowlisted_hosts: [example.org]\nsources:\n  - source_id: BAD\n    url: https://example.org/file.pdf\n    title: bad\n    publisher: bad\n    expected_media_types: [application/pdf]\n    max_bytes: 10\n    sha256: null\n    license: {terms: fetch, review_status: pending}\n    destination: ../escape.pdf\n""",
+        """schema_version: '1.0'\nallowlisted_hosts: [example.org]\nsources:\n  - source_id: BAD\n    url: https://example.org/file.pdf\n    title: bad\n    publisher: bad\n    version_or_date: '1'\n    retrieved_at: '2026-07-16T00:00:00Z'\n    expected_media_types: [application/pdf]\n    max_bytes: 10\n    sha256: '0000000000000000000000000000000000000000000000000000000000000000'\n    license: {terms: fetch, review_status: fetch_only_reviewed}\n    provenance: test\n    usefulness: test\n    destination: ../escape.pdf\n""",
         encoding="utf-8",
     )
     with pytest.raises(PublicSourceError, match="escapes fetch root|unsafe path"):
@@ -98,9 +98,9 @@ def test_fetch_blocks_redirects_oversize_media_and_digest_mismatch(tmp_path: Pat
 
     def write_registry(name: str, *, max_bytes: int, media: str, digest: str | None = None) -> Path:
         path = tmp_path / f"{name}.yaml"
-        digest_value = "null" if digest is None else f"'{digest}'"
+        digest_value = digest or hashlib.sha256(b"abc").hexdigest()
         path.write_text(
-            f"""schema_version: '0.1'\nallowlisted_hosts: [example.org]\nsources:\n  - source_id: TEST\n    url: https://example.org/file.pdf\n    title: test\n    publisher: test\n    expected_media_types: [{media}]\n    max_bytes: {max_bytes}\n    sha256: {digest_value}\n    license: {{terms: fetch, review_status: pending}}\n    destination: file.pdf\n""",
+            f"""schema_version: '1.0'\nallowlisted_hosts: [example.org]\nsources:\n  - source_id: TEST\n    url: https://example.org/file.pdf\n    title: test\n    publisher: test\n    version_or_date: '1'\n    retrieved_at: '2026-07-16T00:00:00Z'\n    expected_media_types: [{media}]\n    max_bytes: {max_bytes}\n    sha256: '{digest_value}'\n    license: {{terms: fetch, review_status: fetch_only_reviewed}}\n    provenance: test\n    usefulness: test\n    destination: file.pdf\n""",
             encoding="utf-8",
         )
         return path

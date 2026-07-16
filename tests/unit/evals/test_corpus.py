@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -64,6 +65,40 @@ def test_fixture_gold_has_stable_spans_questions_and_graph_references() -> None:
             assert ordinals == list(range(len(ordinals)))
             assert variant["raw_order"] == [block["span_id"] for block in variant["raw_blocks"]]
             assert variant["structure_routing"]["expected_mode"] in {"parser", "llm_recovery"}
+            assert {"markdown", "docx"} <= set(variant["format_artifacts"])
+
+
+@pytest.mark.unit
+def test_generated_docx_pdf_and_rag_gold_are_real_and_complete() -> None:
+    root = Path("fixtures/synthetic/corpus")
+    manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+    for family in manifest["families"]:
+        for variant in family["variants"]:
+            family_root = root / family["family_id"]
+            with zipfile.ZipFile(family_root / f"{variant['variant']}.docx") as archive:
+                assert "word/document.xml" in archive.namelist()
+                assert b"vbaProject" not in archive.read("word/document.xml")
+            if "pdf" in variant["formats"]:
+                assert (family_root / f"{variant['variant']}.pdf").read_bytes().startswith(b"%PDF")
+        assert (root / family["family_id"] / "enhanced_target.md").is_file()
+
+    questions = json.loads((root / "cross_document_questions.json").read_text(encoding="utf-8"))
+    assert len(questions["questions"]) >= 8
+    categories = {item["category"] for item in questions["questions"]}
+    assert {
+        "direct_fact",
+        "multi_section_synthesis",
+        "control_to_risk_graph",
+        "current_vs_superseded",
+        "metadata_filter",
+        "ambiguous_follow_up",
+        "unanswerable",
+    } <= categories
+    assert all(
+        "pending:" not in chunk
+        for item in questions["questions"]
+        for chunk in item["expected_chunk_ids"]
+    )
 
 
 @pytest.mark.unit

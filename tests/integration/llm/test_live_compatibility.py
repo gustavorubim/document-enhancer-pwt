@@ -7,7 +7,6 @@ from pathlib import Path
 import pytest
 from pydantic import BaseModel
 
-from document_enhancer.compatibility import load_external_env
 from document_enhancer.errors import ConfigurationError, ProviderError
 from document_enhancer.llm import (
     EMBEDDING_MODEL,
@@ -42,7 +41,6 @@ def _status_for(exc: BaseException) -> str:
 def test_opt_in_live_gemini_routes_and_embedding_are_recorded(tmp_path: Path) -> None:
     if os.getenv("DOCENHANCE_RUN_LIVE") != "1":
         return
-    load_external_env(Path("/Users/gvrubim/Documents/document-enhancer/.env"))
     gateway = GeminiModelGateway(GeminiGatewayConfig.from_env())
     report: dict[str, dict[str, str]] = {}
     for route in (ROUTE_FLASH_LITE, ROUTE_FLASH, ROUTE_PRO_PREVIEW):

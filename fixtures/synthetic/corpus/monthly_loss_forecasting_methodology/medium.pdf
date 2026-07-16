@@ -1,0 +1,67 @@
+%PDF-1.4
+%DE-M8
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 1306 >>
+stream
+BT
+/F1 8 Tf
+36 760 Td
+10 TL
+(Monthly Loss Forecasting Methodology) Tj
+T*
+(**PURPOSE AND SCOPE**) Tj
+T*
+(The method estimates monthly portfolio loss for the fictional Northstar Cooperative. It applies to the managed consumer portfolio and excludes one-off) Tj
+T*
+(**DATA INPUTS AND PREPARATION**) Tj
+T*
+(| Misplaced summary | Value |) Tj
+T*
+(| review note | See prior section |) Tj
+T*
+(The analyst loads the Northstar ledger extract and delinquency history, removes duplicate account rows, and records the as-of date before modeling. Se) Tj
+T*
+(**METHOD AND CALCULATOR**) Tj
+T*
+(The method combines a three-month observed loss rate with a stress multiplier. The Loss Allocation Workbook is an offline Excel calculator owned by th) Tj
+T*
+(**CONTROLS AND VALIDATION**) Tj
+T*
+(The reviewer checks source row counts, recalculates the variance, and archives the workbook with the monthly evidence packet. A control is named but i) Tj
+T*
+(**ASSUMPTIONS AND LIMITATIONS**) Tj
+T*
+(The source assumes stable reporting definitions. It does not state how a structural portfolio change limits the result or who approves an override.) Tj
+T*
+(Monthly Loss Forecasting Methodology | Internal fictional fixture | Page 1 of 2) Tj
+T*
+(Monthly Loss Forecasting Methodology | Internal fictional fixture | Page 1 of 2) Tj
+T*
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000016 00000 n 
+0000000065 00000 n 
+0000000122 00000 n 
+0000000248 00000 n 
+0000001605 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1675
+%%EOF

@@ -1,0 +1,59 @@
+%PDF-1.4
+%DE-M8
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 981 >>
+stream
+BT
+/F1 8 Tf
+36 760 Td
+10 TL
+(Incident Escalation Desktop Procedure) Tj
+T*
+(1. Prerequisites and access) Tj
+T*
+(The operator needs access to Beacon Monitor, the Incident Console, and the service roster. A screenshot is referenced as the authoritative click path.) Tj
+T*
+(## Atomic actions) Tj
+T*
+(Open the alert, acknowledge it, and assign the incident to the on-call role. If it is customer-impacting, notify the communications lead.) Tj
+T*
+(3. Severity decision) Tj
+T*
+(Use the service-level table to choose a fifteen-minute or one-hour response. The table does not define the customer-impacting test.) Tj
+T*
+(## Failure path and rollback) Tj
+T*
+(If the console is unavailable, use the phone tree and record the incident in the offline worksheet. Restore the primary record after service returns.) Tj
+T*
+(5. Evidence and completion) Tj
+T*
+(Save the alert ID and notification timestamp. The procedure does not define the final completion condition or evidence retention.) Tj
+T*
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000016 00000 n 
+0000000065 00000 n 
+0000000122 00000 n 
+0000000248 00000 n 
+0000001279 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1349
+%%EOF
