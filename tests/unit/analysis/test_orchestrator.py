@@ -386,7 +386,8 @@ def test_discovery_promotion_quarantines_item_failures_without_inventing_confide
     assert promoted.candidate_relationships == []
     assert len(promoted.findings) == 2
     assert all(item.category == "candidate_quarantine" for item in promoted.findings)
-    assert all(item.blocking is False for item in promoted.findings)
+    assert all(item.blocking is True for item in promoted.findings)
+    assert all(item.severity.value == "blocker" for item in promoted.findings)
     assert all(item.target_object_id is None for item in promoted.findings)
     assert any("missing model confidence" in item.impact for item in promoted.findings)
 

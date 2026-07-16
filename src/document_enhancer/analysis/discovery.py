@@ -15,7 +15,6 @@ from .common import prompt_variables
 from .errors import CandidateGraphError
 from .gemini_adapter import invoke_discovery_candidate_batch
 from .models import AnalysisBranchResult, AnalysisRequest
-from .promotion import promote_discovery_candidate_batch
 from .protocols import AnalysisCallBudget
 from .rendering import render_discovery_markdown
 
@@ -92,14 +91,14 @@ class ProcessMethodologyDiscoverer:
     ) -> AnalysisBranchResult:
         if budget is not None:
             budget.reserve(self.name)
-        candidates, call = invoke_discovery_candidate_batch(
+        analysis, call = invoke_discovery_candidate_batch(
             self.gateway,
             self.composer,
             variables=prompt_variables(request),
             stage=self.name,
             source_digest=request.source_digest,
+            request=request,
         )
-        analysis = promote_discovery_candidate_batch(request, candidates)
         validate_candidate_graph(request, analysis)
         return AnalysisBranchResult(
             specialist=self.name,

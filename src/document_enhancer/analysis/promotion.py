@@ -88,22 +88,32 @@ def _quarantine_finding(
     evidence_spans = (
         (source_span_id,) if source_span_id in known_spans else request.authoritative_span_ids[:1]
     )
-    reason = str(error).replace("\n", " ").strip()[:320] or type(error).__name__
+    error_text = str(error)
+    if "missing model confidence" in error_text:
+        reason = "inferred candidate is missing model confidence"
+    elif "unknown source span" in error_text:
+        reason = "candidate references a source span outside the authoritative input"
+    elif "was not promoted" in error_text or "not provider-promotable" in error_text:
+        reason = "candidate depends on an object that was not safely promoted"
+    elif "must be unique" in error_text or "duplicate" in error_text:
+        reason = "candidate local key is not unique"
+    else:
+        reason = f"{type(error).__name__}: candidate violates deterministic promotion rules"
     return make_lint_finding(
         request,
         check_id="DISCOVERY-CANDIDATE-QUARANTINE",
         category="candidate_quarantine",
-        severity=FindingSeverity.MEDIUM,
+        severity=FindingSeverity.BLOCKER,
         finding_type=FindingType.EXTRACTION_RISK,
         span_ids=evidence_spans,
-        impact=f"{item_kind} candidate {item_key!r} was not promoted: {reason}",
+        impact=f"{item_kind} candidate {ordinal} was quarantined: {reason}",
         proposed_disposition=(
             "Review or correct this candidate independently; other valid discovery candidates "
             "remain available for Gate 1 review."
         ),
         requirement_id=None if evidence_spans else "SYSTEM-DISCOVERY-PROMOTION",
         requires_human_answer=True,
-        blocking=False,
+        blocking=True,
         details=(item_kind, item_key, str(ordinal)),
     )
 

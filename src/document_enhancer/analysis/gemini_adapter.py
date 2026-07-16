@@ -11,6 +11,7 @@ from typing import Any
 
 from document_enhancer.domain.analysis import (
     AnalysisReport,
+    DiscoveryAnalysis,
     MacroAnalysis,
     RagReadinessAnalysis,
     SectionAnalysis,
@@ -21,7 +22,8 @@ from document_enhancer.llm.profiles import ROUTE_FLASH
 from document_enhancer.prompting import ComposedPrompt, PromptPackComposer
 
 from .errors import AnalysisPromptContractError
-from .models import PromptCallRecord
+from .models import AnalysisRequest, PromptCallRecord
+from .promotion import promote_discovery_candidate_batch
 from .provider_models import DiscoveryCandidateBatch
 
 ANALYSIS_OUTPUT_SCHEMA = "analysis.schema.json"
@@ -188,8 +190,9 @@ def invoke_discovery_candidate_batch(
     variables: dict[str, Any],
     stage: str,
     source_digest: str,
-) -> tuple[DiscoveryCandidateBatch, PromptCallRecord]:
-    """Invoke discovery against its narrow provider DTO, before domain promotion."""
+    request: AnalysisRequest,
+) -> tuple[DiscoveryAnalysis, PromptCallRecord]:
+    """Invoke the narrow DTO and promote it inside the bounded repair/cache boundary."""
 
     prompt_id = "analysis.process-methodology-discovery"
     composed = compose_analysis_prompt(composer, prompt_id=prompt_id, variables=variables)
@@ -207,6 +210,8 @@ def invoke_discovery_candidate_batch(
         input_digests=[source_digest, *reference_digests],
         input_token_budget=composed.input_token_budget,
         output_token_budget=composed.output_token_budget,
+        promote=lambda batch: promote_discovery_candidate_batch(request, batch),
+        result_schema=DiscoveryAnalysis,
     )
     manifest = call.manifest
     if (
@@ -219,12 +224,12 @@ def invoke_discovery_candidate_batch(
         raise AnalysisPromptContractError("analysis call manifest prompt identity mismatch")
     if manifest.prompt_digest != composed.digest:
         raise AnalysisPromptContractError("analysis call manifest prompt digest mismatch")
-    batch = DiscoveryCandidateBatch.model_validate(call.artifact.model_dump(mode="python"))
+    analysis = DiscoveryAnalysis.model_validate(call.artifact.model_dump(mode="python"))
     record = PromptCallRecord(
         resolution=composed.resolution.model_copy(deep=True),
         manifest=manifest.model_copy(deep=True),
     )
-    return batch, record
+    return analysis, record
 
 
 __all__ = [
