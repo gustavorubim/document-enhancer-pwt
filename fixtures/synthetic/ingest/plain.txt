@@ -1,0 +1,5 @@
+Monthly review procedure
+
+The operator checks the approved extract and records evidence.
+
+The reviewer resolves exceptions before approval.
