@@ -223,7 +223,7 @@ def _process_objects(
         completion_id = f"DONE-GOVERNED-{suffix}"
         failure_id = f"ESC-GOVERNED-{suffix}"
         support: list[SemanticObject] = [
-            Role(id=role_id, name=performer, provenance=provenance),
+            Role(id=role_id, name=role_id, provenance=provenance),
             Input(id=input_id, name=input_text, provenance=provenance),
             Output(id=output_id, name=output_text, provenance=provenance),
             CompletionCondition(id=completion_id, name=completion_text, provenance=provenance),
@@ -290,19 +290,16 @@ def _methodology_objects(
         if not evidence.quote.lstrip().startswith("#")
     )
     assumption_id = assumption_row.values.get("assumption_id", "")
+    model_row = next(item for item in tables if item.table_kind == "models").rows[0]
+    parameter_name = model_row.values.get("parameters") or model_row.values.get("inputs")
+    if not parameter_name:
+        raise ValueError("governed methodology model table lacks inputs or parameters")
     objects: list[SemanticObject] = [
         Input(id=input_id, name="; ".join(input_row.values.values()), provenance=input_provenance),
         Parameter(
             id=parameter_id,
-            name=next(item for item in tables if item.table_kind == "models")
-            .rows[0]
-            .values["parameters"],
-            provenance=_provenance(
-                model,
-                next(item for item in tables if item.table_kind == "models")
-                .rows[0]
-                .source_span_ids[0],
-            ),
+            name=parameter_name,
+            provenance=_provenance(model, model_row.source_span_ids[0]),
         ),
         Assumption(
             id=assumption_id,
@@ -359,6 +356,9 @@ def _standard_objects(
     row_objects: dict[str, list[str]] = {}
     for row in table.rows:
         requirement_id = row.values["requirement_id"]
+        evidence = row.values.get("evidence") or row.values.get("evidence_monitoring")
+        if not evidence:
+            raise ValueError(f"governed standard requirement {requirement_id} lacks evidence")
         requirement = Requirement(
             id=requirement_id,
             name=row.values["statement"],
@@ -367,8 +367,10 @@ def _standard_objects(
                 "statement": row.values["statement"],
                 "applicability": row.values["applicability"],
                 "accountable_role_id": row.values["role"],
-                "evidence_ids": [row.values["evidence"]],
+                "evidence_ids": [evidence],
                 "exception_id": row.values["exception"],
+                "authority": row.values.get("authority"),
+                "risk_control": row.values.get("risk_control"),
             },
         )
         objects.append(requirement)

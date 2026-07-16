@@ -1,6 +1,6 @@
 schema_version: "0.1"
 rubric_id: RUBRIC-METHODOLOGY-001
-version: 1.0.0
+version: 2.0.0
 document_type: methodology
 inherits: rubrics/common.yaml
 common_dimensions_retained: true
@@ -30,9 +30,15 @@ template_mappings:
   - {requirement_id: SEC-METH-IMPLEMENTATION, criterion_ids: [COM-DEPEND-001, COM-EXEC-001]}
   - {requirement_id: SEC-METH-RELATED, criterion_ids: [COM-RAG-001]}
   - {requirement_id: SEC-METH-VERSION, criterion_ids: [COM-GOV-001]}
+  - {requirement_id: TBL-METH-METADATA, criterion_ids: [COM-GOV-001, METH-LIMIT-001]}
   - {requirement_id: TBL-METH-DATA, criterion_ids: [METH-DATA-001]}
   - {requirement_id: TBL-METH-MODELS, criterion_ids: [METH-MODEL-001]}
   - {requirement_id: TBL-METH-ASSUMPTIONS, criterion_ids: [METH-LIMIT-001]}
+  - {requirement_id: TBL-METH-PARAMETERS, criterion_ids: [METH-MODEL-001, METH-LIMIT-001]}
+  - {requirement_id: TBL-METH-LIMITATIONS, criterion_ids: [METH-LIMIT-001]}
   - {requirement_id: TBL-METH-VALIDATION, criterion_ids: [METH-VALIDATION-001]}
+  - {requirement_id: TBL-METH-MONITORING, criterion_ids: [METH-VALIDATION-001, COM-EXEC-001]}
   - {requirement_id: TBL-METH-GOVERNANCE, criterion_ids: [COM-GOV-001]}
+  - {requirement_id: TBL-METH-IMPLEMENTATION, criterion_ids: [COM-DEPEND-001, COM-EXEC-001]}
+  - {requirement_id: TBL-METH-OBLIGATIONS, criterion_ids: [COM-RAG-001, COM-GOV-001]}
   - {requirement_id: TBL-METH-VERSIONS, criterion_ids: [COM-GOV-001]}

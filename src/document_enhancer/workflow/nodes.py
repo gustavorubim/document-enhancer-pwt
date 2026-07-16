@@ -747,7 +747,7 @@ def _m6_reference_contract(
                 "anchor": "document-content",
             }
         ]
-        return sections, "enterprise_core", "1.0.0", f"TPL-{document_type.upper()}-001", "1.0.0"
+        return sections, "enterprise_core", "2.0.0", f"TPL-{document_type.upper()}-001", "2.0.0"
     pack = load_reference_pack(services.reference_pack)
     requirements_path = pack.requirements_path(document_type)
     requirements = yaml_parser().load(requirements_path.read_text(encoding="utf-8"))
@@ -765,7 +765,7 @@ def _m6_reference_contract(
             }
         )
     template_id = str(requirements.get("template_id", f"TPL-{document_type.upper()}-001"))
-    template_version = str(requirements.get("version", "1.0.0"))
+    template_version = str(requirements.get("version", "2.0.0"))
     return sections, pack.pack_id, pack.version, template_id, template_version
 
 

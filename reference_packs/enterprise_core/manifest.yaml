@@ -1,15 +1,16 @@
 schema_version: "1.0"
 pack_id: enterprise_core
-version: 1.0.0
+version: 2.0.0
 description: >-
-  Fictional, local-first enterprise reference context for governed process, methodology,
-  standard, and desktop-procedure documents. It contains no proprietary policy text.
+  Fictional, local-first enterprise banking reference context for highly governed process,
+  methodology, standard, and desktop-procedure documents. It is designed for G-SIB-scale
+  governance patterns, contains no proprietary policy text, and does not establish compliance.
 owner:
   name: Enterprise Documentation Council
   team: Governance Enablement
   contact: documentation-council@example.invalid
 status: active
-effective_from: "2026-01-01"
+effective_from: "2026-07-16"
 effective_to: null
 supported_document_types:
   process:
@@ -87,6 +88,9 @@ rubrics:
   desktop_procedure: rubrics/desktop_procedure.yaml
 required_acknowledgements:
   - "This pack is fictional reference context and is not a substitute for legal, policy, or control-owner approval."
+  - "Legal and Compliance must validate regulatory, jurisdiction, legal-entity, and notification applicability before adoption."
+  - "Supervisory publications cited in pack documentation are contextual design inputs, not incorporated obligations or evidence of compliance."
+  - "Fictional retention periods, thresholds, role names, systems, and identifiers must be replaced by approved enterprise values."
 conflicts:
   - conflict_id: CONFLICT-001
     left: POL-DOC-GOV-001
@@ -104,27 +108,27 @@ files:
   - {path: ontology/id_patterns.yaml, sha256: 43bc760b77bd4d84b30c56cf5a93051346d982388dec419c76cc63fdeac9b73b, kind: ontology, required: true}
   - {path: ontology/controlled_terms.yaml, sha256: 8445544a2487c4e40cd979fffb473f6f5b04e5f85c4f4251a1401c0f40e9fdf3, kind: ontology, required: true}
   - {path: context/glossary/glossary.yaml, sha256: c962a278ab9b819097cf7a9532b8a20148636be4597b7b9fe9d8f7596aa75da5, kind: glossary, required: true}
-  - {path: context/style_guides/enterprise_style.md, sha256: 5fa8f4d3c8839eb152d14ab61a52866b4ebb56a204b0da89b5c88dd44b76830f, kind: style_guide, required: true}
-  - {path: context/policies/document-governance.md, sha256: 23bd14837273add15de6c80249208bb5c4fe33b0758e2a3c78308210063752c1, kind: policy, required: true}
-  - {path: context/policies/records-retention.md, sha256: ac375a866ebacd63a18cd7ab2565c71b67686081ab00c1ebbf17e5cbd9c720ca, kind: policy, required: true}
-  - {path: context/standards/operational-documentation.md, sha256: 82d4084c22f1b3d62bdcaec47c5bd092b8ed946bb98a72c915049f2eaa535991, kind: standard, required: true}
-  - {path: context/standards/control-evidence.md, sha256: 5338aa762fbd56d79eac43bf9fdb325be1a6f74f4f6d8d572a699c7755bab157, kind: standard, required: true}
+  - {path: context/style_guides/enterprise_style.md, sha256: bb4552ab8dae05cb6afcea7501060b3136e600da18e2b89e34c5d7310918ddd5, kind: style_guide, required: true}
+  - {path: context/policies/document-governance.md, sha256: e351d0c192c6c913a2f1715075ba35ccc4b4f90f1bf311dc4801f8714e08591a, kind: policy, required: true}
+  - {path: context/policies/records-retention.md, sha256: 29c5e661260d55a061598ec13f7e2762499d5d56420d478a1e41c4ad9a59cf50, kind: policy, required: true}
+  - {path: context/standards/operational-documentation.md, sha256: 7c79752c38e6f53acb6d1085863f4dd4525515f70670d082f274a77a9b058fc7, kind: standard, required: true}
+  - {path: context/standards/control-evidence.md, sha256: e87e66d98a9dfd6e63b62ceb40e54aece2ff97b326865f84fee71cb9223d1b74, kind: standard, required: true}
   - {path: rubrics/common.yaml, sha256: d0088d8204fa09c6e3ea669efedc7255e6787d6b03733fca33e258e449bc0aee, kind: rubric, required: true}
-  - {path: rubrics/process.yaml, sha256: 90c8ef3305b42edd23ea33e3c51d26647991b1a136419863792f01e471fdab7a, kind: rubric, required: true}
-  - {path: rubrics/methodology.yaml, sha256: 73e5d471a7c90cb10b400289d52f1e52e16b783438f881ad6d7813e315203a8d, kind: rubric, required: true}
-  - {path: rubrics/standard.yaml, sha256: 80a45afbcc9c3fdbf33760926b96fa4992e5de09bd6b9463ba3405c5e51e00d9, kind: rubric, required: true}
-  - {path: rubrics/desktop_procedure.yaml, sha256: d2fd176c05431aa6fe7f1b5752e85f0ec831e223098467f40bfa561fd862c129, kind: rubric, required: true}
-  - {path: templates/process/template.md, sha256: 88699a38e5a36210de0a9060955984ccfd00549265e35ce0c76c338e88e92cea, kind: template, required: true}
-  - {path: templates/process/requirements.yaml, sha256: 0c3147042ec6be459330aa533558d1976341d09a2ad3011d0402d6f330ccc196, kind: requirements, required: true}
-  - {path: templates/process/example.md, sha256: 6ad8f8953089cde5403314300b6ad9a594583689da39d6d628df496439f0ebf2, kind: example, required: true}
-  - {path: templates/methodology/template.md, sha256: c0b7d68dc4c10b4a1a8dfec02e55bff25e11268f5853e5d7af817a045fd07261, kind: template, required: true}
-  - {path: templates/methodology/requirements.yaml, sha256: 2c774be9ced0d0de7c8bf8569c7ab03dbb24f62a9087dd46a36263df8183aed4, kind: requirements, required: true}
-  - {path: templates/methodology/example.md, sha256: 39ef6816a75c33761f6b4e348dc17e4cad07ed5fa839f94401836f31dff90415, kind: example, required: true}
-  - {path: templates/standard/template.md, sha256: db55f8b65dc8f3264e975032ac72496601afa5ca8af362b9d9eb4709d967b4a1, kind: template, required: true}
-  - {path: templates/standard/requirements.yaml, sha256: 53b9687b6061594517c33f198af0d3cb40711aaa289df0a2a5f3ae0af5bc6f9a, kind: requirements, required: true}
-  - {path: templates/standard/example.md, sha256: 4df2b3d30055edbce73125bf4259d630ed3cf07a7e4e80ef6ca0085e7116da2e, kind: example, required: true}
-  - {path: templates/desktop_procedure/template.md, sha256: 1da3f4dd117307d703d13305333ef560dac2ca35809bd51f4c34a4a3a6c33694, kind: template, required: true}
-  - {path: templates/desktop_procedure/requirements.yaml, sha256: 36e338977d6cdd4e951407da5b43eb5bdfd147f6baedede1a6ebab806cbe648a, kind: requirements, required: true}
-  - {path: templates/desktop_procedure/example.md, sha256: 42306fef345cf990890e2751fab66b63cde61ab4a594527cab494e5bc1cac772, kind: example, required: true}
-manifest_sha256: e099632a4851712f0e0e88acb1e3de43af5d432e96bcf2e595a51ea8ad7a7fb5
-pack_sha256: afa24eb813cfc33a060b6cf44e421abdfeefd967ae0e313691785db903e3c1ca
+  - {path: rubrics/process.yaml, sha256: 80f49507b304f9c5cc323b052cddeb5d106bb66fd8b9847624a5d5af4b48afd7, kind: rubric, required: true}
+  - {path: rubrics/methodology.yaml, sha256: 6787ad2e1ba86cae5aaa0751e54e6a6876472783dfcd9d8f58339bd4d09553d5, kind: rubric, required: true}
+  - {path: rubrics/standard.yaml, sha256: c257ce619024d31bda58d50e03e3643be5ab4396d410708f8e722ecd2efb4d52, kind: rubric, required: true}
+  - {path: rubrics/desktop_procedure.yaml, sha256: f4541b75c055d0ed4fe64721c7f46b934f9b09cea69bb7368a75219224d5818c, kind: rubric, required: true}
+  - {path: templates/process/template.md, sha256: 192b484b3110b401ee73c888828bbd0bf042c14fedb3245b5348550e4477a1e9, kind: template, required: true}
+  - {path: templates/process/requirements.yaml, sha256: a346369ace4410ed3b74c098fe3fdba32c02b25949fe741500cbc5c886b4c4f1, kind: requirements, required: true}
+  - {path: templates/process/example.md, sha256: 653317a5955ad7b006f9db04622ed79834cbe855a12a103a52c4d8afe1854a0d, kind: example, required: true}
+  - {path: templates/methodology/template.md, sha256: 2d3b4bd88eed0bfeb554e6360dd8a9f2f3619db796b42218da940782eb687764, kind: template, required: true}
+  - {path: templates/methodology/requirements.yaml, sha256: 6f89a3186758725a16c239c10eb2972b5cc255c16c5313f2e7013698382ca33b, kind: requirements, required: true}
+  - {path: templates/methodology/example.md, sha256: b4107e117acc02668c7fa22049a34ae84d909bef713be4a1392d62c0ecaf9d6a, kind: example, required: true}
+  - {path: templates/standard/template.md, sha256: ee3fefa4c92cc8759bd96f5e1071033b5c81b3d6ffba9577aff937c469937a4d, kind: template, required: true}
+  - {path: templates/standard/requirements.yaml, sha256: 5f2f661fb87cdae8f0cec5bd90570fc3f3d9de6b6abe8cc47adfdc6d46d84333, kind: requirements, required: true}
+  - {path: templates/standard/example.md, sha256: 882a549552299b05b537aa9210fac891748480740ffde8640f814e0636adaa48, kind: example, required: true}
+  - {path: templates/desktop_procedure/template.md, sha256: 6292d6b728cad28e7d3111f9cb540fb6b4745def982ee7f18e5457c1baccf7c6, kind: template, required: true}
+  - {path: templates/desktop_procedure/requirements.yaml, sha256: eb3f6206c69d7eadb26117a1078ab66601fe971d32cdfce8fb159b141c8624ce, kind: requirements, required: true}
+  - {path: templates/desktop_procedure/example.md, sha256: d59b5a4be498fe1b00671e834b75da100a82f72a68ea92b22954a285489f6115, kind: example, required: true}
+manifest_sha256: cd2ecdf196928b8652662f585dec1b36d3ca2d5a8a517fb77746e615cc004238
+pack_sha256: 539ef6ad2ac59941b7e7efb1df0cb1df3f2215a0519e013861fbd2bfccd3bcdc

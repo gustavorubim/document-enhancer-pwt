@@ -31,7 +31,7 @@ def test_four_governed_examples_complete_actual_offline_cli_and_rag(tmp_path: Pa
         4,
     ]
     for item in result["documents"].values():
-        assert item["reference_pack"] == {"id": "enterprise_core", "version": "1.0.0"}
+        assert item["reference_pack"] == {"id": "enterprise_core", "version": "2.0.0"}
         assert item["review_gates"] == {
             "gate1_completed": True,
             "gate2_pause": "gate2",

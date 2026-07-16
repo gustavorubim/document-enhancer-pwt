@@ -78,6 +78,13 @@ def _pick_anchor(block: object, specs: Sequence[Mapping[str, str]]) -> str | Non
     if not specs:
         return None
     heading_path = _value(block, "heading_path", ()) or ()
+    normalized_path = {
+        " ".join(re.findall(r"[a-z0-9]+", str(value).lower())) for value in heading_path
+    }
+    for spec in specs:
+        normalized_heading = " ".join(re.findall(r"[a-z0-9]+", spec["heading"].lower()))
+        if normalized_heading in normalized_path:
+            return spec["anchor"]
     source_text = str(_value(block, "text", ""))
     haystack = " ".join([*(str(value) for value in heading_path), source_text]).lower()
     best: tuple[int, str] | None = None
@@ -111,6 +118,25 @@ def _source_digest(normalized: object) -> str:
     return value
 
 
+def _raw_text_by_span(normalized: object) -> dict[str, str]:
+    """Return verbatim raw text keyed by the normalized span identifier when available."""
+
+    raw = getattr(normalized, "raw", None)
+    if isinstance(normalized, Mapping):
+        raw = normalized.get("raw", raw)
+    blocks = getattr(raw, "blocks", None)
+    if isinstance(raw, Mapping):
+        blocks = raw.get("blocks", blocks)
+    if not isinstance(blocks, Sequence):
+        return {}
+    return {
+        validate_span_id(str(_value(block, "span_id", _value(block, "source_span_id", "")))): str(
+            _value(block, "text", "")
+        )
+        for block in blocks
+    }
+
+
 def build_content_ledger(
     normalized: object,
     *,
@@ -127,6 +153,7 @@ def build_content_ledger(
     blocks = _blocks(normalized)
     specs = _section_specs(target_sections)
     source_digest = _source_digest(normalized)
+    raw_texts = _raw_text_by_span(normalized)
     entries: list[ContentLedgerEntry] = []
     for ordinal, block in enumerate(blocks):
         span_id = validate_span_id(
@@ -168,7 +195,9 @@ def build_content_ledger(
                 target_anchor=target_anchor,
                 rationale=rationale,
                 omitted_reason=omitted_reason,
-                source_text_digest=hashlib.sha256(text.encode("utf-8")).hexdigest(),
+                source_text_digest=hashlib.sha256(
+                    raw_texts.get(span_id, text).encode("utf-8")
+                ).hexdigest(),
                 source_ordinal=ordinal,
             )
         )

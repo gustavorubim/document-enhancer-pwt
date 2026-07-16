@@ -2,7 +2,7 @@
 template_id: TPL-STANDARD-001
 document_type: standard
 reference_pack: enterprise_core
-reference_pack_version: 1.0.0
+reference_pack_version: 2.0.0
 document_id: "{{ document.id }}"
 document_version: "{{ document.version }}"
 status: "{{ document.status }}"
@@ -15,12 +15,21 @@ status: "{{ document.status }}"
 **Version:** {{ document.version }}
 **Status:** {{ document.status }}
 **Owner:** {{ document.owner }}
+**Approval authority:** {{ document.approval_authority }}
 **Effective date:** {{ document.effective_date }}
 **Next review date:** {{ document.next_review_date }}
+**Legal entities:** {{ document.legal_entities }}
+**Jurisdictions:** {{ document.jurisdictions }}
+**Risk tier:** {{ document.risk_tier }}
+**Information classification:** {{ document.classification }}
 
 ## Document metadata and governance
 
 {{ sections.metadata }}
+
+| Governance field | Required value | Accountable role | Evidence or system of record |
+| --- | --- | --- | --- |
+| {{ tables.governance }} | TBD | TBD | TBD |
 
 ## Purpose
 
@@ -42,33 +51,33 @@ status: "{{ document.status }}"
 
 {{ sections.requirements }}
 
-| Requirement ID | Normative statement | Applicability | Accountable role | Evidence | Exception path |
-| --- | --- | --- | --- | --- | --- |
-| {{ tables.requirements }} | TBD | TBD | TBD | TBD | TBD |
+| Requirement ID | Authority or obligation | Normative statement | Entity, jurisdiction, and applicability | Accountable role | Risk and control | Evidence and monitoring | Exception path |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| {{ tables.requirements }} | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
 
 ## Accountable roles
 
 {{ sections.roles }}
 
-| Role ID | Responsibility | Approval authority | Escalation |
-| --- | --- | --- | --- |
-| {{ tables.roles }} | TBD | TBD | TBD |
+| Role ID | Line or capacity | Responsibility | Decision or approval authority | Independence or segregation requirement | Escalation |
+| --- | --- | --- | --- | --- | --- |
+| {{ tables.roles }} | TBD | TBD | TBD | TBD | TBD |
 
 ## Evidence and records
 
 {{ sections.evidence }}
 
-| Evidence ID | Type | Producer | Storage reference | Retention |
-| --- | --- | --- | --- | --- |
-| {{ tables.evidence }} | TBD | TBD | TBD | TBD |
+| Evidence ID | Requirement and control | Type and producer | Period and legal entity | Authoritative storage and integrity | Retention and hold | Access owner |
+| --- | --- | --- | --- | --- | --- | --- |
+| {{ tables.evidence }} | TBD | TBD | TBD | TBD | TBD | TBD |
 
 ## Exceptions and waivers
 
 {{ sections.exceptions }}
 
-| Exception ID | Authority | Reason | Expiry or review date | Downstream impact |
-| --- | --- | --- | --- | --- |
-| {{ tables.exceptions }} | TBD | TBD | TBD | TBD |
+| Exception ID | Requirements affected | Authority and second-line concurrence | Risk and reason | Compensating controls | Expiry or review date | Downstream impact and disclosure |
+| --- | --- | --- | --- | --- | --- | --- |
+| {{ tables.exceptions }} | TBD | TBD | TBD | TBD | TBD | TBD |
 
 ## Enforcement and nonconformance
 
@@ -78,6 +87,10 @@ status: "{{ document.status }}"
 
 {{ sections.controls }}
 
+| Control ID | Requirements and risks | Owner and operator | Frequency | Procedure and evidence | Metric, threshold, and breach response | Independent testing |
+| --- | --- | --- | --- | --- | --- | --- |
+| {{ tables.controls }} | TBD | TBD | TBD | TBD | TBD | TBD |
+
 ## Related policies, standards, and documents
 
 {{ sections.related }}
@@ -85,6 +98,14 @@ status: "{{ document.status }}"
 ## Implementation guidance
 
 {{ sections.implementation }}
+
+## Regulatory and policy obligation mapping
+
+{{ sections.obligations }}
+
+| Obligation ID | Authority or source | Citation or internal reference | Interpretation and applicability | Implementing requirement or control | Evidence owner | Legal or Compliance validation |
+| --- | --- | --- | --- | --- | --- | --- |
+| {{ tables.obligations }} | TBD | TBD | TBD | TBD | TBD | TBD |
 
 ## Review and conformance statement
 
@@ -94,8 +115,8 @@ status: "{{ document.status }}"
 
 {{ sections.version }}
 
-| Version | Effective date | Change | Approver | Decision |
-| --- | --- | --- | --- | --- |
-| {{ tables.versions }} | TBD | TBD | TBD | TBD |
+| Version | Effective date | Change and impact assessment | Content owner | Risk or Compliance concurrence | Approval authority | Supersedes |
+| --- | --- | --- | --- | --- | --- | --- |
+| {{ tables.versions }} | TBD | TBD | TBD | TBD | TBD | TBD |
 
 <!-- AUTHORING: Use MUST/MUST NOT/SHOULD/SHOULD NOT/MAY only for explicit normative statements. -->

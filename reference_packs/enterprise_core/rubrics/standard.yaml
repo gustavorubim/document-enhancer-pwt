@@ -1,14 +1,14 @@
 schema_version: "0.1"
 rubric_id: RUBRIC-STANDARD-001
-version: 1.0.0
+version: 2.0.0
 document_type: standard
 inherits: rubrics/common.yaml
 common_dimensions_retained: true
 criteria:
-  - {criterion_id: STD-NORMATIVE-001, dimension_id: executability, requirement: "Express each requirement with a normative term, stable ID, applicability, and evidence", evidence: [requirements table], severity: blocker, hard_blocker: true}
-  - {criterion_id: STD-APPLY-001, dimension_id: purpose_scope, requirement: "Define applicability, exclusions, accountable role, and exceptions for each requirement", evidence: [applicability table, exceptions], severity: high, hard_blocker: false}
-  - {criterion_id: STD-ENFORCE-001, dimension_id: controls, requirement: "State enforcement, control, evidence, escalation, and nonconformance handling", evidence: [enforcement table], severity: high, hard_blocker: false}
-  - {criterion_id: STD-GOV-001, dimension_id: governance, requirement: "Provide version, approval, review, supersession, and related standard governance", evidence: [metadata, version history], severity: high, hard_blocker: false}
+  - {criterion_id: STD-NORMATIVE-001, dimension_id: executability, requirement: "Express each requirement with a normative term, stable ID, authority, legal-entity and jurisdiction applicability, risk and control mapping, evidence, monitoring, and exception route", evidence: [requirements table], severity: blocker, hard_blocker: true}
+  - {criterion_id: STD-APPLY-001, dimension_id: purpose_scope, requirement: "Define inclusions, exclusions, accountable roles, proportionality, local overlays, obligation applicability, and time-bound exceptions", evidence: [scope, requirements table, obligation mapping, exceptions], severity: high, hard_blocker: false}
+  - {criterion_id: STD-ENFORCE-001, dimension_id: controls, requirement: "State control ownership, evidence integrity, monitoring thresholds, independent testing, breach response, issue remediation, escalation, and closure authority", evidence: [controls table, evidence table, enforcement section], severity: high, hard_blocker: false}
+  - {criterion_id: STD-GOV-001, dimension_id: governance, requirement: "Provide accountable ownership, three-lines roles, delegated approval, independent concurrence, review triggers, attestation, version, supersession, and conformance governance", evidence: [metadata, roles table, conformance statement, version history], severity: high, hard_blocker: false}
 template_mappings:
   - {requirement_id: SEC-STD-METADATA, criterion_ids: [COM-GOV-001, STD-GOV-001]}
   - {requirement_id: SEC-STD-PURPOSE, criterion_ids: [COM-SCOPE-001]}
@@ -23,10 +23,14 @@ template_mappings:
   - {requirement_id: SEC-STD-CONTROLS, criterion_ids: [COM-CONTROL-001]}
   - {requirement_id: SEC-STD-RELATED, criterion_ids: [COM-RAG-001]}
   - {requirement_id: SEC-STD-IMPLEMENTATION, criterion_ids: [COM-EXEC-001, COM-DEPEND-001]}
+  - {requirement_id: SEC-STD-OBLIGATIONS, criterion_ids: [COM-RAG-001, COM-GOV-001, STD-APPLY-001]}
   - {requirement_id: SEC-STD-REVIEW, criterion_ids: [STD-GOV-001]}
   - {requirement_id: SEC-STD-VERSION, criterion_ids: [COM-GOV-001, STD-GOV-001]}
-  - {requirement_id: TBL-STD-REQUIREMENTS, criterion_ids: [STD-NORMATIVE-001]}
-  - {requirement_id: TBL-STD-ROLES, criterion_ids: [COM-DEPEND-001]}
-  - {requirement_id: TBL-STD-EVIDENCE, criterion_ids: [STD-ENFORCE-001]}
-  - {requirement_id: TBL-STD-EXCEPTIONS, criterion_ids: [STD-APPLY-001]}
-  - {requirement_id: TBL-STD-VERSIONS, criterion_ids: [STD-GOV-001]}
+  - {requirement_id: TBL-STD-GOVERNANCE, criterion_ids: [COM-GOV-001, STD-GOV-001]}
+  - {requirement_id: TBL-STD-REQUIREMENTS, criterion_ids: [STD-NORMATIVE-001, STD-APPLY-001]}
+  - {requirement_id: TBL-STD-ROLES, criterion_ids: [COM-DEPEND-001, STD-GOV-001]}
+  - {requirement_id: TBL-STD-EVIDENCE, criterion_ids: [STD-ENFORCE-001, COM-CONTROL-001]}
+  - {requirement_id: TBL-STD-EXCEPTIONS, criterion_ids: [STD-APPLY-001, COM-CONTROL-001]}
+  - {requirement_id: TBL-STD-CONTROLS, criterion_ids: [COM-CONTROL-001, STD-ENFORCE-001]}
+  - {requirement_id: TBL-STD-OBLIGATIONS, criterion_ids: [COM-RAG-001, COM-GOV-001, STD-APPLY-001]}
+  - {requirement_id: TBL-STD-VERSIONS, criterion_ids: [STD-GOV-001, COM-GOV-001]}

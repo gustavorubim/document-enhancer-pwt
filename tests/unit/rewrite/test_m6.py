@@ -67,6 +67,58 @@ def test_content_ledger_covers_each_normalized_span_exactly_once(tmp_path: Path)
     assert invalid.duplicate_span_ids == (ledger.entries[0].source_span_id,)
 
 
+def test_content_ledger_digests_verbatim_markdown_hard_breaks(tmp_path: Path) -> None:
+    source = tmp_path / "hard-break.md"
+    source.write_text(
+        "# Metadata\n\n**Owner:** First line  \n**Status:** effective\n", encoding="utf-8"
+    )
+    normalized = normalize_document(parse_source(source))
+    ledger = build_content_ledger(
+        normalized,
+        document_id="DOC-M6-HARD-BREAK",
+        target_sections=[{"id": "SEC-METADATA", "heading": "Metadata", "anchor": "metadata"}],
+    )
+    source_ids = [block.span_id.upper() for block in normalized.raw.blocks]
+    source_texts = {block.span_id.upper(): block.text for block in normalized.raw.blocks}
+
+    report = validate_content_ledger(ledger, source_ids, source_texts=source_texts)
+
+    assert report.valid
+
+
+def test_content_ledger_prefers_structural_heading_over_table_vocabulary(tmp_path: Path) -> None:
+    source = tmp_path / "governed-table.md"
+    source.write_text(
+        "# Process\n\n## Roles and responsibilities\n\n"
+        "| Role | Governance | Metadata |\n| --- | --- | --- |\n| Owner | First line | Active |\n",
+        encoding="utf-8",
+    )
+    normalized = normalize_document(parse_source(source))
+    ledger = build_content_ledger(
+        normalized,
+        document_id="DOC-M6-STRUCTURAL-ANCHOR",
+        target_sections=[
+            {
+                "id": "SEC-METADATA",
+                "heading": "Document metadata and governance",
+                "anchor": "document-metadata-and-governance",
+            },
+            {
+                "id": "SEC-ROLES",
+                "heading": "Roles and responsibilities",
+                "anchor": "roles-and-responsibilities",
+            },
+        ],
+    )
+    table_span = next(
+        block.source_span_id.upper() for block in normalized.blocks if block.block_type == "table"
+    )
+
+    entry = next(item for item in ledger.entries if item.source_span_id == table_span)
+
+    assert entry.target_anchor == "roles-and-responsibilities"
+
+
 def test_rewrite_inputs_expose_only_answered_reviewer_facts(tmp_path: Path) -> None:
     normalized = _normalized(tmp_path)
     ledger = build_content_ledger(

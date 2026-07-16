@@ -1,14 +1,14 @@
 schema_version: "0.1"
 rubric_id: RUBRIC-DESKTOP-001
-version: 1.0.0
+version: 2.0.0
 document_type: desktop_procedure
 inherits: rubrics/common.yaml
 common_dimensions_retained: true
 criteria:
-  - {criterion_id: DESK-PREREQ-001, dimension_id: dependencies, requirement: State access, prerequisites, tools, data, environment, and safety constraints, evidence: [prerequisites, tools table], severity: high, hard_blocker: false}
-  - {criterion_id: DESK-ACTION-001, dimension_id: executability, requirement: Give atomic numbered actions with expected result after each action, evidence: [actions table], severity: blocker, hard_blocker: true}
-  - {criterion_id: DESK-RESULT-001, dimension_id: executability, requirement: Define completion criteria, evidence capture, and downstream output, evidence: [completion section, evidence table], severity: high, hard_blocker: false}
-  - {criterion_id: DESK-RECOVERY-001, dimension_id: controls, requirement: Define decision, failure, rollback, recovery, and escalation paths, evidence: [failure paths, recovery table], severity: high, hard_blocker: false}
+  - {criterion_id: DESK-PREREQ-001, dimension_id: dependencies, requirement: "State legal-entity scope, authorization, training, maker-checker assignment, access, authoritative inputs, tool versions, upstream status, environment, recovery readiness, and safety constraints", evidence: [scope, prerequisites, tools table], severity: high, hard_blocker: false}
+  - {criterion_id: DESK-ACTION-001, dimension_id: executability, requirement: "Give stable atomic actions with operator segregation, exact input and action, expected result and tolerance, control, evidence, timing, and a next action or safe stop", evidence: [actions table, decisions table], severity: blocker, hard_blocker: true}
+  - {criterion_id: DESK-RESULT-001, dimension_id: executability, requirement: "Define observable completion with maker-checker evidence, authoritative records, integrity, retention, downstream acknowledgement, and unresolved-issue status", evidence: [completion table, evidence table], severity: high, hard_blocker: false}
+  - {criterion_id: DESK-RECOVERY-001, dimension_id: controls, requirement: "Define approved and prohibited branches, failure severity, safe stop, containment, impact assessment, rollback, recovery, timed escalation, notification assessment, and closure authority", evidence: [decisions table, failure paths, escalation matrix, recovery section], severity: high, hard_blocker: false}
 template_mappings:
   - {requirement_id: SEC-DESK-METADATA, criterion_ids: [COM-GOV-001, COM-STRUCT-001]}
   - {requirement_id: SEC-DESK-PURPOSE, criterion_ids: [COM-SCOPE-001]}
@@ -18,16 +18,22 @@ template_mappings:
   - {requirement_id: SEC-DESK-TOOLS, criterion_ids: [DESK-PREREQ-001, COM-DEPEND-001]}
   - {requirement_id: SEC-DESK-SAFETY, criterion_ids: [COM-CONTROL-001, DESK-RECOVERY-001]}
   - {requirement_id: SEC-DESK-ACTIONS, criterion_ids: [DESK-ACTION-001, COM-EXEC-001]}
-  - {requirement_id: SEC-DESK-DECISIONS, criterion_ids: [DESK-RECOVERY-001]}
+  - {requirement_id: SEC-DESK-DECISIONS, criterion_ids: [DESK-RECOVERY-001, DESK-ACTION-001]}
   - {requirement_id: SEC-DESK-EVIDENCE, criterion_ids: [DESK-RESULT-001, COM-CONTROL-001]}
   - {requirement_id: SEC-DESK-FAILURE, criterion_ids: [DESK-RECOVERY-001]}
   - {requirement_id: SEC-DESK-ROLLBACK, criterion_ids: [DESK-RECOVERY-001]}
   - {requirement_id: SEC-DESK-ESCALATION, criterion_ids: [DESK-RECOVERY-001, COM-DEPEND-001]}
   - {requirement_id: SEC-DESK-COMPLETION, criterion_ids: [DESK-RESULT-001, COM-EXEC-001]}
   - {requirement_id: SEC-DESK-RELATED, criterion_ids: [COM-RAG-001]}
+  - {requirement_id: SEC-DESK-OBLIGATIONS, criterion_ids: [COM-RAG-001, COM-GOV-001]}
   - {requirement_id: SEC-DESK-VERSION, criterion_ids: [COM-GOV-001]}
-  - {requirement_id: TBL-DESK-TOOLS, criterion_ids: [DESK-PREREQ-001]}
-  - {requirement_id: TBL-DESK-ACTIONS, criterion_ids: [DESK-ACTION-001]}
+  - {requirement_id: TBL-DESK-GOVERNANCE, criterion_ids: [COM-GOV-001]}
+  - {requirement_id: TBL-DESK-TOOLS, criterion_ids: [DESK-PREREQ-001, COM-DEPEND-001]}
+  - {requirement_id: TBL-DESK-ACTIONS, criterion_ids: [DESK-ACTION-001, COM-EXEC-001]}
+  - {requirement_id: TBL-DESK-DECISIONS, criterion_ids: [DESK-RECOVERY-001, DESK-ACTION-001]}
   - {requirement_id: TBL-DESK-FAILURE, criterion_ids: [DESK-RECOVERY-001]}
-  - {requirement_id: TBL-DESK-EVIDENCE, criterion_ids: [DESK-RESULT-001]}
+  - {requirement_id: TBL-DESK-EVIDENCE, criterion_ids: [DESK-RESULT-001, COM-CONTROL-001]}
+  - {requirement_id: TBL-DESK-ESCALATION, criterion_ids: [DESK-RECOVERY-001, COM-DEPEND-001]}
+  - {requirement_id: TBL-DESK-COMPLETION, criterion_ids: [DESK-RESULT-001, COM-EXEC-001]}
+  - {requirement_id: TBL-DESK-OBLIGATIONS, criterion_ids: [COM-RAG-001, COM-GOV-001]}
   - {requirement_id: TBL-DESK-VERSIONS, criterion_ids: [COM-GOV-001]}

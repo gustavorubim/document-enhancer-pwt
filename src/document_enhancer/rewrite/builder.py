@@ -402,9 +402,9 @@ def build_enhanced_document(
     document_id: str,
     document_type: DocumentType | str = DocumentType.PROCESS,
     reference_pack_id: str = "enterprise_core",
-    reference_pack_version: str = "1.0.0",
+    reference_pack_version: str = "2.0.0",
     template_id: str | None = None,
-    template_version: str = "1.0.0",
+    template_version: str = "2.0.0",
     ledger: ContentLedger | None = None,
     revision_counters: RevisionCounters | None = None,
 ) -> EnhancedDocumentModel:
