@@ -1,7 +1,14 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pytest
 
+from document_enhancer.analysis.errors import AnalysisIncompleteError
+from document_enhancer.analysis.models import AnalysisStageRecord
+from document_enhancer.domain.enums import DocumentType
+from document_enhancer.workflow import DocumentWorkflow, WorkflowServices
 from document_enhancer.workflow.cache import WORKFLOW_STAGES, WorkflowCache
 from document_enhancer.workflow.checkpoint import SideEffectLedger
 
@@ -60,6 +67,57 @@ def test_side_effect_receipts_are_idempotent(tmp_path) -> None:
     assert not ledger.run_once("effect", {"value": 1}, lambda: calls.append("called"))
     assert calls == ["called"]
     assert ledger.count() == 1
+
+
+class _FailedAnalysisRunner:
+    def run(self, request, *, recorder):
+        outcome = AnalysisStageRecord(
+            document_id=request.document_id,
+            source_digest=request.source_digest,
+            stage="macro_reviewer",
+            status="failed",
+            error_type="RecordedProviderFailure",
+            error_message="Required analysis stage did not produce a validated artifact.",
+            retry_action="Retry the macro_reviewer analysis stage with the same validated inputs.",
+        )
+        recorder.record(outcome)
+        raise AnalysisIncompleteError((outcome,))
+
+
+def test_workflow_checkpoints_failed_analysis_before_question_and_downstream_gates(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source.md"
+    source.write_text("# Procedure\n\nThe analyst reviews the monthly report.\n", encoding="utf-8")
+    services = WorkflowServices(
+        run_root=tmp_path / "runs",
+        source=source,
+        document_type=DocumentType.PROCESS,
+        analysis_runner=_FailedAnalysisRunner(),
+        structure_mode="parser",
+        offline=True,
+    )
+
+    with pytest.raises(AnalysisIncompleteError):
+        DocumentWorkflow(services).run()
+
+    assert services.checkpoint is not None
+    state = json.loads(services.checkpoint.state_path.read_text(encoding="utf-8"))["state"]
+    assert state["status"] == "failed"
+    assert state["current_stage"] == "analysis"
+    assert state["resume_entry"] == "analysis"
+    assert state["next_action"] == (
+        "Retry the macro_reviewer analysis stage with the same validated inputs."
+    )
+    assert "question_synthesis" not in state["completed_stages"]
+    assert "gate1" not in state["completed_stages"]
+    assert not services.paths.artifact_path("clarification/questions.yaml").exists()
+    assert not services.paths.artifact_path("audit/audit.json").exists()
+    assert not services.paths.artifact_path("rag/build-manifest.json").exists()
+    stage = services.checkpoint.checkpoints.get(services.paths.run_id, "analysis")
+    assert stage is not None
+    assert stage.status == "failed"
+    assert stage.payload["unresolved_stages"] == ["macro_reviewer"]
 
 
 @pytest.mark.parametrize("changed_input", ["template", "reference_file", "prompt", "schema"])

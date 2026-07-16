@@ -274,7 +274,7 @@ def build_configured_workflow_services(
         run_id=run_id,
         document_type=document_type,
         structure_service=structure_service,
-        analysis_runner=analysis.run if analysis is not None else None,
+        analysis_runner=analysis,
         question_generator=question_generator,
         checklist_generator=checklist_generator,
         rewrite_runner=rewriter,

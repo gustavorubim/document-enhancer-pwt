@@ -28,6 +28,7 @@ class WorkflowState(TypedDict, total=False):
     normalized: object
     structure_result: object
     analysis_result: object
+    analysis_stages: object
     questions: object
     answers: object
     steering: object

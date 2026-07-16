@@ -5,7 +5,16 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, StrictStr, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictBool,
+    StrictInt,
+    StrictStr,
+    field_validator,
+    model_validator,
+)
 
 from document_enhancer.domain.analysis import (
     AnalysisReport,
@@ -123,6 +132,52 @@ class SourceDispositionMap(FrozenModel):
     dispositions: tuple[SourceSpanDisposition, ...]
 
 
+AnalysisStageName = Literal[
+    "macro_reviewer",
+    "section_mapper",
+    "process_methodology_discoverer",
+    "rag_readiness_reviewer",
+    "finding_synthesizer",
+]
+
+
+class AnalysisStageRecord(FrozenModel):
+    """Safe, independently persistable outcome for one required analysis stage."""
+
+    document_id: StrictStr
+    source_digest: StrictStr
+    stage: AnalysisStageName
+    status: Literal["succeeded", "failed", "quarantined"]
+    branch: AnalysisBranchResult | None = None
+    disposition_map: SourceDispositionMap | None = None
+    error_type: StrictStr | None = None
+    error_message: StrictStr | None = None
+    retry_action: StrictStr | None = None
+
+    @model_validator(mode="after")
+    def validate_outcome(self) -> AnalysisStageRecord:
+        if self.disposition_map is not None and self.stage != "section_mapper":
+            raise ValueError("only the section branch can contain a source disposition map")
+        if self.status == "succeeded":
+            if self.branch is None or self.branch.specialist != self.stage:
+                raise ValueError("successful branch stage record requires its matching branch")
+            if self.stage == "section_mapper" and self.disposition_map is None:
+                raise ValueError("successful section branch requires its source disposition map")
+            if any(
+                value is not None
+                for value in (self.error_type, self.error_message, self.retry_action)
+            ):
+                raise ValueError("successful branch stage record cannot contain failure metadata")
+            return self
+        if self.error_type is None or self.error_message is None or self.retry_action is None:
+            raise ValueError("unresolved analysis stage requires safe failure and retry metadata")
+        if self.status == "failed" and self.branch is not None:
+            raise ValueError("failed analysis stage cannot contain an unvalidated branch")
+        if self.branch is not None and self.branch.specialist != self.stage:
+            raise ValueError("quarantined branch stage record has the wrong specialist")
+        return self
+
+
 class DeterministicLintResult(FrozenModel):
     check_ids: tuple[StrictStr, ...]
     findings: tuple[Finding, ...]
@@ -172,6 +227,8 @@ __all__ = [
     "AnalysisBranchResult",
     "AnalysisRequest",
     "AnalysisRunResult",
+    "AnalysisStageName",
+    "AnalysisStageRecord",
     "DeterministicLintResult",
     "FindingConflict",
     "FrozenModel",

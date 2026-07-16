@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from langgraph.types import interrupt
 
+from document_enhancer.analysis.errors import AnalysisIncompleteError
 from document_enhancer.analysis.models import AnalysisRequest
 from document_enhancer.artifacts.paths import RunPaths, content_addressed_run_id
 from document_enhancer.artifacts.run_storage import RunStorage
@@ -74,7 +75,7 @@ from document_enhancer.rewrite import (
 from document_enhancer.rewrite.governed_example import apply_governed_example_contract
 
 from .cache import WorkflowCache, stage_inputs_for
-from .checkpoint import WorkflowCheckpoint
+from .checkpoint import AnalysisArtifactRecorder, WorkflowCheckpoint
 from .prompts import resolved_prompt_artifact
 from .routing import gate1_required, gate1_satisfied, gate2_required, gate2_satisfied, next_action
 from .state import WorkflowSnapshot, WorkflowState, state_json
@@ -82,7 +83,17 @@ from .state import WorkflowSnapshot, WorkflowState, state_json
 if TYPE_CHECKING:
     from .execution import ExecutionMetadata
 
-AnalysisRunner = Callable[[AnalysisRequest], object]
+
+class RecordedAnalysisRunner(Protocol):
+    def run(
+        self,
+        request: AnalysisRequest,
+        *,
+        recorder: AnalysisArtifactRecorder,
+    ) -> object: ...
+
+
+AnalysisRunner = Callable[[AnalysisRequest], object] | RecordedAnalysisRunner
 RewriteRunner = Callable[[tuple[SectionRewriteInput, ...]], object]
 AuditRevisionRunner = Callable[[EnhancedDocumentModel, Audit], object]
 
@@ -540,7 +551,44 @@ def analysis_node(state: WorkflowState, services: WorkflowServices) -> WorkflowS
             metadata=(),
             reviewer_inputs="",
         )
-        state["analysis_result"] = services.analysis_runner(request)
+        assert services.checkpoint is not None
+        recorder = AnalysisArtifactRecorder(services.checkpoint, state)
+        try:
+            run_method = getattr(services.analysis_runner, "run", None)
+            if callable(run_method):
+                state["analysis_result"] = run_method(request, recorder=recorder)
+            else:
+                runner = cast(Callable[[AnalysisRequest], object], services.analysis_runner)
+                state["analysis_result"] = runner(request)
+        except AnalysisIncompleteError as exc:
+            records = exc.records
+            unresolved = tuple(record for record in records if record.status != "succeeded")
+            state.pop("analysis_result", None)
+            state["analysis_stages"] = [record.model_dump(mode="json") for record in records]
+            state["current_stage"] = "analysis"
+            state["resume_entry"] = "analysis"
+            state["status"] = "failed"
+            state["next_action"] = unresolved[0].retry_action or "Retry the analysis stage."
+            state.setdefault("errors", []).append(exc.message)
+            services.checkpoint.record_stage(
+                state,
+                stage="analysis",
+                cache_key=_stage_key(state, services, "analysis"),
+                status="failed",
+                artifact_paths=tuple(
+                    f"analysis/branches/{record.stage}.json" for record in records
+                ),
+                payload={
+                    "unresolved_stages": [record.stage for record in unresolved],
+                    "successful_sibling_stages": [
+                        record.stage for record in records if record.status == "succeeded"
+                    ],
+                    "retry_action": state["next_action"],
+                },
+            )
+            services.checkpoint.save_state(state)
+            raise
+        state["analysis_stages"] = [record.model_dump(mode="json") for record in recorder.records()]
     return _finish_stage(state, services, "analysis")
 
 

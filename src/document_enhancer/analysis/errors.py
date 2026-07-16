@@ -1,5 +1,11 @@
 """Fail-closed errors for the bounded analysis-specialist lane."""
 
+from __future__ import annotations
+
+from document_enhancer.errors import ProviderError
+
+from .models import AnalysisStageRecord
+
 
 class AnalysisError(RuntimeError):
     """Base class for analysis failures that must stop downstream promotion."""
@@ -33,10 +39,23 @@ class AnalysisSynthesisError(AnalysisError):
     """Fan-in could not preserve and canonically synthesize the specialist findings."""
 
 
+class AnalysisIncompleteError(ProviderError):
+    """One or more required stages are unresolved, so fan-in cannot be authoritative."""
+
+    def __init__(self, records: tuple[AnalysisStageRecord, ...]) -> None:
+        unresolved = tuple(record for record in records if record.status != "succeeded")
+        if not unresolved:
+            raise ValueError("analysis incomplete error requires an unresolved stage")
+        self.records = records
+        self.unresolved_stages = tuple(record.stage for record in unresolved)
+        super().__init__("required analysis stage unresolved: " + ", ".join(self.unresolved_stages))
+
+
 __all__ = [
     "AnalysisBudgetError",
     "AnalysisError",
     "AnalysisIdentityError",
+    "AnalysisIncompleteError",
     "AnalysisPromptContractError",
     "AnalysisSynthesisError",
     "CandidateGraphError",

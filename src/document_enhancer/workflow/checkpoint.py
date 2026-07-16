@@ -10,6 +10,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from document_enhancer.analysis.models import (
+    AnalysisRequest,
+    AnalysisStageName,
+    AnalysisStageRecord,
+)
 from document_enhancer.artifacts.atomic import atomic_write_json
 from document_enhancer.artifacts.checkpoint import CheckpointRecord, CheckpointStore
 from document_enhancer.artifacts.paths import RunPaths
@@ -130,4 +135,83 @@ class WorkflowCheckpoint:
         return self.effects.run_once(f"{self.paths.run_id}:{stage}:{effect_name}", payload, effect)
 
 
-__all__ = ["SideEffectLedger", "WorkflowCheckpoint"]
+class AnalysisArtifactRecorder:
+    """Atomic, idempotent branch artifacts plus per-stage SQLite receipts."""
+
+    _BRANCH_STAGES: tuple[AnalysisStageName, ...] = (
+        "macro_reviewer",
+        "section_mapper",
+        "process_methodology_discoverer",
+        "rag_readiness_reviewer",
+    )
+
+    def __init__(self, checkpoint: WorkflowCheckpoint, state: Mapping[str, Any]) -> None:
+        self.checkpoint = checkpoint
+        self.state = state
+
+    @staticmethod
+    def _relative_path(stage: AnalysisStageName) -> str:
+        return f"analysis/branches/{stage}.json"
+
+    def record(self, outcome: AnalysisStageRecord) -> None:
+        relative_path = self._relative_path(outcome.stage)
+        digest = atomic_write_json(
+            self.checkpoint.paths.artifact_path(relative_path),
+            outcome.model_dump(mode="json"),
+        )
+        cache_key = hashlib.sha256(
+            json.dumps(
+                {
+                    "document_id": outcome.document_id,
+                    "source_digest": outcome.source_digest,
+                    "stage": outcome.stage,
+                    "status": outcome.status,
+                },
+                sort_keys=True,
+            ).encode("utf-8")
+        ).hexdigest()
+        self.checkpoint.record_stage(
+            self.state,
+            stage=f"analysis.branch.{outcome.stage}",
+            cache_key=cache_key,
+            status=outcome.status,
+            artifact_paths=(relative_path,),
+            artifact_digests=(digest,),
+            payload={
+                "error_type": outcome.error_type,
+                "retry_action": outcome.retry_action,
+            },
+        )
+
+    def records(self) -> tuple[AnalysisStageRecord, ...]:
+        outcomes: list[AnalysisStageRecord] = []
+        for stage in (*self._BRANCH_STAGES, "finding_synthesizer"):
+            path = self.checkpoint.paths.artifact_path(self._relative_path(stage))
+            if path.is_file():
+                outcomes.append(AnalysisStageRecord.model_validate_json(path.read_text("utf-8")))
+        return tuple(outcomes)
+
+    def clear(self, stage: AnalysisStageName) -> None:
+        self.checkpoint.paths.artifact_path(self._relative_path(stage)).unlink(missing_ok=True)
+        self.checkpoint.checkpoints.delete(
+            self.checkpoint.paths.run_id,
+            f"analysis.branch.{stage}",
+        )
+
+    def completed_records(
+        self, request: AnalysisRequest
+    ) -> Mapping[AnalysisStageName, AnalysisStageRecord]:
+        completed: dict[AnalysisStageName, AnalysisStageRecord] = {}
+        for outcome in self.records():
+            if outcome.stage not in self._BRANCH_STAGES or outcome.status != "succeeded":
+                continue
+            if (
+                outcome.document_id != request.document_id
+                or outcome.source_digest != request.source_digest
+            ):
+                raise ValueError("persisted analysis branch belongs to different validated inputs")
+            completed[outcome.stage] = outcome
+        return completed
+
+
+__all__ = ["AnalysisArtifactRecorder", "SideEffectLedger", "WorkflowCheckpoint"]

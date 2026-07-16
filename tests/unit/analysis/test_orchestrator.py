@@ -10,6 +10,7 @@ import pytest
 
 from document_enhancer.analysis.errors import (
     AnalysisBudgetError,
+    AnalysisIncompleteError,
     AnalysisPromptContractError,
 )
 from document_enhancer.analysis.gemini_adapter import (
@@ -23,6 +24,7 @@ from document_enhancer.analysis.models import AnalysisRequest, AnalysisRunResult
 from document_enhancer.analysis.orchestrator import AnalysisOrchestrator
 from document_enhancer.analysis.promotion import promote_discovery_candidate_batch
 from document_enhancer.analysis.provider_models import DiscoveryCandidateBatch
+from document_enhancer.artifacts.paths import RunPaths
 from document_enhancer.domain.analysis import (
     AnalysisReport,
     DiscoveryAnalysis,
@@ -40,6 +42,7 @@ from document_enhancer.llm.structured import (
 )
 from document_enhancer.prompting import PromptPackComposer
 from document_enhancer.references.loader import ReferencePack
+from document_enhancer.workflow.checkpoint import AnalysisArtifactRecorder, WorkflowCheckpoint
 
 GatewayFactory = Callable[[Mapping[str, list[object]]], tuple[GeminiModelGateway, Any]]
 
@@ -118,6 +121,69 @@ def test_fan_out_fan_in_is_bounded_ordered_injection_safe_and_schema_valid(
     candidate = discovery_schema["properties"]["candidates"]["items"]
     assert len(candidate["properties"]["entity_type"]["enum"]) == 42
     assert "entity_type" in candidate["required"]
+
+
+def test_failed_branch_preserves_siblings_and_resume_reuses_completed_records(
+    tmp_path: Path,
+    composer: PromptPackComposer,
+    analysis_request: AnalysisRequest,
+    responses: dict[str, list[object]],
+    gateway_factory: GatewayFactory,
+) -> None:
+    failing_responses = {key: list(value) for key, value in responses.items()}
+    failing_responses["process_methodology_discoverer"] = [{"invalid": True}]
+    gateway, first_model = gateway_factory(failing_responses)
+    checkpoint = WorkflowCheckpoint(RunPaths(tmp_path / "runs", "run-analysis-resume"))
+    state = {"run_id": "run-analysis-resume"}
+    recorder = AnalysisArtifactRecorder(checkpoint, state)
+
+    with pytest.raises(AnalysisIncompleteError) as caught:
+        AnalysisOrchestrator(composer, gateway).run(analysis_request, recorder=recorder)
+
+    records = {record.stage: record for record in recorder.records()}
+    assert caught.value.unresolved_stages == ("process_methodology_discoverer",)
+    assert records["process_methodology_discoverer"].status == "failed"
+    assert records["process_methodology_discoverer"].branch is None
+    assert records["process_methodology_discoverer"].error_message == (
+        "Required analysis stage did not produce a validated artifact."
+    )
+    assert {stage for stage, record in records.items() if record.status == "succeeded"} == {
+        "macro_reviewer",
+        "section_mapper",
+        "rag_readiness_reviewer",
+    }
+    assert "finding_synthesizer" not in records
+    assert {str(call["stage"]) for call in first_model.calls} == {
+        "macro_reviewer",
+        "section_mapper",
+        "process_methodology_discoverer",
+        "rag_readiness_reviewer",
+    }
+    sibling_bytes = {
+        stage: checkpoint.paths.artifact_path(f"analysis/branches/{stage}.json").read_bytes()
+        for stage in ("macro_reviewer", "section_mapper", "rag_readiness_reviewer")
+    }
+
+    retry_responses = {
+        "process_methodology_discoverer": responses["process_methodology_discoverer"],
+        "finding_synthesizer": responses["finding_synthesizer"],
+    }
+    retry_gateway, retry_model = gateway_factory(retry_responses)
+    result = AnalysisOrchestrator(composer, retry_gateway).run(
+        analysis_request,
+        recorder=recorder,
+    )
+
+    assert result.complete is True
+    assert [str(call["stage"]) for call in retry_model.calls] == [
+        "process_methodology_discoverer",
+        "finding_synthesizer",
+    ]
+    assert all(
+        checkpoint.paths.artifact_path(f"analysis/branches/{stage}.json").read_bytes()
+        == sibling_bytes[stage]
+        for stage in sibling_bytes
+    )
 
 
 def test_invalid_structured_output_fails_closed_without_partial_artifact(
