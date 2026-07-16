@@ -1533,18 +1533,18 @@ Acceptance: all four branches can run concurrently against a fake model, emit sc
 
 ### M5 — Questions, reviewer inputs, checklist, and resumable graph
 
-- [ ] M5.1 Implement question synthesis, deduplication, prerequisite ordering, priority, and blocking policy.
-- [ ] M5.2 Generate authoritative YAML plus readable Markdown question artifacts.
-- [ ] M5.3 Implement answer, steering, and waiver validation with clear diagnostics.
-- [ ] M5.4 Implement rewrite-checklist construction and evidence links.
-- [ ] M5.5 Implement LangGraph state and routing for raw ingestion, structure quality, Gemini scan, conditional recovery, validation, parallel analysis, persisted interrupts, and resume commands.
-- [ ] M5.6 Implement human gate 1 and human gate 2 policies.
-- [ ] M5.7 Implement status/current-stage/next-action views and stable JSON CLI output.
-- [ ] M5.8 Prove cache invalidation when one answer, source, template, reference file, prompt, or schema changes.
-- [ ] M5.9 Prove idempotent side effects across interrupt re-execution.
-- [ ] M5.10 Implement `prompts list`, `prompts show`, and `prompts validate`, plus prompt-pack selection and resolved-prompt inspection in run artifacts.
+- [x] M5.1 Implement question synthesis, deduplication, prerequisite ordering, priority, and blocking policy.
+- [x] M5.2 Generate authoritative YAML plus readable Markdown question artifacts.
+- [x] M5.3 Implement answer, steering, and waiver validation with clear diagnostics.
+- [x] M5.4 Implement rewrite-checklist construction and evidence links.
+- [x] M5.5 Implement LangGraph state and routing for raw ingestion, structure quality, Gemini scan, conditional recovery, validation, parallel analysis, persisted interrupts, and resume commands.
+- [x] M5.6 Implement human gate 1 and human gate 2 policies.
+- [x] M5.7 Implement status/current-stage/next-action views and stable JSON CLI output.
+- [x] M5.8 Prove cache invalidation when one answer, source, template, reference file, prompt, or schema changes.
+- [x] M5.9 Prove idempotent side effects across interrupt re-execution.
+- [x] M5.10 Implement `prompts list`, `prompts show`, and `prompts validate`, plus prompt-pack selection and resolved-prompt inspection in run artifacts.
 
-Acceptance: a CLI run pauses with reviewable files, exits with the waiting code, survives process termination, resumes after validated edits, and does not repeat unchanged upstream model calls.
+Acceptance: a CLI run pauses with reviewable files, exits with the waiting code, survives process termination, resumes after validated edits, and does not repeat unchanged upstream model calls. **Verified 2026-07-16 on merged code commit `80cec30`: 220 passed, 2 opt-in tests deselected; frozen sync, Ruff format/check, ty, schemas, reference/prompt packs, fixture corpus, build, and diff checks passed.**
 
 ### M6 — Governed rewrite, Mermaid, and semantic sidecar
 

@@ -3,18 +3,19 @@
 Document Enhancer is a local-first, Gemini-first Python CLI for turning enterprise methodology, standard, process, and desktop-procedure documents into traceable human, semantic, and retrieval-ready artifacts.
 
 The repository now includes the foundational contracts, governed reference and prompt packs,
-source ingestion and structure recovery, the Gemini model gateway, and the four parallel analysis
-specialists. Questions, reviewer gates, rewriting, audit/export, and RAG execution follow in the
-remaining milestones.
+source ingestion and structure recovery, the Gemini model gateway, four parallel analysis
+specialists, deterministic clarification artifacts, and a durable two-gate LangGraph workflow.
+Governed rewriting, audit/export, and RAG execution follow in the remaining milestones.
 
 ## Verified status
 
-M4 (model gateway and analysis specialists) is formally complete as of 2026-07-16. The complete
-offline gate passed on code commit `921d6ac`: 209 tests passed and 2 opt-in tests were deselected;
-Ruff format/check, ty, generated schemas, the enterprise reference pack, all 20 governed prompt
-routes across four document types, the synthetic corpus, package build, and diff checks also
-passed. The structure-recovery Gemini path was separately exercised successfully with the local
-opt-in credential configuration. M5 (questions, reviewer inputs, checklist, and resumable graph)
+M5 (questions, reviewer inputs, checklist, and resumable graph) is formally complete as of
+2026-07-16. The complete offline gate passed on merged code commit `80cec30`: 220 tests passed and
+2 opt-in tests were deselected; frozen sync, Ruff format/check, ty, generated schemas, the
+enterprise reference pack, all 20 governed prompt routes across four document types, the synthetic
+corpus, package build, and diff checks also passed. Runs now pause with exit code 10 for review,
+persist durable state and idempotent side-effect receipts, validate reviewer edits fail-closed, and
+resume without replaying unchanged analysis. M6 (governed rewrite, Mermaid, and semantic sidecar)
 is the active next milestone.
 
 ## Quick start
@@ -33,11 +34,19 @@ The project requires Python 3.12 or 3.13 and uses `uv` for a reproducible enviro
 docenhance doctor [--json]
 docenhance config show [--json]
 docenhance version
+docenhance run SOURCE [--run-dir PATH] [--until questions|checklist] [--json]
+docenhance status RUN_ID [--run-dir PATH] [--json]
+docenhance current-stage RUN_ID [--run-dir PATH] [--json]
+docenhance next-action RUN_ID [--run-dir PATH] [--json]
+docenhance resume RUN_ID [--run-dir PATH] [--json]
+docenhance prompts list [--json]
+docenhance prompts show PROMPT_ID [--composed] [--json]
+docenhance prompts validate [--json]
 ```
 
-The remaining product commands are added milestone by milestone. Calling an unsupported command
-returns a clear configuration/contract error rather than pretending that a later workflow is
-available.
+The M5 workflow is offline-safe by default and writes editable clarification YAML plus readable
+Markdown under the selected run directory. Calling a later unsupported product command returns a
+clear configuration/contract error rather than pretending the capability is available.
 
 ## Verification
 
@@ -64,4 +73,8 @@ Compatibility tests are offline by default. They validate the installed LangChai
 
 ## Data handling
 
-Source documents and derived artifacts are treated as untrusted, confidential data. The foundation logs event metadata only, redacts credential-shaped values, keeps provider tools disabled by default, and does not create or modify run artifacts. The external `.env` is intentionally preserved for local use and is never read into output or logs.
+Source documents and derived artifacts are treated as untrusted, confidential data. The workflow
+logs event metadata only, redacts credential-shaped and raw-content values from prompt snapshots,
+keeps provider tools disabled by default, and writes run artifacts atomically under the selected
+local run directory. The external `.env` is intentionally preserved for local use and is never
+read into output or logs.
