@@ -120,10 +120,16 @@ def test_native_structured_output_is_promoted_and_manifest_is_digest_only() -> N
 
 def test_bounded_repair_retries_invalid_structured_response() -> None:
     fake = FakeStructuredModel([{"ok": "not-a-bool", "note": "bad"}, {"ok": True, "note": "fixed"}])
-    result = gateway(fake).invoke(route=ROUTE_FLASH_LITE, schema=Probe, prompt="repair me")
+    governed_prompt = "caller-composed governed prompt"
+    result = gateway(fake).invoke(route=ROUTE_FLASH_LITE, schema=Probe, prompt=governed_prompt)
     assert result.artifact.note == "fixed"
     assert result.manifest.attempts == 2
     assert result.manifest.structured_repairs == 1
+    assert [call["prompt_digest"] for call in fake.calls] == [
+        result.manifest.prompt_digest,
+        result.manifest.prompt_digest,
+    ]
+    assert "Return only one JSON object" not in governed_prompt
 
 
 def test_invalid_structured_response_never_promotes_unstructured_text() -> None:
@@ -153,6 +159,8 @@ def test_content_addressed_cache_is_atomic_and_invalidates_on_dependencies(tmp_p
         input_digests=["input-one"],
     )
     assert second.manifest.status == CallStatus.CACHE_HIT
+    assert second.manifest.prompt_digest == first.manifest.prompt_digest
+    assert second.manifest.cache_key == first.manifest.cache_key
     changed = gateway(FakeStructuredModel([{"ok": True, "note": "changed"}]), cache=cache).invoke(
         route=ROUTE_FLASH_LITE,
         schema=Probe,

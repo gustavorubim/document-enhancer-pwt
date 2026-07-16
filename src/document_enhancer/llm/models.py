@@ -519,7 +519,6 @@ class GeminiModelGateway:
         repairs = 0
         provider_retries = 0
         attempts = 0
-        current_prompt = prompt
         usage: UsageMetadata | None = None
         while True:
             attempts += 1
@@ -532,7 +531,7 @@ class GeminiModelGateway:
                 )
                 callback = UsageCallbackHandler()
                 response = native_model.invoke(
-                    current_prompt,
+                    prompt,
                     config={
                         "callbacks": [callback],
                         "metadata": {
@@ -580,10 +579,6 @@ class GeminiModelGateway:
                         "native structured output failed after bounded repairs"
                     ) from exc
                 repairs += 1
-                current_prompt = (
-                    f"{prompt}\n\n[structured-output-repair-{repairs}] "
-                    "Return only one JSON object that validates against the supplied native schema."
-                )
                 continue
             except BaseException as exc:
                 if isinstance(exc, (KeyboardInterrupt, SystemExit, asyncio.CancelledError)):
