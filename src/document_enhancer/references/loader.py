@@ -13,6 +13,7 @@ import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
+from importlib.resources import files
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -38,6 +39,7 @@ __all__ = [
     "PrecedenceResolution",
     "load_reference_pack",
     "resolve_precedence",
+    "bundled_reference_pack_path",
     "validate_reference_pack",
 ]
 
@@ -56,6 +58,20 @@ _ALLOWED_STATUS = {"draft", "active", "deprecated", "retired"}
 _MAX_YAML_BYTES = 2_000_000
 _MAX_YAML_NODES = 20_000
 _MAX_YAML_DEPTH = 40
+
+
+def bundled_reference_pack_path(pack_id: str = "enterprise_core") -> Path:
+    """Return a bundled reference pack in an installed wheel or source checkout."""
+
+    if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]{2,80}", pack_id):
+        raise ReferencePackSecurityError(f"Invalid bundled reference-pack ID: {pack_id!r}")
+    installed = Path(str(files("document_enhancer").joinpath("data", "reference_packs", pack_id)))
+    if installed.is_dir():
+        return installed
+    source_checkout = Path(__file__).resolve().parents[3] / "reference_packs" / pack_id
+    if source_checkout.is_dir():
+        return source_checkout
+    raise ReferencePackValidationError(f"Bundled reference pack is unavailable: {pack_id}")
 
 
 def _canonical_json(value: Any) -> bytes:

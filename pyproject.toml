@@ -43,10 +43,14 @@ docenhance = "document_enhancer.cli:main"
 [tool.hatch.build.targets.wheel]
 packages = ["src/document_enhancer"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"reference_packs" = "document_enhancer/data/reference_packs"
+
 [tool.hatch.build.targets.sdist]
 include = [
   "/src",
   "/tests",
+  "/reference_packs",
   "/README.md",
   "/pyproject.toml",
 ]
