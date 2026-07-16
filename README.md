@@ -11,15 +11,15 @@ catalog, and the Rich CLI performs explainable retrieval and grounded cited Q&A 
 
 ## Verified status
 
-M7 (audit, diff, graph export, Gemini embeddings, SQLite catalog, and Rich CLI RAG) is formally
-complete as of 2026-07-16. The complete offline gate passed on merged code commit `ec278eb`: 258
-tests passed and 2 opt-in tests were deselected; frozen sync, import smoke, Ruff format/check, ty,
-generated schemas, the enterprise reference and Gemini prompt packs, the synthetic corpus, package
-build, and diff checks also passed. Passing runs now produce reconciled audit/export artifacts and
-an atomically promoted catalog with FTS, graph, and vector inputs. The CLI supports deterministic
-hybrid search, grounded cited answers, generation-pinned chat sessions, source resolution, graph
-inspection, and catalog statistics. M8 (fixtures, evaluation, security, documentation, and release)
-is the active milestone.
+M8 (fixtures, evaluation, security, documentation, and release) is formally complete as of
+2026-07-16. The complete offline gate passed on merged code commit `d7c80c1`: 266 tests passed and 2
+opt-in tests were deselected; frozen sync, import smoke, Ruff format/check, ty, generated schemas,
+both governed packs, all 60 generated corpus files, both evaluation artifacts, package build, and
+diff checks also passed. All 21 deterministic offline release thresholds passed across 48
+fixture-format evaluations. A separate temporary clean clone and isolated-wheel proof passed at
+`5b763b8` with zero Gemini calls and zero public downloads. These are controlled offline results,
+not claims about live Gemini quality or public-source generalization; live-model and public-download
+evaluations remain explicit opt-in checks. The final plan/evidence reconciliation audit is active.
 
 ## Quick start
 
@@ -77,12 +77,15 @@ uv run python scripts/verify_reference_pack.py reference_packs/enterprise_core
 uv run python scripts/verify_prompt_pack.py prompt_packs/gemini_core \
   --reference-pack reference_packs/enterprise_core
 uv run python scripts/generate_fixture_corpus.py --check
+uv run python scripts/run_evaluations.py --check
 uv build
 git diff --check
 ```
 
-The coverage floor remains an incremental project guardrail, not a release-quality threshold; M8
-adds the final evaluation thresholds, release evidence, security hardening, and clean-install demo.
+For the stronger release proof, run `scripts/verify_release.sh HEAD`; it repeats the gate in a
+temporary clean clone and then validates the built wheel from a separate isolated environment.
+The checked-in offline evaluation report and exact limitations are in
+`evals/reports/m8-evaluation.md`.
 
 Compatibility tests are offline by default. They validate the installed LangChain, LangGraph, Deep Agents, SQLite FTS5, sqlite-vec, and adapter shapes without sending document content anywhere. Live Gemini structured-output and embedding profile checks are separately marked `live_model` and require explicit opt-in.
 

@@ -1593,18 +1593,18 @@ Acceptance: deliberate omissions, invented facts, dangling edges, invalid Mermai
 
 ### M8 — Fixtures, evaluation, security, documentation, and release
 
-- [ ] M8.1 Create the five synthetic fixture families and controlled content/layout degradation generator.
-- [ ] M8.2 Add gold raw-block order, source section boundaries/hierarchy, structure-routing decisions, questions, facts, objects/edges, content dispositions, enhanced outputs, seeded defect labels, and cross-document RAG questions with expected evidence/graph paths/citations/abstentions.
-- [ ] M8.3 Add the public-source registry and allow-listed fetch script with digest/license checks.
-- [ ] M8.4 Build metric graders and per-fixture evaluation reports, including structure recovery, SQLite/graph/embedding completeness, retrieval ranking, answer groundedness, citations, and abstention.
-- [ ] M8.5 Run the configured `gemini-3.1-flash-lite`, `gemini-3.5-flash`, `gemini-3.1-pro-preview`, and `gemini-embedding-2` routes and document structure accuracy, quality, embedding coverage, cost, latency, fallback, and lifecycle behavior.
-- [ ] M8.6 Complete prompt-injection, path, file-format, YAML, secret, and hostile-content security tests.
-- [ ] M8.7 Document installation, Gemini/embedding configuration, prompt-pack and reference-pack authoring, normal review workflow, SQLite schema/migration contract, Rich RAG CLI usage, troubleshooting, artifact interpretation, and data handling.
-- [ ] M8.8 Add an end-to-end demo that stops for human review, resumes, passes audit, ingests the cumulative catalog, performs retrieval-only search, and answers a cited CLI question.
-- [ ] M8.9 Run the full release gate from a clean clone and isolated wheel install.
-- [ ] M8.10 Publish an evaluation report with failures and limitations across enhancement, retrieval, graph expansion, answers, citations, latency, and cost—not only aggregate scores.
+- [x] M8.1 Create the five synthetic fixture families and controlled content/layout degradation generator.
+- [x] M8.2 Add gold raw-block order, source section boundaries/hierarchy, structure-routing decisions, questions, facts, objects/edges, content dispositions, enhanced outputs, seeded defect labels, and cross-document RAG questions with expected evidence/graph paths/citations/abstentions.
+- [x] M8.3 Add the public-source registry and allow-listed fetch script with digest/license checks.
+- [x] M8.4 Build metric graders and per-fixture evaluation reports, including structure recovery, SQLite/graph/embedding completeness, retrieval ranking, answer groundedness, citations, and abstention.
+- [x] M8.5 Run the configured `gemini-3.1-flash-lite`, `gemini-3.5-flash`, `gemini-3.1-pro-preview`, and `gemini-embedding-2` routes and document structure accuracy, quality, embedding coverage, cost, latency, fallback, and lifecycle behavior.
+- [x] M8.6 Complete prompt-injection, path, file-format, YAML, secret, and hostile-content security tests.
+- [x] M8.7 Document installation, Gemini/embedding configuration, prompt-pack and reference-pack authoring, normal review workflow, SQLite schema/migration contract, Rich RAG CLI usage, troubleshooting, artifact interpretation, and data handling.
+- [x] M8.8 Add an end-to-end demo that stops for human review, resumes, passes audit, ingests the cumulative catalog, performs retrieval-only search, and answers a cited CLI question.
+- [x] M8.9 Run the full release gate from a clean clone and isolated wheel install.
+- [x] M8.10 Publish an evaluation report with failures and limitations across enhancement, retrieval, graph expansion, answers, citations, latency, and cost—not only aggregate scores.
 
-Acceptance: all release thresholds in Section 20 pass, documentation reproduces the enhancement and Rich RAG CLI demo, and the known-limitations list accurately describes PDF/OCR, messy-structure uncertainty, Gemini model lifecycle/preview variability, inference review, local SQLite scale, pre-v1 SQLiteVec risk, and lack of enterprise identity/hosted UI.
+Acceptance: all release thresholds in Section 20 pass, documentation reproduces the enhancement and Rich RAG CLI demo, and the known-limitations list accurately describes PDF/OCR, messy-structure uncertainty, Gemini model lifecycle/preview variability, inference review, local SQLite scale, pre-v1 SQLiteVec risk, and lack of enterprise identity/hosted UI. **Verified 2026-07-16 on merged code commit `d7c80c1`: 266 passed, 2 opt-in tests deselected; all 21 deterministic offline threshold rows passed across 48 fixture-format evaluations; frozen sync, import smoke, Ruff format/check, ty, schemas, reference/prompt packs, 60-file fixture drift, evaluation drift, build, and diff checks passed. Clean-clone and isolated-wheel verification passed at `5b763b8` with zero provider calls and zero public downloads. Live-model and public-download evaluations remain explicit opt-in checks.**
 
 ## 24. Integration and verification commands
 
