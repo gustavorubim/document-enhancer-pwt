@@ -225,3 +225,18 @@ def test_analysis_schema_adapters_are_stage_only_and_keep_full_pydantic_validati
                 "analyses": [],
             },
         )
+
+
+def test_section_provider_schema_constrains_disposition_to_canonical_values() -> None:
+    schema = gemini_schema(GeminiSectionAnalysisReport)
+    mapping = schema["properties"]["analyses"]["items"]["properties"]["mappings"]["items"]
+
+    assert mapping["properties"]["disposition"]["enum"] == [
+        "preserved",
+        "moved",
+        "merged",
+        "split",
+        "omitted",
+        "uncertain",
+        "blocking",
+    ]

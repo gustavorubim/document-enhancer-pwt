@@ -14,7 +14,7 @@ from document_enhancer.domain.serialization import (
 )
 
 
-def _mapping(*, disposition: str = "mapped", **values: Any) -> SectionMapping:
+def _mapping(*, disposition: str = "preserved", **values: Any) -> SectionMapping:
     payload: dict[str, Any] = {
         "source_span_ids": ["SPAN-ABCDEFGH"],
         "disposition": disposition,
@@ -26,7 +26,7 @@ def _mapping(*, disposition: str = "mapped", **values: Any) -> SectionMapping:
 def test_section_mapping_supports_one_multiple_and_explicit_none() -> None:
     one = _mapping(target_section_ids=["SEC-ONE"])
     multiple = _mapping(target_section_ids=["SEC-ONE", "SEC-TWO"])
-    none = _mapping(target_section_ids=[], disposition="unmapped")
+    none = _mapping(target_section_ids=[], disposition="omitted")
 
     assert one.target_section_ids == ["SEC-ONE"]
     assert one.target_section_id == "SEC-ONE"
@@ -37,7 +37,7 @@ def test_section_mapping_supports_one_multiple_and_explicit_none() -> None:
 
 
 def test_section_mapping_defaults_and_serializes_explicit_empty_targets() -> None:
-    mapping = _mapping(disposition="unmapped")
+    mapping = _mapping(disposition="omitted")
 
     assert mapping.target_section_ids == []
     assert mapping.model_dump()["target_section_ids"] == []
@@ -47,7 +47,7 @@ def test_section_mapping_defaults_and_serializes_explicit_empty_targets() -> Non
 
 def test_legacy_singular_input_normalizes_to_canonical_plural_field() -> None:
     legacy = _mapping(target_section_id="SEC-LEGACY")
-    legacy_none = _mapping(target_section_id=None, disposition="unmapped")
+    legacy_none = _mapping(target_section_id=None, disposition="omitted")
     consistent = _mapping(
         target_section_id="SEC-LEGACY",
         target_section_ids=["SEC-LEGACY"],
@@ -105,3 +105,17 @@ def test_section_mapping_rejects_conflicts_duplicates_and_blanks(
 def test_section_mapping_rejects_invalid_target_shapes(values: dict[str, Any]) -> None:
     with pytest.raises(ValidationError):
         _mapping(**values)
+
+
+@pytest.mark.parametrize(
+    "disposition",
+    ["preserved", "moved", "merged", "split", "omitted", "uncertain", "blocking"],
+)
+def test_section_mapping_accepts_only_canonical_dispositions(disposition: str) -> None:
+    assert _mapping(disposition=disposition).disposition.value == disposition
+
+
+@pytest.mark.parametrize("disposition", ["mapped", "unmapped", "retain", "blocked", "other"])
+def test_section_mapping_rejects_noncanonical_dispositions(disposition: str) -> None:
+    with pytest.raises(ValidationError, match="disposition"):
+        _mapping(disposition=disposition)

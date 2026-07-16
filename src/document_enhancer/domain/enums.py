@@ -194,6 +194,18 @@ class StructureDisposition(StrEnum):
     UNCERTAIN = "uncertain"
 
 
+class SpanDisposition(StrEnum):
+    """Canonical source-to-target outcomes emitted by section analysis."""
+
+    PRESERVED = "preserved"
+    MOVED = "moved"
+    MERGED = "merged"
+    SPLIT = "split"
+    OMITTED = "omitted"
+    UNCERTAIN = "uncertain"
+    BLOCKING = "blocking"
+
+
 class FindingSeverity(StrEnum):
     BLOCKER = "blocker"
     HIGH = "high"

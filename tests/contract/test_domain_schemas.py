@@ -52,6 +52,16 @@ def test_analysis_schema_declares_canonical_plural_section_targets() -> None:
     assert targets["items"] == {"type": "string"}
     assert targets["uniqueItems"] is True
     assert targets["default"] == []
+    assert mapping["properties"]["disposition"] == {"$ref": "#/$defs/SpanDisposition"}
+    assert schema["$defs"]["SpanDisposition"]["enum"] == [
+        "preserved",
+        "moved",
+        "merged",
+        "split",
+        "omitted",
+        "uncertain",
+        "blocking",
+    ]
 
 
 def test_valid_yaml_fixture_round_trips_and_negative_fixtures_fail() -> None:

@@ -23,6 +23,7 @@ from document_enhancer.domain.enums import (
     DocumentType,
     FindingSeverity,
     FindingType,
+    SpanDisposition,
     StructureDecision,
     StructureDisposition,
 )
@@ -451,7 +452,7 @@ class SectionMapping(StrictModel):
         default_factory=list,
         json_schema_extra={"default": [], "uniqueItems": True},
     )
-    disposition: StrictStr
+    disposition: SpanDisposition
     rationale: StrictStr | None = None
 
     @model_validator(mode="before")

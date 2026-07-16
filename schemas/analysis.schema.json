@@ -7088,8 +7088,7 @@
       "additionalProperties": false,
       "properties": {
         "disposition": {
-          "title": "Disposition",
-          "type": "string"
+          "$ref": "#/$defs/SpanDisposition"
         },
         "rationale": {
           "anyOf": [
@@ -7379,6 +7378,20 @@
       },
       "title": "SourceLocation",
       "type": "object"
+    },
+    "SpanDisposition": {
+      "description": "Canonical source-to-target outcomes emitted by section analysis.",
+      "enum": [
+        "preserved",
+        "moved",
+        "merged",
+        "split",
+        "omitted",
+        "uncertain",
+        "blocking"
+      ],
+      "title": "SpanDisposition",
+      "type": "string"
     },
     "Standard": {
       "additionalProperties": false,

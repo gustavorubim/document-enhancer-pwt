@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from enum import StrEnum
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, StrictStr, field_validator
@@ -16,7 +15,7 @@ from document_enhancer.domain.analysis import (
     RagReadinessAnalysis,
     SectionAnalysis,
 )
-from document_enhancer.domain.enums import DocumentType
+from document_enhancer.domain.enums import DocumentType, SpanDisposition
 from document_enhancer.domain.run import PromptResolution
 from document_enhancer.domain.source import NormalizedDocument
 from document_enhancer.llm.models import CallManifest
@@ -106,16 +105,6 @@ class AnalysisBranchResult(FrozenModel):
     analysis: AnalysisArtifact
     markdown: StrictStr
     call: PromptCallRecord
-
-
-class SpanDisposition(StrEnum):
-    PRESERVED = "preserved"
-    MOVED = "moved"
-    MERGED = "merged"
-    SPLIT = "split"
-    OMITTED = "omitted"
-    UNCERTAIN = "uncertain"
-    BLOCKING = "blocking"
 
 
 class SourceSpanDisposition(FrozenModel):

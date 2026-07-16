@@ -1,6 +1,6 @@
 schema_version: "1.0"
 pack_id: gemini_core
-version: "1.0.4"
+version: "1.0.5"
 description: >-
   Versioned, Gemini-first prompt pack for governed document enhancement and grounded local RAG.
 owner: Document Enhancer Prompt Governance
@@ -100,13 +100,13 @@ file_digests:
   analysis/macro.md: d74c0b63d0ab9ef31576a36dec07ad78ec2e5348da2fc4ef2e07d1ab0380f58b
   analysis/process-methodology-discovery.md: 83d3b7ed9878324d0dbb501f13d3a7af696167315f59c2c4a359203a5e8729fc
   analysis/rag-readiness.md: 0b7979f88719289fc98dec5f059fc19c77402ea345b79f366dea2538c97053d1
-  analysis/sections.md: 7d12b4f036a81b4429abef0110de60e87e4193d4585e658751ce4f0a15508817
+  analysis/sections.md: 5e523f5ae64ff0a0c78f4147fdd7c291ceb510706ba7a6e5df1e85fc1a92a309
   analysis/synthesize-findings.md: 66b05c01f84317fd46addbad1b6dd4e0754028e22a5a3274106d3181e56b7a92
   audit/content-fidelity.md: 24318ca0ba89520121f9c77cddf96681b1b08645daf733f9475a2d70d4b8bed8
   audit/remediation-routing.md: aad1588c9bd94cd173e8d23a2ad70c860721da474af30cc2009fbcf997a61118
   clarification/questions.md: 5f99be2b4e90b811d572ed503b8d0a21a67dc1c24eb005889c6a6835dbb45371
   clarification/rewrite-checklist.md: 356a6a5cc0060c461fe6dcb58577f770be2d45c190a1262da15a68833d97e4a0
-  golden/compositions.yaml: 1a884614462d7dfe44b343496d454ad0c25860c5ffdfaa0a5c1a4eef5c0ec528
+  golden/compositions.yaml: 6e564c7a3833701cb82c5f9a949f3d18f14169e39099cc84fa9fd396a10b3044
   golden/fake_outputs.json: c56cd2b5738027a726b1621f6df08b16aa7a56d3b391be9fd74b393bb35b8531
   rag/citation-audit.md: 60a64d31aa960cbf280c3954fe9aeb3cbbde6f99cf7280cfcc605748d947b4c5
   rag/entity-linking.md: 579717547253ccf0e0399423c3dbb92ba1c594e16031534a5e69618c66a6d4dd

@@ -1,5 +1,5 @@
 schema_version: "1.0"
-pack_version: "1.0.4"
+pack_version: "1.0.5"
 purpose: offline composition coverage; source and reviewer values are supplied by tests
 reference_scopes:
   structure.triage: []
