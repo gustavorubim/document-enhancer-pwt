@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 import pytest
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from document_enhancer.errors import ProviderError
 from document_enhancer.llm import (
@@ -20,7 +20,7 @@ from document_enhancer.llm import (
     ModelLifecycleError,
     resolve_route,
 )
-from document_enhancer.llm.caching import ResponseCache
+from document_enhancer.llm.caching import ResponseCache, digest_bytes
 from document_enhancer.llm.models import classify_provider_error
 
 
@@ -29,15 +29,25 @@ class Probe(BaseModel):
     note: str
 
 
+class CandidateProbe(BaseModel):
+    candidate_id: str
+
+
+class PromotedProbe(BaseModel):
+    stable_id: str = Field(pattern=r"^OBJ-[0-9]+$")
+
+
 def gateway(
     fake: object,
     *,
     cache: ResponseCache | None = None,
     allow_pro_fallback: bool = False,
+    max_repairs: int | None = None,
 ) -> GeminiModelGateway:
     return GeminiModelGateway(
         GeminiGatewayConfig(
             max_retries_override=0,
+            max_repairs_override=max_repairs,
             retry_backoff_seconds=0,
             allow_pro_fallback=allow_pro_fallback,
         ),
@@ -167,11 +177,156 @@ def test_bounded_repair_retries_invalid_structured_response() -> None:
     assert result.artifact.note == "fixed"
     assert result.manifest.attempts == 2
     assert result.manifest.structured_repairs == 1
-    assert [call["prompt_digest"] for call in fake.calls] == [
-        result.manifest.prompt_digest,
-        result.manifest.prompt_digest,
-    ]
+    attempt_digests = [str(call["prompt_digest"]) for call in fake.calls]
+    assert attempt_digests == result.manifest.attempt_prompt_digests
+    assert attempt_digests[0] == result.manifest.prompt_digest
+    assert attempt_digests[1] != result.manifest.prompt_digest
     assert "Return only one JSON object" not in governed_prompt
+
+
+def test_post_parse_promotion_gets_one_safe_targeted_repair() -> None:
+    secret = "AIza-secret-value /Users/example/private/source.md raw-source-sentence"
+
+    class CapturingModel:
+        def __init__(self) -> None:
+            self.responses = [
+                {"candidate_id": secret},
+                {"candidate_id": "OBJ-42"},
+            ]
+            self.prompts: list[str] = []
+
+        def with_structured_output(self, *_: object, **__: object) -> object:
+            parent = self
+
+            class Runnable:
+                def invoke(self, prompt: str, **__: object) -> object:
+                    parent.prompts.append(prompt)
+                    return {"parsed": parent.responses.pop(0)}
+
+            return Runnable()
+
+    model = CapturingModel()
+    governed_prompt = "governed base prompt"
+    result = gateway(model, max_repairs=1).invoke(
+        route=ROUTE_FLASH_LITE,
+        schema=CandidateProbe,
+        prompt=governed_prompt,
+        promote=lambda candidate: PromotedProbe(stable_id=candidate.candidate_id),
+        result_schema=PromotedProbe,
+    )
+
+    assert result.artifact == PromotedProbe(stable_id="OBJ-42")
+    assert result.manifest.prompt_digest == digest_bytes(governed_prompt.encode("utf-8"))
+    assert result.manifest.attempt_prompt_digests == [
+        digest_bytes(value.encode("utf-8")) for value in model.prompts
+    ]
+    assert result.manifest.structured_repairs == 1
+    assert len(model.prompts) == 2
+    assert model.prompts[0] == governed_prompt
+    assert model.prompts[1] != governed_prompt
+    feedback = model.prompts[1].split("DOCUMENT_ENHANCER_VALIDATION_FEEDBACK", 1)[1]
+    assert set(json.loads(feedback.splitlines()[-1])[0]) == {
+        "location",
+        "error_type",
+        "message",
+    }
+    assert "stable_id" in feedback
+    assert secret not in feedback
+    assert "AIza" not in feedback
+    assert "/Users/" not in feedback
+    assert "raw-source-sentence" not in feedback
+
+
+def test_failed_promotion_is_not_cached_and_success_caches_promoted_artifact(
+    tmp_path: Path,
+) -> None:
+    cache = ResponseCache(tmp_path / "cache")
+
+    def promote(candidate: CandidateProbe) -> PromotedProbe:
+        return PromotedProbe(stable_id=candidate.candidate_id)
+
+    with pytest.raises(ProviderError, match="native structured output"):
+        gateway(
+            FakeStructuredModel(
+                [{"candidate_id": "invalid-secret"}, {"candidate_id": "still-invalid"}]
+            ),
+            cache=cache,
+            max_repairs=1,
+        ).invoke(
+            route=ROUTE_FLASH_LITE,
+            schema=CandidateProbe,
+            result_schema=PromotedProbe,
+            promote=promote,
+            prompt="promotion cache",
+        )
+    assert list((tmp_path / "cache").glob("*.json")) == []
+
+    first = gateway(
+        FakeStructuredModel([{"candidate_id": "OBJ-7"}]), cache=cache, max_repairs=1
+    ).invoke(
+        route=ROUTE_FLASH_LITE,
+        schema=CandidateProbe,
+        result_schema=PromotedProbe,
+        promote=promote,
+        prompt="promotion cache",
+    )
+    assert first.artifact == PromotedProbe(stable_id="OBJ-7")
+    cache_text = next((tmp_path / "cache").glob("*.json")).read_text(encoding="utf-8")
+    assert '"stable_id":"OBJ-7"' in cache_text
+    assert "candidate_id" not in cache_text
+
+    second = gateway(FakeStructuredModel([]), cache=cache, max_repairs=1).invoke(
+        route=ROUTE_FLASH_LITE,
+        schema=CandidateProbe,
+        result_schema=PromotedProbe,
+        promote=promote,
+        prompt="promotion cache",
+    )
+    assert second.manifest.status == CallStatus.CACHE_HIT
+    assert second.artifact == first.artifact
+    assert second.manifest.result_schema_digest == first.manifest.result_schema_digest
+
+
+def test_call_manifest_additions_are_backward_compatible() -> None:
+    result = gateway(FakeStructuredModel([{"ok": True, "note": "manifest"}])).invoke(
+        route=ROUTE_FLASH_LITE,
+        schema=Probe,
+        prompt="manifest",
+    )
+    legacy = result.manifest.model_dump(mode="json")
+    legacy.pop("attempt_prompt_digests")
+    legacy.pop("result_schema_name")
+    legacy.pop("result_schema_digest")
+    loaded = type(result.manifest).model_validate(legacy)
+    assert loaded.attempt_prompt_digests == []
+    assert loaded.result_schema_name is None
+    assert loaded.result_schema_digest is None
+
+
+def test_result_schema_changes_cache_identity(tmp_path: Path) -> None:
+    class AlternateResult(BaseModel):
+        alternate_id: str
+
+    cache = ResponseCache(tmp_path / "cache")
+    first = gateway(FakeStructuredModel([{"candidate_id": "OBJ-9"}]), cache=cache).invoke(
+        route=ROUTE_FLASH_LITE,
+        schema=CandidateProbe,
+        result_schema=PromotedProbe,
+        promote=lambda candidate: PromotedProbe(stable_id=candidate.candidate_id),
+        prompt="schema identity",
+    )
+    second_fake = FakeStructuredModel([{"candidate_id": "OBJ-9"}])
+    second = gateway(second_fake, cache=cache).invoke(
+        route=ROUTE_FLASH_LITE,
+        schema=CandidateProbe,
+        result_schema=AlternateResult,
+        promote=lambda candidate: AlternateResult(alternate_id=candidate.candidate_id),
+        prompt="schema identity",
+    )
+    assert second.manifest.status == CallStatus.SUCCESS
+    assert len(second_fake.calls) == 1
+    assert second.manifest.cache_key != first.manifest.cache_key
+    assert second.manifest.result_schema_digest != first.manifest.result_schema_digest
 
 
 def test_invalid_structured_response_never_promotes_unstructured_text() -> None:

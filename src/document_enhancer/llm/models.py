@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import re
 import time
 import uuid
 from collections.abc import Callable, Mapping, Sequence
@@ -12,6 +13,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, TypeVar, cast
 
+import pydantic
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
 from document_enhancer.contracts import ModelGateway
@@ -21,9 +23,19 @@ from document_enhancer.logging import redact
 from .caching import CacheKey, ResponseCache, canonical_json, digest_bytes, digest_json
 from .callbacks import UsageCallbackHandler, UsageMetadata
 from .profiles import ROUTE_FLASH, ROUTE_PRO_PREVIEW, GeminiRoute, resolve_route
-from .structured import StructuredOutputError, artifact_json, gemini_schema, validate_artifact
+from .structured import (
+    StructuredOutputError,
+    artifact_json,
+    gemini_schema,
+    schema_for,
+    validate_artifact,
+)
 
 ArtifactT = TypeVar("ArtifactT")
+ResultT = TypeVar("ResultT")
+
+_SAFE_ERROR_TOKEN = re.compile(r"[^A-Za-z0-9_.-]+")
+_REPAIR_FEEDBACK_MARKER = "DOCUMENT_ENHANCER_VALIDATION_FEEDBACK"
 
 
 class BackendName(StrEnum):
@@ -116,7 +128,10 @@ class CallManifest(BaseModel):
     prompt_id: str | None = None
     prompt_version: str | None = None
     prompt_digest: str
+    attempt_prompt_digests: list[str] = Field(default_factory=list)
     input_digests: list[str] = Field(default_factory=list)
+    result_schema_name: str | None = None
+    result_schema_digest: str | None = None
     cache_key: str
     status: CallStatus
     attempts: int = Field(ge=0)
@@ -144,6 +159,127 @@ class StructuredCall[ArtifactT]:
 def _error_text(exc: BaseException) -> str:
     text = redact(str(exc)).replace("\n", " ").strip()
     return text[:240] if text else type(exc).__name__
+
+
+def _safe_error_token(value: object, *, fallback: str) -> str:
+    token = _SAFE_ERROR_TOKEN.sub("_", str(value)).strip("_.-")[:80]
+    return token or fallback
+
+
+def _schema_field_names(schema: type[Any]) -> set[str]:
+    names: set[str] = set()
+
+    def visit(node: object) -> None:
+        if isinstance(node, Mapping):
+            properties = node.get("properties")
+            if isinstance(properties, Mapping):
+                names.update(str(name) for name in properties)
+            for value in node.values():
+                visit(value)
+        elif isinstance(node, list):
+            for value in node:
+                visit(value)
+
+    visit(schema_for(schema))
+    return names
+
+
+def _safe_error_location(location: Sequence[object], *, allowed_fields: set[str]) -> str:
+    parts: list[str] = []
+    for part in location:
+        if isinstance(part, int):
+            parts.append(str(part))
+            continue
+        token = str(part)
+        parts.append(token if token in allowed_fields else "field")
+    return ".".join(parts) if parts else "$"
+
+
+def _safe_validation_message(error_type: str) -> str:
+    """Map validation codes to corrective text without copying provider-controlled values."""
+
+    if error_type == "missing":
+        return "Required field is missing."
+    if error_type.startswith("literal") or error_type.startswith("enum"):
+        return "Value must match one of the permitted values."
+    if error_type.startswith("extra"):
+        return "Field is not permitted by the result contract."
+    if error_type.startswith(("string", "bytes")):
+        return "Value does not satisfy the required text contract."
+    if error_type.startswith(("int", "float", "decimal", "finite_number")):
+        return "Value does not satisfy the required numeric contract."
+    if error_type.startswith(("list", "tuple", "set", "dict")):
+        return "Value does not satisfy the required collection contract."
+    if error_type.startswith("bool"):
+        return "Value does not satisfy the required boolean contract."
+    if error_type.startswith(("date", "time", "datetime")):
+        return "Value does not satisfy the required date or time contract."
+    if error_type in {"structured_output_error", "json_invalid"}:
+        return "Response must be one JSON object matching the provider schema."
+    if error_type == "promotion_validation_error":
+        return "Parsed output does not satisfy deterministic promotion rules."
+    return "Value does not satisfy the required validation rule."
+
+
+def _validation_feedback(exc: BaseException, *, allowed_fields: set[str]) -> list[dict[str, str]]:
+    """Return only allow-listed validation metadata; never echo inputs or exception text."""
+
+    current: BaseException | None = exc
+    seen: set[int] = set()
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if isinstance(current, pydantic.ValidationError):
+            feedback: list[dict[str, str]] = []
+            for item in current.errors(
+                include_url=False,
+                include_context=False,
+                include_input=False,
+            )[:20]:
+                error_type = _safe_error_token(
+                    item.get("type", "validation_error"), fallback="validation_error"
+                )
+                raw_location = item.get("loc", ())
+                location = (
+                    _safe_error_location(raw_location, allowed_fields=allowed_fields)
+                    if isinstance(raw_location, (list, tuple))
+                    else "$"
+                )
+                feedback.append(
+                    {
+                        "location": location,
+                        "error_type": error_type,
+                        "message": _safe_validation_message(error_type),
+                    }
+                )
+            if feedback:
+                return feedback
+        current = current.__cause__ or current.__context__
+
+    error_type = (
+        "structured_output_error"
+        if isinstance(exc, StructuredOutputError)
+        else "promotion_validation_error"
+    )
+    return [
+        {
+            "location": "$",
+            "error_type": error_type,
+            "message": _safe_validation_message(error_type),
+        }
+    ]
+
+
+def _repair_prompt(base_prompt: str, exc: BaseException, *, allowed_fields: set[str]) -> str:
+    feedback = canonical_json(_validation_feedback(exc, allowed_fields=allowed_fields))
+    return (
+        f"{base_prompt}\n\n{_REPAIR_FEEDBACK_MARKER}\n"
+        "Correct only the validation failures below and return one complete JSON object.\n"
+        f"{feedback}"
+    )
+
+
+class _PromotionValidationError(ValueError):
+    """Internal marker for deterministic post-parse promotion failures."""
 
 
 def is_model_lifecycle_error(exc: BaseException) -> bool:
@@ -312,9 +448,12 @@ class GeminiModelGateway:
         schema: type[Any],
         schema_digest: str,
         prompt_digest: str,
+        attempt_prompt_digests: Sequence[str] = (),
         prompt_id: str | None,
         prompt_version: str | None,
         input_digests: Sequence[str],
+        result_schema_name: str | None = None,
+        result_schema_digest: str | None = None,
         cache_key: CacheKey,
         status: CallStatus,
         attempts: int,
@@ -343,7 +482,10 @@ class GeminiModelGateway:
             prompt_id=prompt_id,
             prompt_version=prompt_version,
             prompt_digest=prompt_digest,
+            attempt_prompt_digests=list(attempt_prompt_digests),
             input_digests=list(input_digests),
+            result_schema_name=result_schema_name,
+            result_schema_digest=result_schema_digest,
             cache_key=cache_key.digest,
             status=status,
             attempts=attempts,
@@ -376,7 +518,9 @@ class GeminiModelGateway:
         use_cache: bool = True,
         input_token_budget: int | None = None,
         output_token_budget: int | None = None,
-    ) -> StructuredCall[ArtifactT]:
+        promote: Callable[[ArtifactT], ResultT] | None = None,
+        result_schema: type[ResultT] | None = None,
+    ) -> StructuredCall[ArtifactT] | StructuredCall[ResultT]:
         resolved = resolve_route(route)
         if (input_token_budget is None) != (output_token_budget is None):
             raise ValueError("input and output token budgets must be supplied together")
@@ -397,11 +541,19 @@ class GeminiModelGateway:
         actual_stage = stage or (resolved.stage if route == resolved.route_id else route)
         native_schema = gemini_schema(schema)
         schema_digest = digest_json(native_schema)
+        resolved_result_schema: type[Any] = result_schema or schema
+        result_schema_digest = digest_json(schema_for(resolved_result_schema))
+        cache_contract_digest = digest_json(
+            {
+                "provider_schema_digest": schema_digest,
+                "result_schema_digest": result_schema_digest,
+            }
+        )
         resolved_prompt_digest = prompt_digest or digest_bytes(prompt.encode("utf-8"))
         key = self._cache_key(
             resolved,
             prompt=prompt,
-            schema_digest=schema_digest,
+            schema_digest=cache_contract_digest,
             input_digests=input_digests,
             prompt_digest=resolved_prompt_digest,
             token_budget=call_token_budget,
@@ -412,7 +564,7 @@ class GeminiModelGateway:
         if use_cache and self._cache is not None:
             record = self._cache.get(key)
             if record is not None:
-                artifact = validate_artifact(schema, record.response)
+                artifact = validate_artifact(resolved_result_schema, record.response)
                 cached_effective = resolved
                 cached_effective_id = record.manifest.get("effective_route_id")
                 if isinstance(cached_effective_id, str):
@@ -437,6 +589,10 @@ class GeminiModelGateway:
                     prompt_id=prompt_id,
                     prompt_version=prompt_version,
                     input_digests=input_digests,
+                    result_schema_name=getattr(
+                        resolved_result_schema, "__name__", str(resolved_result_schema)
+                    ),
+                    result_schema_digest=result_schema_digest,
                     cache_key=key,
                     status=CallStatus.CACHE_HIT,
                     attempts=0,
@@ -456,6 +612,8 @@ class GeminiModelGateway:
                 requested=resolved,
                 effective=resolved,
                 schema=schema,
+                result_schema=resolved_result_schema,
+                promote=promote,
                 native_schema=native_schema,
                 prompt=prompt,
                 stage=actual_stage,
@@ -479,6 +637,8 @@ class GeminiModelGateway:
                 requested=resolved,
                 effective=fallback,
                 schema=schema,
+                result_schema=resolved_result_schema,
+                promote=promote,
                 native_schema=native_schema,
                 prompt=prompt,
                 stage=actual_stage,
@@ -498,7 +658,7 @@ class GeminiModelGateway:
             if self._cache is not None:
                 self._cache.put(
                     key,
-                    artifact_json(schema, result.artifact),
+                    artifact_json(resolved_result_schema, result.artifact),
                     manifest={
                         "call_id": call_id,
                         "status": result.manifest.status.value,
@@ -538,6 +698,8 @@ class GeminiModelGateway:
         requested: GeminiRoute,
         effective: GeminiRoute,
         schema: type[ArtifactT],
+        result_schema: type[ResultT],
+        promote: Callable[[ArtifactT], ResultT] | None,
         native_schema: dict[str, Any],
         prompt: str,
         stage: str,
@@ -552,13 +714,19 @@ class GeminiModelGateway:
         output_budget: int,
         fallback_from: str | None = None,
         fallback_reason: str | None = None,
-    ) -> StructuredCall[ArtifactT]:
+    ) -> StructuredCall[ArtifactT] | StructuredCall[ResultT]:
         repairs = 0
         provider_retries = 0
         attempts = 0
         usage: UsageMetadata | None = None
+        attempt_prompt = prompt
+        attempt_prompt_digests: list[str] = []
+        result_schema_name = getattr(result_schema, "__name__", str(result_schema))
+        result_schema_digest = digest_json(schema_for(result_schema))
+        allowed_feedback_fields = _schema_field_names(schema) | _schema_field_names(result_schema)
         while True:
             attempts += 1
+            attempt_prompt_digests.append(digest_bytes(attempt_prompt.encode("utf-8")))
             try:
                 model = self._build_chat_model(effective)
                 native_model = model.with_structured_output(
@@ -568,7 +736,7 @@ class GeminiModelGateway:
                 )
                 callback = UsageCallbackHandler()
                 response = native_model.invoke(
-                    prompt,
+                    attempt_prompt,
                     config={
                         "callbacks": [callback],
                         "metadata": {
@@ -579,8 +747,20 @@ class GeminiModelGateway:
                     },
                 )
                 usage = callback.usage or UsageMetadata.from_response(response)
-                artifact = validate_artifact(schema, _extract_parsed(response))
-                artifact_payload = artifact_json(schema, artifact)
+                provider_artifact = validate_artifact(schema, _extract_parsed(response))
+                if promote is None:
+                    promoted: object = provider_artifact
+                else:
+                    try:
+                        promoted = promote(provider_artifact)
+                    except (KeyboardInterrupt, SystemExit, asyncio.CancelledError):
+                        raise
+                    except Exception as exc:
+                        raise _PromotionValidationError(
+                            "deterministic post-parse promotion failed"
+                        ) from exc
+                artifact = validate_artifact(result_schema, promoted)
+                artifact_payload = artifact_json(result_schema, artifact)
                 self._enforce_budget(
                     effective,
                     usage,
@@ -603,9 +783,12 @@ class GeminiModelGateway:
                         schema=schema,
                         schema_digest=digest_json(native_schema),
                         prompt_digest=prompt_digest,
+                        attempt_prompt_digests=attempt_prompt_digests,
                         prompt_id=prompt_id,
                         prompt_version=prompt_version,
                         input_digests=input_digests,
+                        result_schema_name=result_schema_name,
+                        result_schema_digest=result_schema_digest,
                         cache_key=key,
                         status=CallStatus.FAILED,
                         attempts=attempts,
@@ -624,6 +807,45 @@ class GeminiModelGateway:
                         "native structured output failed after bounded repairs"
                     ) from exc
                 repairs += 1
+                corrective_prompt = _repair_prompt(
+                    prompt,
+                    exc,
+                    allowed_fields=allowed_feedback_fields,
+                )
+                if digest_bytes(corrective_prompt.encode("utf-8")) in attempt_prompt_digests:
+                    manifest = self._manifest_base(
+                        call_id=call_id,
+                        stage=stage,
+                        requested=requested,
+                        effective=effective,
+                        schema=schema,
+                        schema_digest=digest_json(native_schema),
+                        prompt_digest=prompt_digest,
+                        attempt_prompt_digests=attempt_prompt_digests,
+                        prompt_id=prompt_id,
+                        prompt_version=prompt_version,
+                        input_digests=input_digests,
+                        result_schema_name=result_schema_name,
+                        result_schema_digest=result_schema_digest,
+                        cache_key=key,
+                        status=CallStatus.FAILED,
+                        attempts=attempts,
+                        retries=provider_retries,
+                        repairs=repairs,
+                        started=started,
+                        usage=usage,
+                        error=exc,
+                        fallback_from=fallback_from,
+                        fallback_reason=fallback_reason,
+                        token_budget=token_budget,
+                        output_budget=output_budget,
+                    )
+                    self.last_manifest = manifest
+                    raise ProviderError(
+                        "native structured output failed because the bounded repair prompt "
+                        "would repeat unchanged"
+                    ) from exc
+                attempt_prompt = corrective_prompt
                 continue
             except BaseException as exc:
                 if isinstance(exc, (KeyboardInterrupt, SystemExit, asyncio.CancelledError)):
@@ -641,9 +863,12 @@ class GeminiModelGateway:
                         schema=schema,
                         schema_digest=digest_json(native_schema),
                         prompt_digest=prompt_digest,
+                        attempt_prompt_digests=attempt_prompt_digests,
                         prompt_id=prompt_id,
                         prompt_version=prompt_version,
                         input_digests=input_digests,
+                        result_schema_name=result_schema_name,
+                        result_schema_digest=result_schema_digest,
                         cache_key=key,
                         status=CallStatus.FAILED,
                         attempts=attempts,
@@ -672,9 +897,12 @@ class GeminiModelGateway:
                         schema=schema,
                         schema_digest=digest_json(native_schema),
                         prompt_digest=prompt_digest,
+                        attempt_prompt_digests=attempt_prompt_digests,
                         prompt_id=prompt_id,
                         prompt_version=prompt_version,
                         input_digests=input_digests,
+                        result_schema_name=result_schema_name,
+                        result_schema_digest=result_schema_digest,
                         cache_key=key,
                         status=CallStatus.FAILED,
                         attempts=attempts,
@@ -705,9 +933,12 @@ class GeminiModelGateway:
                     schema=schema,
                     schema_digest=digest_json(native_schema),
                     prompt_digest=prompt_digest,
+                    attempt_prompt_digests=attempt_prompt_digests,
                     prompt_id=prompt_id,
                     prompt_version=prompt_version,
                     input_digests=input_digests,
+                    result_schema_name=result_schema_name,
+                    result_schema_digest=result_schema_digest,
                     cache_key=key,
                     status=CallStatus.SUCCESS,
                     attempts=attempts,
