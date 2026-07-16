@@ -128,6 +128,20 @@ class ParserOutline(FrozenContract):
     warnings: tuple[str, ...] = ()
 
 
+class StructuralBlockSegment(FrozenContract):
+    """Validated character-slice metadata retained in a selected structural view."""
+
+    segment_id: str
+    char_start: int = Field(ge=0)
+    char_end: int = Field(ge=0)
+    offset_unit: Literal["python_characters"] = "python_characters"
+    disposition: str
+    section_id: str | None = None
+    confidence: float = Field(ge=0.0, le=1.0)
+    rationale: str | None = None
+    slice_sha256: str
+
+
 class StructuralBlockDisposition(FrozenContract):
     """One deterministic classification in a selected structural view."""
 
@@ -137,6 +151,7 @@ class StructuralBlockDisposition(FrozenContract):
     section_id: str | None = None
     confidence: float = Field(default=1.0, ge=0.0, le=1.0)
     source_text_digest: str
+    segments: tuple[StructuralBlockSegment, ...] | None = None
 
 
 class SelectedStructuralView(FrozenContract):
@@ -229,6 +244,7 @@ __all__ = [
     "SelectedStructuralView",
     "SourceLocation",
     "StructuralBlockDisposition",
+    "StructuralBlockSegment",
     "StructureQualityReport",
     "StructureRoutingDecision",
     "utc_now",

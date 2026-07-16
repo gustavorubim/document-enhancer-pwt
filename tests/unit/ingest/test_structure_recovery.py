@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from collections.abc import Mapping
 from dataclasses import replace
@@ -14,10 +15,13 @@ from document_enhancer.domain.analysis import (
     RecoveredSection,
     StructureRecoveryProposal,
 )
+from document_enhancer.domain.ids import allocate_segment_id
 from document_enhancer.ingest.markdown import MarkdownParser
-from document_enhancer.ingest.models import RecoveryThresholds
+from document_enhancer.ingest.models import RecoveryThresholds, SelectedStructuralView
 from document_enhancer.ingest.normalize import normalize_document
 from document_enhancer.ingest.recovery import (
+    GatewayBlockDisposition,
+    GatewayBlockSegment,
     StructureRecoveryConfig,
     StructureRecoveryService,
     adapt_raw_document,
@@ -98,25 +102,27 @@ def _proposal(
     *,
     span_ids: tuple[str, ...] | None = None,
     conflict_span: str | None = None,
+    segments_by_span: Mapping[str, list[dict[str, object]]] | None = None,
     recovery_id: str = "RECOVERY-M3B-TEST-001",
     model: str = "fake",
     confidence: float = 0.8,
 ):
     mapping = adapt_raw_document(raw)
-    blocks = {block.span_id: block for block in mapping.domain.blocks}
+    blocks = {cast(str, block.span_id): block for block in mapping.domain.blocks}
     ids = span_ids or tuple(blocks)
     dispositions = []
     for span_id in ids:
         block = blocks[span_id]
         disposition = "heading" if span_id == conflict_span else "body"
-        dispositions.append(
-            {
-                "span_id": span_id,
-                "disposition": disposition,
-                "source_text_digest": block.text_digest,
-                "confidence": confidence,
-            }
-        )
+        item: dict[str, object] = {
+            "span_id": span_id,
+            "disposition": disposition,
+            "source_text_digest": block.text_digest,
+            "confidence": confidence,
+        }
+        if segments_by_span is not None and span_id in segments_by_span:
+            item["segments"] = segments_by_span[span_id]
+        dispositions.append(item)
     return {
         "recovery_id": recovery_id,
         "document_id": mapping.domain.document_id,
@@ -129,6 +135,29 @@ def _proposal(
         "disagreements": [],
         "model": model,
         "prompt_id": "structure.recover-window",
+    }
+
+
+def _segment_payload(
+    span_id: str,
+    text: str,
+    start: int,
+    end: int,
+    *,
+    confidence: float = 0.9,
+    disposition: str = "body",
+    section_id: str | None = None,
+) -> dict[str, object]:
+    slice_digest = hashlib.sha256(text[start:end].encode()).hexdigest()
+    return {
+        "segment_id": allocate_segment_id(span_id, start, end, slice_digest),
+        "char_start": start,
+        "char_end": end,
+        "offset_unit": "python_characters",
+        "disposition": disposition,
+        "section_id": section_id,
+        "confidence": confidence,
+        "slice_sha256": slice_digest,
     }
 
 
@@ -389,6 +418,163 @@ def test_low_confidence_recovery_is_explicitly_uncertain(composer: PromptPackCom
     assert all(block.disposition == "uncertain" for block in result.selected_view.blocks)
 
 
+def test_gateway_segment_schema_has_no_provider_rejected_constraints() -> None:
+    def schema_keywords(value: object) -> set[str]:
+        if isinstance(value, dict):
+            found = {str(key) for key in value}
+            return found | set[str]().union(*(schema_keywords(item) for item in value.values()))
+        if isinstance(value, list):
+            return set().union(*(schema_keywords(item) for item in value))
+        return set()
+
+    forbidden = {"pattern", "minimum", "maximum", "minItems", "maxItems"}
+    assert schema_keywords(GatewayBlockSegment.model_json_schema()).isdisjoint(forbidden)
+    assert schema_keywords(GatewayBlockDisposition.model_json_schema()).isdisjoint(forbidden)
+
+
+def test_valid_unicode_split_round_trips_selected_view_and_persistence(
+    tmp_path: Path, composer: PromptPackComposer
+) -> None:
+    source = tmp_path / "unicode-split.md"
+    source.write_text("# Root\n\nαβ🙂 café\n", encoding="utf-8")
+    raw = _raw(source)
+    mapping = adapt_raw_document(raw)
+    local_block = next(block for block in raw.blocks if "αβ🙂" in block.text)
+    span_id = mapping.local_to_domain[local_block.span_id]
+    domain_block = next(block for block in mapping.domain.blocks if block.span_id == span_id)
+    cut = 3
+    segments = [
+        _segment_payload(span_id, domain_block.text, 0, cut),
+        _segment_payload(span_id, domain_block.text, cut, len(domain_block.text)),
+    ]
+    storage = RunStorage.for_source(tmp_path / "runs", raw)
+    storage.persist_ingest(normalize_document(raw))
+    gateway, _ = _gateway([_proposal(raw, segments_by_span={span_id: segments})])
+
+    result = StructureRecoveryService(
+        config=StructureRecoveryConfig(mode="recover"),
+        gateway=gateway,
+        prompt_composer=composer,
+    ).run(raw, repository=storage)
+
+    assert result.validation.passed
+    assert result.recovered_proposal is not None
+    assert result.recovered_proposal.validate_against(result.authoritative_raw).passed
+    selected_block = next(
+        block
+        for block in result.selected_view.blocks
+        if block.source_span_id == local_block.span_id
+    )
+    assert selected_block.segments is not None
+    assert [segment.char_end for segment in selected_block.segments] == [3, len(domain_block.text)]
+    assert len(domain_block.text[:cut].encode()) > cut
+    assert (
+        SelectedStructuralView.model_validate_json(result.selected_view.model_dump_json())
+        == result.selected_view
+    )
+    persisted = SelectedStructuralView.model_validate_json(
+        (storage.paths.run_dir / "source/selected-view.json").read_text(encoding="utf-8")
+    )
+    assert persisted == result.selected_view
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        "single",
+        "gap",
+        "overlap",
+        "reordered",
+        "bad_digest",
+        "bad_id",
+        "bad_offset_unit",
+        "utf8_byte_offsets",
+    ],
+)
+def test_invalid_gateway_splits_fail_closed(
+    tmp_path: Path, composer: PromptPackComposer, case: str
+) -> None:
+    source = tmp_path / f"invalid-split-{case}.md"
+    source.write_text("# Root\n\nαβ🙂 café\n", encoding="utf-8")
+    raw = _raw(source)
+    mapping = adapt_raw_document(raw)
+    domain_block = next(block for block in mapping.domain.blocks if "αβ🙂" in block.text)
+    span_id = cast(str, domain_block.span_id)
+    text = domain_block.text
+    cut = 3
+    valid = [
+        _segment_payload(span_id, text, 0, cut),
+        _segment_payload(span_id, text, cut, len(text)),
+    ]
+    segments = [dict(segment) for segment in valid]
+    if case == "single":
+        segments = [_segment_payload(span_id, text, 0, len(text))]
+    elif case == "gap":
+        segments = [
+            _segment_payload(span_id, text, 0, cut),
+            _segment_payload(span_id, text, cut + 1, len(text)),
+        ]
+    elif case == "overlap":
+        segments = [
+            _segment_payload(span_id, text, 0, cut + 1),
+            _segment_payload(span_id, text, cut, len(text)),
+        ]
+    elif case == "reordered":
+        segments.reverse()
+    elif case == "bad_digest":
+        segments[0]["slice_sha256"] = "0" * 64
+    elif case == "bad_id":
+        segments[0]["segment_id"] = "SEG-0000000000000000"
+    elif case == "bad_offset_unit":
+        segments[0]["offset_unit"] = "utf8_bytes"
+    elif case == "utf8_byte_offsets":
+        byte_end = len(text.encode())
+        segments = [
+            _segment_payload(span_id, text, 0, cut),
+            _segment_payload(span_id, text, cut, byte_end),
+        ]
+
+    gateway, _ = _gateway([_proposal(raw, segments_by_span={span_id: segments})])
+    result = StructureRecoveryService(
+        config=StructureRecoveryConfig(mode="recover"),
+        gateway=gateway,
+        prompt_composer=composer,
+    ).run(raw)
+
+    assert result.selected_view.origin == "parser"
+    assert result.recovered_proposal is None
+    assert not result.validation.passed
+
+
+def test_low_confidence_segment_marks_parent_uncertain_without_losing_metadata(
+    tmp_path: Path, composer: PromptPackComposer
+) -> None:
+    source = tmp_path / "low-confidence-split.md"
+    source.write_text("# Root\n\nCompound block text\n", encoding="utf-8")
+    raw = _raw(source)
+    mapping = adapt_raw_document(raw)
+    domain_block = next(block for block in mapping.domain.blocks if "Compound" in block.text)
+    span_id = cast(str, domain_block.span_id)
+    cut = 8
+    segments = [
+        _segment_payload(span_id, domain_block.text, 0, cut, confidence=0.2),
+        _segment_payload(span_id, domain_block.text, cut, len(domain_block.text)),
+    ]
+    gateway, _ = _gateway([_proposal(raw, segments_by_span={span_id: segments})])
+
+    result = StructureRecoveryService(
+        config=StructureRecoveryConfig(mode="recover"),
+        gateway=gateway,
+        prompt_composer=composer,
+    ).run(raw)
+
+    assert result.validation.passed
+    selected = next(block for block in result.selected_view.blocks if block.segments is not None)
+    assert selected.disposition == "uncertain"
+    assert selected.segments is not None and selected.segments[0].confidence == 0.2
+    assert "low_confidence_selection" in result.selected_view.warnings
+
+
 @pytest.mark.parametrize("mode", ["off", "parser"])
 def test_explicit_non_model_modes_are_deterministic(
     mode: Literal["off", "parser"],
@@ -449,6 +635,74 @@ def test_long_document_uses_overlapping_windows_and_one_reconciliation_call(
     assert fake.calls[-1]["route"] == "gemini-3.1-flash-lite"
     assert result.metadata is not None
     assert result.metadata.call_manifests[-1].prompt_id == "structure.reconcile-boundaries"
+
+
+def test_overlapping_window_split_conflict_retains_evidence_and_reconciles_once(
+    tmp_path: Path, composer: PromptPackComposer
+) -> None:
+    source = tmp_path / "long-split.md"
+    source.write_text(
+        "# Root\n\n" + "\n\n".join(f"Paragraph {index} stable text." for index in range(28)),
+        encoding="utf-8",
+    )
+    raw = _raw(source)
+    mapping = adapt_raw_document(raw)
+    config = StructureRecoveryConfig(mode="recover", max_window_chars=400)
+    windows = build_recovery_windows(mapping.domain, config)
+    shared_span = next(
+        span_id for span_id in windows[1].span_ids if span_id in set(windows[0].span_ids)
+    )
+    shared_block = next(block for block in mapping.domain.blocks if block.span_id == shared_span)
+    split_a = [
+        _segment_payload(shared_span, shared_block.text, 0, 1),
+        _segment_payload(shared_span, shared_block.text, 1, len(shared_block.text)),
+    ]
+    split_b = [
+        _segment_payload(shared_span, shared_block.text, 0, 2),
+        _segment_payload(shared_span, shared_block.text, 2, len(shared_block.text)),
+    ]
+    shared_occurrence = 0
+    responses: list[object] = []
+    for window in windows:
+        segment_map = None
+        if shared_span in window.span_ids:
+            split = split_a if shared_occurrence == 0 else split_b
+            segment_map = {shared_span: split}
+            shared_occurrence += 1
+        responses.append(_proposal(raw, span_ids=window.span_ids, segments_by_span=segment_map))
+    reconciliation = _proposal(raw)
+    reconciliation["prompt_id"] = "structure.reconcile-boundaries"
+    responses.append(reconciliation)
+    gateway, fake = _gateway(responses)
+
+    result = StructureRecoveryService(
+        config=config,
+        gateway=gateway,
+        prompt_composer=composer,
+    ).run(raw)
+
+    evidence = [
+        item.segments
+        for proposal in result.window_proposals
+        for item in proposal.dispositions
+        if item.span_id == shared_span and item.segments is not None
+    ]
+    assert len(evidence) >= 2
+    assert {tuple(segment.char_end for segment in split) for split in evidence} >= {
+        (1, len(shared_block.text)),
+        (2, len(shared_block.text)),
+    }
+    assert result.conflicts == (f"span:{shared_span}",)
+    assert result.reconciliation is not None
+    assert result.metadata is not None
+    assert (
+        sum(
+            manifest.prompt_id == "structure.reconcile-boundaries"
+            for manifest in result.metadata.call_manifests
+        )
+        == 1
+    )
+    assert len(fake.calls) == len(windows) + 1
 
 
 def test_reconciliation_prompt_change_invalidates_only_reconciliation_stage(
@@ -566,6 +820,42 @@ def test_window_merge_retains_section_and_disagreement_conflicts() -> None:
     assert len(serialized) == len(set(serialized))
 
 
+def test_window_merge_marks_different_splits_uncertain_without_selecting_one() -> None:
+    raw = _raw(FIXTURE_ROOT / "clean.md")
+    mapping = adapt_raw_document(raw)
+    target = next(block for block in mapping.domain.blocks if len(block.text) >= 4)
+    span_id = cast(str, target.span_id)
+    split_a = [
+        _segment_payload(span_id, target.text, 0, 1),
+        _segment_payload(span_id, target.text, 1, len(target.text)),
+    ]
+    split_b = [
+        _segment_payload(span_id, target.text, 0, 2),
+        _segment_payload(span_id, target.text, 2, len(target.text)),
+    ]
+    first = StructureRecoveryProposal.model_validate(
+        _proposal(raw, segments_by_span={span_id: split_a})
+    )
+    second = StructureRecoveryProposal.model_validate(
+        _proposal(raw, segments_by_span={span_id: split_b})
+    )
+
+    merged = merge_window_proposals([first, second], mapping.domain)
+
+    merged_item = next(item for item in merged.dispositions if item.span_id == span_id)
+    assert merged_item.disposition.value == "uncertain"
+    assert merged_item.segments is None
+    assert next(item for item in first.dispositions if item.span_id == span_id).segments is not None
+    assert (
+        next(item for item in second.dispositions if item.span_id == span_id).segments is not None
+    )
+    assert any(
+        disagreement.model_label == "overlapping_window_segment_conflict"
+        and disagreement.span_ids == [span_id]
+        for disagreement in merged.disagreements
+    )
+
+
 def test_window_merge_retains_same_id_different_alternatives() -> None:
     raw = _raw(FIXTURE_ROOT / "clean.md")
     mapping = adapt_raw_document(raw)
@@ -613,6 +903,28 @@ def test_window_merge_retains_same_id_different_alternatives() -> None:
         disagreement.model_label == "overlapping_window_alternative_conflict"
         for disagreement in merged.disagreements
     )
+
+
+def test_segment_validation_errors_align_with_authoritative_contract() -> None:
+    raw = _raw(FIXTURE_ROOT / "clean.md")
+    mapping = adapt_raw_document(raw)
+    target = next(block for block in mapping.domain.blocks if len(block.text) >= 4)
+    span_id = cast(str, target.span_id)
+    segments = [
+        _segment_payload(span_id, target.text, 0, 2),
+        _segment_payload(span_id, target.text, 2, len(target.text)),
+    ]
+    segments[0]["slice_sha256"] = "0" * 64
+    proposal = StructureRecoveryProposal.model_validate(
+        _proposal(raw, segments_by_span={span_id: segments})
+    )
+
+    authoritative = proposal.validate_against(mapping.domain)
+    lane_report = validate_recovery_proposal(proposal, mapping.domain)
+
+    assert not authoritative.passed and not lane_report.passed
+    assert set(authoritative.errors) <= set(lane_report.errors)
+    assert any("original Python-character slice" in error for error in lane_report.errors)
 
 
 def test_validation_rejects_duplicate_gaps_mutation_and_crossing_sections() -> None:

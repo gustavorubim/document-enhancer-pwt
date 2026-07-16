@@ -53,6 +53,7 @@ from .models import (
     RecoveryThresholds,
     SelectedStructuralView,
     StructuralBlockDisposition,
+    StructuralBlockSegment,
     StructureQualityReport,
 )
 from .normalize import normalize_document
@@ -108,6 +109,22 @@ class GatewayRecoveredSection(BaseModel):
     inferred_label: bool = False
 
 
+class GatewayBlockSegment(BaseModel):
+    """Provider-safe wire shape; authoritative validators enforce every constraint."""
+
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    segment_id: str
+    char_start: int
+    char_end: int
+    offset_unit: str = "python_characters"
+    disposition: StructureDisposition
+    section_id: str | None = None
+    confidence: float
+    rationale: str | None = None
+    slice_sha256: str
+
+
 class GatewayBlockDisposition(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
@@ -117,6 +134,7 @@ class GatewayBlockDisposition(BaseModel):
     text_digest_ref: str = Field(alias="source_text_digest")
     confidence: float
     rationale: str | None = None
+    segments: list[GatewayBlockSegment] | None = None
 
 
 class GatewayStructureAssociation(BaseModel):
@@ -780,6 +798,11 @@ def validate_recovery_proposal(
         block = by_id.get(item.span_id)
         if block is not None and item.source_text_digest != block.text_digest:
             errors.append(f"source text digest mismatch for {item.span_id}")
+    validation_raw = raw.model_copy(
+        update={"blocks": [by_id[span_id] for span_id in expected if span_id in by_id]}
+    )
+    authoritative_validation = proposal.model_copy(deep=True).validate_against(validation_raw)
+    errors.extend(authoritative_validation.errors)
     section_errors, _, section_by_id = _validate_section_collection(
         proposal.sections,
         raw,
@@ -799,6 +822,19 @@ def validate_recovery_proposal(
             ordinal = ordinal_by_span.get(item.span_id)
             if interval is None or ordinal is None or not interval[0] <= ordinal <= interval[1]:
                 errors.append(f"disposition {item.span_id} lies outside section {item.section_id}")
+        for segment in item.segments or ():
+            if segment.section_id is not None and segment.section_id not in known_sections:
+                errors.append(
+                    f"segment {segment.segment_id} references unknown section {segment.section_id}"
+                )
+            elif segment.section_id is not None:
+                interval = _section_interval(section_by_id[segment.section_id], ordinal_by_span)
+                ordinal = ordinal_by_span.get(item.span_id)
+                if interval is None or ordinal is None or not interval[0] <= ordinal <= interval[1]:
+                    errors.append(
+                        f"segment {segment.segment_id} for {item.span_id} lies outside section "
+                        f"{segment.section_id}"
+                    )
     for association in proposal.associations:
         if association.span_id not in expected_set:
             errors.append(
@@ -830,9 +866,7 @@ def validate_recovery_proposal(
         )
         errors.extend(alternative_errors)
     uncertain = tuple(
-        item.span_id
-        for item in proposal.dispositions
-        if item.disposition is StructureDisposition.UNCERTAIN or item.confidence < 0.5
+        item.span_id for item in proposal.dispositions if _disposition_is_uncertain(item)
     )
     return StructureValidationReport(
         passed=not errors,
@@ -942,18 +976,27 @@ def _recovered_local_view(
     for block in raw.blocks:
         domain_id = mapping.local_to_domain[block.span_id]
         item = disposition_by_domain[domain_id]
+        segments = (
+            tuple(
+                StructuralBlockSegment.model_validate(segment.model_dump(mode="json"))
+                for segment in item.segments
+            )
+            if item.segments is not None
+            else None
+        )
         blocks.append(
             StructuralBlockDisposition(
                 source_span_id=block.span_id,
                 ordinal=block.ordinal,
                 disposition=(
                     StructureDisposition.UNCERTAIN.value
-                    if item.confidence < 0.5
+                    if _disposition_is_uncertain(item)
                     else item.disposition.value
                 ),
                 section_id=item.section_id,
                 confidence=item.confidence,
                 source_text_digest=block.content_digest,
+                segments=segments,
             )
         )
     return SelectedStructuralView(
@@ -966,7 +1009,7 @@ def _recovered_local_view(
             warning
             for warning in (
                 "low_confidence_selection"
-                if any(item.confidence < 0.5 for item in proposal.dispositions)
+                if any(_disposition_is_uncertain(item) for item in proposal.dispositions)
                 else "",
                 "ambiguity_retained" if proposal.boundary_alternatives else "",
                 "parser_model_disagreement_retained" if proposal.disagreements else "",
@@ -997,8 +1040,41 @@ def _material_disagreement(
     return bool(scan_boundaries and scan_boundaries != parser_boundaries)
 
 
-def _conflict_key(item: BlockDisposition) -> tuple[str, str | None, str]:
-    return item.disposition.value, item.section_id, item.source_text_digest
+def _disposition_is_uncertain(item: BlockDisposition) -> bool:
+    return bool(
+        item.disposition is StructureDisposition.UNCERTAIN
+        or item.confidence < 0.5
+        or any(
+            segment.disposition is StructureDisposition.UNCERTAIN or segment.confidence < 0.5
+            for segment in item.segments or ()
+        )
+    )
+
+
+def _segment_structure_key(item: BlockDisposition) -> bytes:
+    return canonical_json(
+        [
+            {
+                "segment_id": segment.segment_id,
+                "char_start": segment.char_start,
+                "char_end": segment.char_end,
+                "offset_unit": segment.offset_unit,
+                "disposition": segment.disposition.value,
+                "section_id": segment.section_id,
+                "slice_sha256": segment.slice_sha256,
+            }
+            for segment in item.segments or ()
+        ]
+    )
+
+
+def _conflict_key(item: BlockDisposition) -> tuple[str, str | None, str, bytes]:
+    return (
+        item.disposition.value,
+        item.section_id,
+        item.source_text_digest,
+        _segment_structure_key(item),
+    )
 
 
 def _dedupe_disagreements(
@@ -1041,13 +1117,23 @@ def merge_window_proposals(
         if not candidates:
             raise StructureValidationFailure(f"window merge omitted span {span_id}")
         first = candidates[0]
-        if any(_conflict_key(candidate) != _conflict_key(first) for candidate in candidates[1:]):
+        conflicting = [
+            candidate
+            for candidate in candidates[1:]
+            if _conflict_key(candidate) != _conflict_key(first)
+        ]
+        if conflicting:
+            segment_conflict = any(
+                _segment_structure_key(candidate) != _segment_structure_key(first)
+                for candidate in conflicting
+            )
             merged_dispositions.append(
                 first.model_copy(
                     update={
                         "disposition": StructureDisposition.UNCERTAIN,
                         "confidence": min(candidate.confidence for candidate in candidates),
                         "section_id": first.section_id,
+                        "segments": None if segment_conflict else first.segments,
                     }
                 )
             )
@@ -1055,7 +1141,11 @@ def merge_window_proposals(
                 StructureDisagreement(
                     span_ids=[span_id],
                     parser_label=None,
-                    model_label="overlapping_window_conflict",
+                    model_label=(
+                        "overlapping_window_segment_conflict"
+                        if segment_conflict
+                        else "overlapping_window_conflict"
+                    ),
                     resolution=None,
                     requires_review=True,
                 )

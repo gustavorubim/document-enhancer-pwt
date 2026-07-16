@@ -22,17 +22,13 @@ The prompt pack, not Python, owns prompt text, shared references, output schemas
 selection. Source content is placed in the prompt pack's untrusted-data boundary. Tools are not
 available to any structure route.
 
-## Cross-lane integration dependency
+## Prompt and reference scope
 
-The WT3 implementation is offline-green and remains fail-closed when the live gateway cannot
-produce a native structured result. The first credential-backed smoke exposed a WT11 prompt-pack
-scope issue: all nine reference files were injected into the structure prompts, and composing the
-empty-source structure prompt was 48,806 characters. The resulting `BudgetExceededError` is a
-prompt-scope integration finding, not a structure-routing or validation failure in this lane.
-WT11 is correcting this with explicit per-prompt reference scopes and empty reference scopes for
-the structure routes. After that shared correction is merged, rerun the opt-in scan and recovery
-smoke on the combined baseline. WT3 deliberately does not duplicate prompt text or modify shared
-prompt/gateway files.
+Every structure prompt now declares an explicit zero-reference scope. Triage, window recovery,
+and boundary reconciliation receive only their governed prompt-pack instructions, safe document
+metadata, and the bounded source/window inputs supplied by this service. Enterprise reference
+files are not composed into structure prompts. WT3 does not duplicate production prompt text or
+modify shared prompt/gateway files.
 
 ## Windows, validation, and promotion
 
@@ -48,12 +44,19 @@ ambiguity loss. A failed scan or proposal leaves the parser-selected view active
 artifacts are retained separately for inspection, but are never treated as a successful selected
 view unless full validation passes.
 
-The authoritative WT1 `StructureRecoveryProposal`/`BlockDisposition` contract identifies whole
-source spans and carries a source-text digest, but it has no split-offset fields. WT3 therefore
-does not invent a lane-local split contract: deterministic compound-block splitting cannot be
-represented or validated end-to-end here. Such blocks remain whole and fail closed when exact
-coverage requires a split; central domain/prompt schema correction is required before that M3.13
-path can be enabled.
+Compound blocks may be split through the authoritative optional `BlockDisposition.segments`
+contract while preserving one top-level disposition for the raw span. Segment offsets are Python
+code-point character offsets into the exact immutable block text. Validation requires at least two
+positive, ordered, contiguous segments with full block coverage, exact slice SHA-256 digests, and
+deterministic `SEG-*` identities. Gaps, overlaps, reordering, UTF-8 byte offsets, text mutation,
+bad digests, or bad IDs fail closed.
+
+Selected-view artifacts retain the validated segment IDs, offsets, disposition/section mapping,
+confidence, rationale, and slice digest. Different splits for the same overlap span are retained
+in their per-window proposals and represented as an explicit uncertain disagreement; no candidate
+split is silently selected. At most one governed boundary-reconciliation call may resolve that
+conflict. Low-confidence segment choices keep their metadata but mark the parent selected-view
+disposition as machine-readable `uncertain`.
 
 ## Artifact contract
 
