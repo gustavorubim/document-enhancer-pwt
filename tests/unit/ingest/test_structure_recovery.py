@@ -16,6 +16,7 @@ from document_enhancer.domain.analysis import (
     StructureRecoveryProposal,
 )
 from document_enhancer.domain.ids import allocate_segment_id
+from document_enhancer.errors import ValidationError
 from document_enhancer.ingest.markdown import MarkdownParser
 from document_enhancer.ingest.models import RecoveryThresholds, SelectedStructuralView
 from document_enhancer.ingest.normalize import normalize_document
@@ -39,6 +40,7 @@ from document_enhancer.llm import (
 from document_enhancer.prompting.composer import PromptPackComposer
 from document_enhancer.prompting.loader import load_prompt_pack
 from document_enhancer.references.loader import load_reference_pack
+from document_enhancer.workflow.nodes import WorkflowServices, structure_validate_node
 
 ROOT = Path(__file__).resolve().parents[3]
 PROMPT_ROOT = ROOT / "prompt_packs" / "gemini_core"
@@ -1127,20 +1129,72 @@ def test_validation_rejects_unknown_order_hierarchy_containment_and_alternatives
     assert any("alternative" in error and "crossing" in error for error in report.errors)
 
 
-def test_invalid_model_result_cannot_promote_selected_view(composer: PromptPackComposer) -> None:
+def test_invalid_auto_model_result_defers_to_valid_parser_view(
+    tmp_path: Path, composer: PromptPackComposer
+) -> None:
     raw = _raw(FIXTURE_ROOT / "severe-mess.md")
     normalized = normalize_document(raw)
     invalid = _proposal(raw)
     invalid["dispositions"] = invalid["dispositions"][:-1]
     gateway, _ = _gateway([_scan(raw, normalized, decision="recover"), invalid])
+    storage = RunStorage.for_source(tmp_path / "persisted-runs", raw)
+    storage.persist_ingest(normalized)
     result = StructureRecoveryService(
         config=StructureRecoveryConfig(mode="auto"),
         gateway=gateway,
         prompt_composer=composer,
-    ).run(raw)
+    ).run(raw, repository=storage)
     assert result.selected_view.origin == "parser"
+    assert result.selected_view.validation_passed
     assert not result.validation.passed
     assert result.recovered_proposal is None
+    assert result.metadata is not None
+    assert result.metadata.status == "deferred"
+    assert any("window_validation_failed" in warning for warning in result.metadata.warnings)
+    assert RunManifest.load(storage.paths.manifest).status == "succeeded"
+
+    state = structure_validate_node(
+        {"structure_result": result},
+        WorkflowServices(
+            run_root=tmp_path / "runs",
+            source=raw.source_path,
+            structure_mode="auto",
+        ),
+    )
+    assert state["current_stage"] == "structure_validate"
+
+
+@pytest.mark.parametrize("mode", ["recover", "force"])
+def test_invalid_explicit_recovery_mode_remains_fail_closed(
+    tmp_path: Path,
+    composer: PromptPackComposer,
+    mode: Literal["recover", "force"],
+) -> None:
+    raw = _raw(FIXTURE_ROOT / "severe-mess.md")
+    invalid = _proposal(raw)
+    invalid["dispositions"] = invalid["dispositions"][:-1]
+    gateway, _ = _gateway([invalid])
+    result = StructureRecoveryService(
+        config=StructureRecoveryConfig(mode=mode),
+        gateway=gateway,
+        prompt_composer=composer,
+    ).run(raw)
+
+    assert result.selected_view.origin == "parser"
+    assert result.selected_view.validation_passed
+    assert not result.validation.passed
+    assert result.recovered_proposal is None
+    assert result.metadata is not None
+    assert result.metadata.status == "failed"
+    with pytest.raises(ValidationError, match="failed exact source coverage"):
+        structure_validate_node(
+            {"structure_result": result},
+            WorkflowServices(
+                run_root=tmp_path / "runs",
+                source=raw.source_path,
+                structure_mode=mode,
+            ),
+        )
 
 
 def test_persistence_replaces_only_deferred_reservations_and_reconciles(

@@ -1462,9 +1462,14 @@ class StructureRecoveryService:
                     "errors": tuple(dict.fromkeys((*validation.errors, *warnings))),
                 }
             )
-            status: Literal["parser", "recovered", "failed", "deferred"] = (
-                "failed" if should_recover else "parser"
-            )
+            status: Literal["parser", "recovered", "failed", "deferred"]
+            if should_recover and mode == "auto" and parser_view.validation_passed:
+                # Auto recovery is advisory: retain the rejected proposal validation and warnings
+                # as audit evidence, but a coverage-valid parser view is still a safe selected
+                # structure. Explicit recover/force modes remain fail-closed below.
+                status = "deferred"
+            else:
+                status = "failed" if should_recover else "parser"
         else:
             selected = parser_view.model_copy(
                 update={"warnings": tuple(dict.fromkeys((*parser_view.warnings, *warnings)))}
@@ -1900,6 +1905,7 @@ def persist_structure_result(
             ],
             "selected_view": [record for record in records if record.stage == "selected_view"],
         }
+        nonfatal_status = status in {"parser", "recovered", "deferred"}
         for stage, stage_records in grouped.items():
             if not stage_records:
                 continue
@@ -1909,7 +1915,7 @@ def persist_structure_result(
             manifest = manifest.record_stage(
                 StageRecord(
                     stage=stage,
-                    status="succeeded" if status in {"parser", "recovered"} else "failed",
+                    status="succeeded" if nonfatal_status else "failed",
                     cache_key=cache_key,
                     artifact_paths=tuple(record.relative_path for record in stage_records),
                     artifact_digests=tuple(record.digest for record in stage_records),
@@ -1920,14 +1926,14 @@ def persist_structure_result(
                     run_id=resolved_run_id,
                     stage=stage,
                     cache_key=cache_key,
-                    status="succeeded" if status in {"parser", "recovered"} else "failed",
+                    status="succeeded" if nonfatal_status else "failed",
                     artifact_digest=stage_records[0].digest,
                     artifact_path=stage_records[0].relative_path,
                     payload={"artifact_paths": [record.relative_path for record in stage_records]},
                 )
             )
         storage.repository.save_manifest(
-            manifest.with_status("succeeded" if status in {"parser", "recovered"} else "failed")
+            manifest.with_status("succeeded" if nonfatal_status else "failed")
         )
     return result.model_copy(update={"metadata": metadata})
 

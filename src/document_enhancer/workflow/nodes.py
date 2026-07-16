@@ -475,7 +475,28 @@ def structure_validate_node(state: WorkflowState, services: WorkflowServices) ->
         if passed is None and isinstance(validation, dict):
             passed = validation.get("passed")
         if passed is False and services.structure_mode not in {"parser", "off"}:
-            raise ValidationError("selected structure failed exact source coverage validation")
+            metadata = getattr(result, "metadata", None)
+            if metadata is None and isinstance(result, dict):
+                metadata = result.get("metadata")
+            recovery_status = getattr(metadata, "status", None)
+            if recovery_status is None and isinstance(metadata, dict):
+                recovery_status = metadata.get("status")
+            selected = getattr(result, "selected_view", None)
+            if selected is None and isinstance(result, dict):
+                selected = result.get("selected_view")
+            selected_origin = getattr(selected, "origin", None)
+            selected_valid = getattr(selected, "validation_passed", None)
+            if isinstance(selected, dict):
+                selected_origin = selected.get("origin", selected_origin)
+                selected_valid = selected.get("validation_passed", selected_valid)
+            safe_auto_fallback = bool(
+                services.structure_mode == "auto"
+                and recovery_status == "deferred"
+                and selected_origin == "parser"
+                and selected_valid is True
+            )
+            if not safe_auto_fallback:
+                raise ValidationError("selected structure failed exact source coverage validation")
     return _finish_stage(state, services, "structure_validate")
 
 
