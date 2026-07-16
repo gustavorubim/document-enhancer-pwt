@@ -45,12 +45,14 @@ packages = ["src/document_enhancer"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "reference_packs" = "document_enhancer/data/reference_packs"
+"prompt_packs" = "document_enhancer/data/prompt_packs"
 
 [tool.hatch.build.targets.sdist]
 include = [
   "/src",
   "/tests",
   "/reference_packs",
+  "/prompt_packs",
   "/README.md",
   "/pyproject.toml",
 ]

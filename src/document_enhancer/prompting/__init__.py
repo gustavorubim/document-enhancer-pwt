@@ -10,6 +10,7 @@ from .errors import (
 from .loader import (
     GeminiPromptPackLoader,
     PromptPack,
+    bundled_prompt_pack_path,
     load_prompt_pack,
     resolve_reference_inputs,
 )
@@ -24,6 +25,7 @@ __all__ = [
     "PromptPackSecurityError",
     "PromptPackValidationError",
     "PromptPackValidationReport",
+    "bundled_prompt_pack_path",
     "list_prompts",
     "load_prompt_pack",
     "resolve_reference_inputs",

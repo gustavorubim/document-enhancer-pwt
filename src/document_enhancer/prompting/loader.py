@@ -6,6 +6,7 @@ import hashlib
 import json
 import re
 from collections.abc import Mapping, Sequence
+from importlib.resources import files
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -41,6 +42,7 @@ __all__ = [
     "PromptTemplate",
     "ReferenceInputSpec",
     "ResolvedReferenceInput",
+    "bundled_prompt_pack_path",
     "load_prompt_pack",
     "resolve_reference_inputs",
 ]
@@ -55,6 +57,20 @@ _INCLUDE_RE = re.compile(
     r"\{\{\s*(?:include\s*[: ]\s*['\"]?([^'\"}\s]+)['\"]?|>\s*([^}\s]+))\s*\}\}",
     re.IGNORECASE,
 )
+
+
+def bundled_prompt_pack_path(pack_id: str = "gemini_core") -> Path:
+    """Return a bundled prompt pack in an installed wheel or source checkout."""
+
+    if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]{2,80}", pack_id):
+        raise PromptPackSecurityError(f"Invalid bundled prompt-pack ID: {pack_id!r}")
+    installed = Path(str(files("document_enhancer").joinpath("data", "prompt_packs", pack_id)))
+    if installed.is_dir():
+        return installed
+    source_checkout = Path(__file__).resolve().parents[3] / "prompt_packs" / pack_id
+    if source_checkout.is_dir():
+        return source_checkout
+    raise PromptPackValidationError(f"Bundled prompt pack is unavailable: {pack_id}")
 
 
 def _sha256_bytes(value: bytes) -> str:
