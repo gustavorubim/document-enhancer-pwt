@@ -1,0 +1,63 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "catalog_generation": {
+      "exclusiveMinimum": 0,
+      "title": "Catalog Generation",
+      "type": "integer"
+    },
+    "catalog_path": {
+      "title": "Catalog Path",
+      "type": "string"
+    },
+    "document_id": {
+      "pattern": "^DOC-[A-Z0-9-]+$",
+      "title": "Document Id",
+      "type": "string"
+    },
+    "idempotent": {
+      "title": "Idempotent",
+      "type": "boolean"
+    },
+    "ingested_at": {
+      "format": "date-time",
+      "title": "Ingested At",
+      "type": "string"
+    },
+    "ingestion_id": {
+      "title": "Ingestion Id",
+      "type": "string"
+    },
+    "rag_build_id": {
+      "title": "Rag Build Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": "m7.catalog-ingestion.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "status": {
+      "const": "promoted",
+      "default": "promoted",
+      "title": "Status",
+      "type": "string"
+    },
+    "version_id": {
+      "pattern": "^(DOCV|VER)-[A-Z0-9-]+$",
+      "title": "Version Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "ingestion_id",
+    "rag_build_id",
+    "document_id",
+    "version_id",
+    "catalog_generation",
+    "idempotent",
+    "catalog_path"
+  ],
+  "title": "CatalogIngestionReceipt",
+  "type": "object"
+}

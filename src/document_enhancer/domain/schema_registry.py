@@ -25,6 +25,7 @@ from document_enhancer.domain.questions import (
     WaiversArtifact,
 )
 from document_enhancer.domain.run import (
+    CatalogIngestionReceipt,
     ExportBundle,
     ExportChunk,
     PromptPackManifest,
@@ -44,6 +45,7 @@ SCHEMA_MODELS: Mapping[str, type[BaseModel]] = {
     "audit.schema.json": Audit,
     "content-ledger.schema.json": ContentLedger,
     "chunk.schema.json": ExportChunk,
+    "catalog-ingestion.schema.json": CatalogIngestionReceipt,
     "entity.schema.json": Entity,
     "export.schema.json": ExportBundle,
     "provenance.schema.json": Provenance,

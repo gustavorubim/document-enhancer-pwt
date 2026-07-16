@@ -17,9 +17,18 @@ from .domain.enums import DocumentType
 from .domain.run import ExportBundleManifest
 from .errors import DocumentEnhancerError
 from .export import validate_export_bundle
+from .llm import EmbeddingProfile, GeminiEmbeddingAdapter
 from .logging import configure_logging, get_logger
 from .prompting import ComposedPrompt, PromptPack, list_prompts, load_prompt_pack, show_prompt
 from .prompting import validate as validate_prompts
+from .rag import (
+    OfflineDeterministicEmbedder,
+    RagBuildError,
+    build_package,
+    ingest_package,
+    inspect_package,
+    verify_package,
+)
 from .references.loader import load_reference_pack
 from .workflow import (
     DocumentWorkflow,
@@ -38,6 +47,8 @@ config_app = typer.Typer(help="Inspect non-secret configuration.")
 app.add_typer(config_app, name="config")
 prompts_app = typer.Typer(help="Inspect and validate the selected versioned prompt pack.")
 app.add_typer(prompts_app, name="prompts")
+rag_app = typer.Typer(help="Build and inspect sealed SQLite RAG packages and catalogs.")
+app.add_typer(rag_app, name="rag")
 console = Console()
 logger = get_logger("cli")
 
@@ -125,6 +136,13 @@ def run_workflow(
     gate2: Annotated[
         bool, typer.Option("--gate2/--no-gate2", help="Enable the second human gate.")
     ] = True,
+    catalog_ingest: Annotated[
+        bool,
+        typer.Option(
+            "--catalog-ingest/--no-catalog-ingest",
+            help="Ingest the validated package into the cumulative catalog.",
+        ),
+    ] = True,
     json_output: Annotated[
         bool, typer.Option("--json", help="Emit stable machine-readable JSON.")
     ] = False,
@@ -154,6 +172,13 @@ def run_workflow(
             ),
             prompt_pack=config.references.prompt_pack,
             reference_pack=config.references.reference_pack,
+            auto_catalog_ingest=catalog_ingest,
+            catalog_path=config.workspace.catalog_path,
+            embedding_profile=EmbeddingProfile(
+                model=config.gemini.embedding_model,
+                dimensions=config.gemini.embedding_dimensions,
+                backend=config.gemini.backend,
+            ),
         )
         result = DocumentWorkflow(services).run()
         payload = result.model_dump(mode="json")
@@ -284,6 +309,13 @@ def resume_workflow(
             ),
             prompt_pack=config.references.prompt_pack,
             reference_pack=config.references.reference_pack,
+            auto_catalog_ingest=True,
+            catalog_path=config.workspace.catalog_path,
+            embedding_profile=EmbeddingProfile(
+                model=config.gemini.embedding_model,
+                dimensions=config.gemini.embedding_dimensions,
+                backend=config.gemini.backend,
+            ),
         )
         result = DocumentWorkflow(services).resume()
         if json_output:
@@ -383,6 +415,146 @@ def inspect_export(
             console.print(f"- {error}")
     if errors:
         raise typer.Exit(30)
+
+
+def _rag_database(value: str, run_dir: Path) -> tuple[Path, Path | None]:
+    candidate = Path(value).expanduser()
+    if candidate.is_file():
+        return candidate.resolve(), None
+    run_path = run_dir.expanduser() / value
+    return run_path / "rag/document-rag.sqlite3", run_path / "export"
+
+
+@rag_app.command("build")
+def rag_build(
+    run_id: Annotated[str, typer.Argument(help="Completed, audit-passing run ID.")],
+    run_dir: Annotated[Path | None, typer.Option("--run-dir", help="Run artifact root.")] = None,
+    offline: Annotated[
+        bool,
+        typer.Option("--offline", help="Use the deterministic fake embedding provider."),
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    """Build a sealed package only; this command performs no retrieval or answer generation."""
+
+    config = load_config()
+    root = (run_dir or config.workspace.run_dir).expanduser()
+    profile = EmbeddingProfile(
+        model=config.gemini.embedding_model,
+        dimensions=config.gemini.embedding_dimensions,
+        backend=config.gemini.backend,
+    )
+    adapter = None
+    if offline:
+        adapter = GeminiEmbeddingAdapter(
+            profile=profile,
+            embedder=OfflineDeterministicEmbedder(profile.dimensions),
+        )
+    try:
+        manifest = build_package(root / run_id, profile=profile, adapter=adapter)
+    except RagBuildError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(30) from exc
+    payload = {
+        "schema_version": "m7.cli.rag-build.v1",
+        "run_id": run_id,
+        "rag_build_id": manifest.rag_build_id,
+        "database": str(root / run_id / "rag/document-rag.sqlite3"),
+        "manifest": str(root / run_id / "rag/build-manifest.json"),
+        "promotion_status": manifest.promotion_status,
+        "row_counts": manifest.row_counts,
+        "embedding": {
+            "model": manifest.embedding_model,
+            "backend": manifest.embedding_backend,
+            "dimension": manifest.embedding_dimension,
+            "format_version": manifest.embedding_input_format_version,
+        },
+    }
+    if json_output:
+        _emit_json(payload)
+    else:
+        console.print(f"[green]PROMOTED[/green] RAG build {manifest.rag_build_id}")
+        console.print(f"database: {payload['database']}")
+        console.print(f"chunks/vectors: {manifest.vector_count}")
+
+
+@rag_app.command("verify")
+def rag_verify(
+    target: Annotated[str, typer.Argument(help="Run ID or SQLite package path.")],
+    run_dir: Annotated[Path | None, typer.Option("--run-dir")] = None,
+    json_output: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    """Verify schema, integrity, counts, graph, FTS, and embeddings without retrieval."""
+
+    database, export_dir = _rag_database(target, run_dir or load_config().workspace.run_dir)
+    result = verify_package(database, export_dir=export_dir)
+    payload = result.as_dict() | {"database": str(database)}
+    if json_output:
+        _emit_json(payload)
+    else:
+        style = "green" if result.valid else "red"
+        console.print(f"[{style}]{'VALID' if result.valid else 'INVALID'}[/{style}] {database}")
+        console.print(f"schema: {result.schema_version}; build: {result.rag_build_id}")
+        for name, count in sorted(result.row_counts.items()):
+            console.print(f"{name}: {count}")
+        for error in result.errors:
+            console.print(f"- {error}")
+    if not result.valid:
+        raise typer.Exit(30)
+
+
+@rag_app.command("inspect")
+def rag_inspect(
+    target: Annotated[str, typer.Argument(help="Run ID or SQLite package path.")],
+    run_dir: Annotated[Path | None, typer.Option("--run-dir")] = None,
+    json_output: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    """Render stable package metadata and human-readable row summaries."""
+
+    database, _export_dir = _rag_database(target, run_dir or load_config().workspace.run_dir)
+    payload = inspect_package(database)
+    if json_output:
+        _emit_json(payload)
+    else:
+        console.print(f"[bold]RAG package[/bold] {database}")
+        console.print(f"valid: {payload['valid']}")
+        console.print(f"build: {payload['rag_build_id']}")
+        for name, count in sorted(cast(dict[str, int], payload["row_counts"]).items()):
+            console.print(f"{name}: {count}")
+    if not payload["valid"]:
+        raise typer.Exit(30)
+
+
+@rag_app.command("ingest")
+def rag_ingest(
+    run_id: Annotated[str, typer.Argument(help="Run ID with a validated RAG package.")],
+    run_dir: Annotated[Path | None, typer.Option("--run-dir")] = None,
+    catalog: Annotated[Path | None, typer.Option("--catalog")] = None,
+    json_output: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    """Atomically ingest one sealed package into the cumulative catalog."""
+
+    config = load_config()
+    root = (run_dir or config.workspace.run_dir).expanduser()
+    run_path = root / run_id
+    try:
+        receipt = ingest_package(
+            run_path / "rag/document-rag.sqlite3",
+            catalog or config.workspace.catalog_path,
+            receipt_path=run_path / "rag/catalog-ingestion.json",
+        )
+    except RagBuildError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(30) from exc
+    payload = receipt.as_dict()
+    if json_output:
+        _emit_json(payload)
+    else:
+        suffix = " (idempotent)" if receipt.idempotent else ""
+        console.print(
+            f"[green]PROMOTED[/green] catalog generation {receipt.catalog_generation}{suffix}"
+        )
+        console.print(f"catalog: {receipt.catalog_path}")
 
 
 def _prompt_variables(pack: PromptPack, prompt_id: str, document_type: str) -> dict[str, object]:

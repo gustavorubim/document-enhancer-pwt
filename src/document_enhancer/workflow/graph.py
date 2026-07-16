@@ -23,6 +23,7 @@ from .nodes import (
     audit_failed_node,
     audit_gate_node,
     audit_node,
+    catalog_ingest_node,
     checklist_node,
     chunk_node,
     complete_node,
@@ -34,6 +35,7 @@ from .nodes import (
     mermaid_validate_node,
     normalize_node,
     question_synthesis_node,
+    rag_build_node,
     raw_ingest_node,
     render_node,
     rewrite_inputs_node,
@@ -124,6 +126,8 @@ def build_graph(services: WorkflowServices):
     builder.add_node("diff", _node_call(diff_node, services))
     builder.add_node("chunk", _node_call(chunk_node, services))
     builder.add_node("export", _node_call(export_node, services))
+    builder.add_node("rag_build", _node_call(rag_build_node, services))
+    builder.add_node("catalog_ingest", _node_call(catalog_ingest_node, services))
     builder.add_node("complete", _node_call(complete_node, services))
 
     builder.add_conditional_edges(
@@ -154,6 +158,8 @@ def build_graph(services: WorkflowServices):
             "diff": "diff",
             "chunk": "chunk",
             "export": "export",
+            "rag_build": "rag_build",
+            "catalog_ingest": "catalog_ingest",
             "complete": "complete",
         },
     )
@@ -193,7 +199,9 @@ def build_graph(services: WorkflowServices):
     )
     builder.add_edge("diff", "chunk")
     builder.add_edge("chunk", "export")
-    builder.add_edge("export", "complete")
+    builder.add_edge("export", "rag_build")
+    builder.add_edge("rag_build", "catalog_ingest")
+    builder.add_edge("catalog_ingest", "complete")
     builder.add_edge("complete", END)
     return builder.compile(checkpointer=InMemorySaver())
 

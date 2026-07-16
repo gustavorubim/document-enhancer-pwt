@@ -80,6 +80,8 @@ def next_action(state: Mapping[str, object]) -> str:
         "diff",
         "chunk",
         "export",
+        "rag_build",
+        "catalog_ingest",
     }:
         return f"Run the {stage} stage or resume the persisted task."
     if stage == "audit_gate":

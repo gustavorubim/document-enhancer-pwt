@@ -36,6 +36,8 @@ WorkflowStage = Literal[
     "diff",
     "chunk",
     "export",
+    "rag_build",
+    "catalog_ingest",
     "complete",
 ]
 
@@ -64,6 +66,8 @@ WORKFLOW_STAGES: tuple[str, ...] = (
     "diff",
     "chunk",
     "export",
+    "rag_build",
+    "catalog_ingest",
     "complete",
 )
 
@@ -92,7 +96,9 @@ WORKFLOW_DEPENDENCIES: dict[str, tuple[str, ...]] = {
     "diff": ("audit",),
     "chunk": ("diff",),
     "export": ("chunk",),
-    "complete": ("export",),
+    "rag_build": ("export",),
+    "catalog_ingest": ("rag_build",),
+    "complete": ("catalog_ingest",),
 }
 
 _FIELD_STAGE_IMPACT: dict[str, tuple[str, ...]] = {
@@ -241,6 +247,8 @@ class WorkflowCache:
                 "diff",
                 "chunk",
                 "export",
+                "rag_build",
+                "catalog_ingest",
             }
             changed = [stage for stage in changed if stage not in m6_suffix]
             expected -= m6_suffix
@@ -355,6 +363,8 @@ def stage_inputs_for(stage: str, values: Mapping[str, object]) -> dict[str, obje
         "diff",
         "chunk",
         "export",
+        "rag_build",
+        "catalog_ingest",
         "complete",
     }:
         return {
