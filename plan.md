@@ -1,6 +1,6 @@
 # Document Enhancer implementation plan
 
-Status: implementation complete; Definition of Done verified
+Status: M0-M8 offline implementation complete; M9 live-provider boundary remediation planned
 
 Repository state when written: empty Git repository
 
@@ -1759,3 +1759,103 @@ honest explicit opt-ins and were not run as part of this offline release proof.
 - [EPA QA/G-6 Guidance for Preparing Standard Operating Procedures](https://www.epa.gov/quality/guidance-preparing-standard-operating-procedures-epa-qag-6-march-2001)
 - [NASA Systems Engineering Handbook](https://www.nasa.gov/reference/systems-engineering-handbook/)
 - [NIST Cybersecurity Framework 2.0](https://www.nist.gov/publications/nist-cybersecurity-framework-csf-20)
+
+## 30. M9 — Live-provider boundary remediation
+
+### 30.1 Why M9 exists
+
+The M0-M8 offline implementation and deterministic release proof remain valid, but limited live
+Gemini testing exposed a provider-boundary design flaw. The application currently asks the model to
+emit persistence-grade artifacts containing application-owned IDs, provenance infrastructure,
+layers, review states, and cross-field ontology invariants. It also repeats broad reference-pack
+content in stages that need only a small governed subset. Prompt patches and larger budgets cannot
+make that boundary reliable.
+
+Live evidence on the severe fictional desktop procedure established the failure pattern:
+
+- Macro and section analysis passed once their real 22k-token inputs fit the configured route.
+- The original discovery provider schema was about 150 KB; the temporary projection reduced it to
+  about 10.8 KB but still required the response to promote directly into the full domain model.
+- Discovery then failed because Gemini generated a `DataAsset` ID with the wrong prefix and omitted
+  confidence required by inferred provenance.
+- Questions and checklist prompts contain roughly 72k characters of governed context before their
+  dynamic analysis/reviewer inputs, despite an 18k-token input allowance.
+- The audit-revision adapter exposes the complete enhanced-document model through a provider schema
+  of roughly 165 KB, creating a predictable later failure.
+- Structured repair currently repeats the same prompt without safe validation feedback.
+
+The strict enterprise domain model is not relaxed. M9 moves deterministic responsibilities out of
+the stochastic provider contract and keeps final promotion, audit, catalog, and RAG gates fail
+closed.
+
+### 30.2 Corrected ownership boundary
+
+| Gemini may propose | Application code must construct and validate |
+| --- | --- |
+| Candidate type, name, aliases, exact source-span key, explicit/inferred judgment, local endpoint keys, relationship type, model confidence, proposed section content | Document/source/analysis/finding/entity/edge IDs, canonical prefixes, digests, extraction method, timestamps, layer, review state, provisional flag, stable provenance, endpoint types, relationship IDs, deterministic evidence offsets, persistence objects |
+
+An invalid candidate is retained as a visible quarantine issue with its safe validation reason. It
+does not disappear, count as successfully promoted, or permit final audit/RAG/catalog promotion.
+Successful sibling artifacts are checkpointed, but a required failed analysis remains visibly
+failed or deferred until repaired or governed by an explicit review policy.
+
+### 30.3 Parallel implementation plan
+
+Wave 1 uses three independent worktrees; workers do not edit `plan.md`, the root `README.md`, or
+shared release evidence.
+
+| Lane | Tasks | Owned paths | Handoff acceptance |
+| --- | --- | --- | --- |
+| WT12A provider boundary | M9.1-M9.4 | `analysis/provider_models.py`, `analysis/promotion.py`, discovery adapter/specialist tests | Compact provider DTO has no application-owned IDs or full provenance; deterministic promotion is stable and strict-domain valid; item failures quarantine visibly |
+| WT12B repair boundary | M9.5-M9.7 | `llm/models.py`, structured-call helpers, gateway tests | One bounded correction receives sanitized validation feedback; attempt digests/cache evidence remain auditable; failed promotion is never cached |
+| WT12C context and inputs | M9.8-M9.10 | prompt manifest/golden files, composer tests, question/checklist adapter inputs | Each stage receives only required governed references; discovery includes ontology; question/checklist inputs exclude the full analysis-run object and redundant source; compositions fit exact route budgets |
+
+Wave 2 begins after the Wave 1 contracts merge:
+
+| Lane | Tasks | Owned paths | Handoff acceptance |
+| --- | --- | --- | --- |
+| WT12D patch revision | M9.11-M9.12 | audit-revision provider DTO, deterministic patch applier, model-service tests | No full `EnhancedDocumentModel` provider schema; only allowed section/issue patches apply; post-patch domain and audit validation remain strict |
+| WT12E resilient analysis | M9.13-M9.14 | analysis orchestrator/checkpoint integration and tests | Successful branches persist independently; required failures remain visible and block authoritative completion; no sibling result is erased |
+
+The integrator then runs M9.15-M9.18 in dependency order and closes M9 only after the complete
+offline release gate and clean-clone proof pass.
+
+### 30.4 Task checklist
+
+- [ ] M9.1 Add minimal discovery object and relationship DTOs containing semantic judgments, local keys, exact span references, and optional model confidence only.
+- [ ] M9.2 Add deterministic discovery promotion that allocates stable provisional IDs, canonical prefixes, provenance infrastructure, layers/review states, endpoint types, and edge IDs.
+- [ ] M9.3 Quarantine item-level promotion failures with safe structured reasons; never fabricate missing confidence or silently omit failed candidates.
+- [ ] M9.4 Replace the discovery persistence-schema projection with the DTO/promoter boundary and prove repeated identical inputs produce identical promoted IDs and graph artifacts.
+- [ ] M9.5 Add an optional post-parse promotion/validation callback inside the bounded gateway attempt loop.
+- [ ] M9.6 Feed one correction attempt only sanitized `location`, `error type`, and `message` fields; exclude input values, source text, prompts, credentials, and host paths.
+- [ ] M9.7 Record distinct attempt/prompt digests, repair count, and safe error class; prove failed parsing or promotion cannot populate the response cache.
+- [ ] M9.8 Replace broad stage scopes with the minimum governed references: macro gets rubrics/governance; section mapping gets template structure; discovery gets ontology and relevant template requirements; RAG readiness gets retrieval/ontology context; synthesis gets finding rules.
+- [ ] M9.9 Send the question generator the deterministic baseline questions/findings rather than the complete analysis-run object and redundant full source; send checklist generation only the governed questions, answers, steering, waivers, and template requirements.
+- [ ] M9.10 Calibrate prompt budgets against `enterprise_core` 2.0 compositions and add budget-relative regression tests instead of fixed prompt-length heuristics.
+- [ ] M9.11 Replace full-document audit revision output with a narrow patch DTO keyed to existing section/issue IDs and evidence handles.
+- [ ] M9.12 Apply revision patches deterministically, reject unknown targets/unsupported fields, and re-run complete enhanced-document and audit validation before acceptance.
+- [ ] M9.13 Persist each successful analysis branch and its safe call manifest before fan-in; preserve failures/quarantines as explicit stage artifacts.
+- [ ] M9.14 Keep required analysis completion fail-closed while allowing Gate-1 reviewers to inspect successful sibling evidence and the exact unresolved stage.
+- [ ] M9.15 Pass offline recorded-provider integration tests across discovery, questions, checklist, section rewrite, independent audit, patch revision, checkpoint/resume, and cache invalidation.
+- [ ] M9.16 Pass limited live route/schema compatibility and one severe fictional document through structure recovery, all analysis branches, question synthesis, and the Gate-1 pause without retries or fallback where practical.
+- [ ] M9.17 Pass a thin fictional post-review workflow through checklist, one Pro section rewrite, independent Flash audit, Gemini embedding, SQLite promotion, and one cited Rich CLI answer; record routes, attempts, tokens, latency, and unavailable cost honestly.
+- [ ] M9.18 Run the full fail-fast integration gate, clean-clone/wheel proof, update `README.md`, this plan, evaluations, and `FOLLOW_UP.md`, push main, and remove completed M9 worktrees.
+
+### 30.5 Acceptance and testing boundary
+
+M9 plumbing acceptance is deliberately separate from model-quality evaluation:
+
+1. **Provider compatibility:** exact configured models accept every narrow provider schema.
+2. **Deterministic promotion:** one thin fictional workflow produces strict, traceable domain
+   artifacts and reaches the human review boundary.
+3. **Thin end-to-end plumbing:** one bounded post-review path reaches audited SQLite/RAG output and
+   a cited CLI answer.
+4. **Representative quality:** a later evaluation uses real enterprise-like documents to measure
+   discovery recall/precision, rewrite quality, retrieval, and reviewer usability. It does not
+   block the M9 plumbing correction unless it reveals data loss, invented facts, broken provenance,
+   or another required shared-contract failure.
+
+Before a real-world pilot, add bounded per-section or per-window discovery with deterministic merge
+and deduplication so long documents do not rely on one giant extraction call. Context caching,
+broader quality samples, and operational scale hardening remain recorded follow-ups unless they
+meet the explicit blocker definition in `AGENTS.md`.
