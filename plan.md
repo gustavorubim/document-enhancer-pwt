@@ -1,6 +1,6 @@
 # Document Enhancer implementation plan
 
-Status: proposed implementation plan
+Status: implementation milestones complete; Definition of Done verification blocked
 
 Repository state when written: empty Git repository
 
@@ -1439,79 +1439,79 @@ WT8 implements final validation, diff, and JSONL exports while WT10 builds the v
 
 ### M0 — Scaffold and freeze cross-lane contracts
 
-- [ ] M0.1 Initialize a packaged `uv` project with `src/` layout and `docenhance` entry point.
-- [ ] M0.2 Set Python requirement, build backend, runtime dependencies, dependency groups, and committed `uv.lock`.
-- [ ] M0.3 Configure Ruff formatter/linter and `ty check` in `pyproject.toml`.
-- [ ] M0.4 Add pytest markers for unit, integration, live model, public download, security, and end-to-end tests.
-- [ ] M0.5 Define initial exit codes, exception hierarchy, configuration precedence, and logging contract.
-- [ ] M0.6 Write ADRs for dual artifacts, deterministic-versus-LLM boundaries, input support, human gates, graph layering, and local data handling.
-- [ ] M0.7 Freeze interface stubs/protocols for parsers, artifact repository, reference-pack loader, prompt-pack loader/composer, model gateway, specialists, validators, retrievers, and exporters.
-- [ ] M0.8 Add CI/offline quality gate commands and a clean package import/build smoke test.
-- [ ] M0.9 Complete ecosystem spike proving `langchain-google-genai` with Gemini native JSON-schema output through both Developer API and Vertex AI configuration, LangGraph parallel branches/checkpoint/interrupt/resume, and a restricted Deep Agents backend.
-- [ ] M0.10 Record any ty/third-party typing limitations as narrow, owned suppressions—not blanket ignores.
-- [ ] M0.11 Record the Gemini routing ADR: active `gemini-3.1-flash-lite` for cheap structure/clerical stages, `gemini-3.5-flash` for primary analysis and independent audit, and intentional `gemini-3.1-pro-preview` use for complex reconciliation/rewrite, including lifecycle/fallback policy.
-- [ ] M0.12 Complete the SQLite RAG spike: FTS5, pinned `sqlite-vec`, LangChain `VectorStore`/`BaseRetriever` adapters, Gemini query/document embedding parity, extension loading on supported platforms, and exact-scan fallback boundary.
+- [x] M0.1 Initialize a packaged `uv` project with `src/` layout and `docenhance` entry point.
+- [x] M0.2 Set Python requirement, build backend, runtime dependencies, dependency groups, and committed `uv.lock`.
+- [x] M0.3 Configure Ruff formatter/linter and `ty check` in `pyproject.toml`.
+- [x] M0.4 Add pytest markers for unit, integration, live model, public download, security, and end-to-end tests.
+- [x] M0.5 Define initial exit codes, exception hierarchy, configuration precedence, and logging contract.
+- [x] M0.6 Write ADRs for dual artifacts, deterministic-versus-LLM boundaries, input support, human gates, graph layering, and local data handling.
+- [x] M0.7 Freeze interface stubs/protocols for parsers, artifact repository, reference-pack loader, prompt-pack loader/composer, model gateway, specialists, validators, retrievers, and exporters.
+- [x] M0.8 Add CI/offline quality gate commands and a clean package import/build smoke test.
+- [x] M0.9 Complete ecosystem spike proving `langchain-google-genai` with Gemini native JSON-schema output through both Developer API and Vertex AI configuration, LangGraph parallel branches/checkpoint/interrupt/resume, and a restricted Deep Agents backend.
+- [x] M0.10 Record any ty/third-party typing limitations as narrow, owned suppressions—not blanket ignores.
+- [x] M0.11 Record the Gemini routing ADR: active `gemini-3.1-flash-lite` for cheap structure/clerical stages, `gemini-3.5-flash` for primary analysis and independent audit, and intentional `gemini-3.1-pro-preview` use for complex reconciliation/rewrite, including lifecycle/fallback policy.
+- [x] M0.12 Complete the SQLite RAG spike: FTS5, pinned `sqlite-vec`, LangChain `VectorStore`/`BaseRetriever` adapters, Gemini query/document embedding parity, extension loading on supported platforms, and exact-scan fallback boundary.
 
-Acceptance: a fresh clone can run `uv sync --frozen`, format/lint/type/test an empty skeleton, build a wheel, and execute `docenhance --help`.
+Acceptance: a fresh clone can run `uv sync --frozen`, format/lint/type/test an empty skeleton, build a wheel, and execute `docenhance --help`. **Verified 2026-07-16 from foundation commits `112880f`, `95aa09a`, and `1f64367`: current `pyproject.toml`, `uv.lock`, `.github/workflows/ci.yml`, `src/document_enhancer/{config,contracts,errors,logging,compatibility}.py`, ADRs 0001–0008, `tests/compatibility/test_ecosystem.py`, `tests/contract/test_protocols.py`, and package-surface tests cover M0.1–M0.12. The final offline and isolated-wheel proof at `5b763b8` also exercises the current packaged CLI.**
 
 ### M1 — Ontology, IDs, provenance, and artifact schemas
 
-- [ ] M1.1 Implement entity, relationship, authority, layer, review-status, and provenance models.
-- [ ] M1.2 Implement readable ID patterns, provisional-ID allocation, uniqueness checks, and reference resolution.
-- [ ] M1.3 Define source document/block/location models and stable source-span IDs.
-- [ ] M1.4 Define prompt-pack manifest/resolution, structure-quality, structure-scan, structure-recovery, finding, question, answer, steering, waiver, checklist, content-ledger, semantic-document, audit, RAG query/answer/citation, export, RAG-build manifest, and run models.
-- [ ] M1.5 Implement relationship allow-list plus valid source/target type combinations.
-- [ ] M1.6 Implement temporal/version fields and document identity/version separation.
-- [ ] M1.7 Generate stable JSON Schemas from Pydantic and add schema-drift verification.
-- [ ] M1.8 Add round-trip fixtures for YAML/JSON artifacts and reject unknown critical fields where forward compatibility would be unsafe.
-- [ ] M1.9 Document ontology extension and deprecation rules.
+- [x] M1.1 Implement entity, relationship, authority, layer, review-status, and provenance models.
+- [x] M1.2 Implement readable ID patterns, provisional-ID allocation, uniqueness checks, and reference resolution.
+- [x] M1.3 Define source document/block/location models and stable source-span IDs.
+- [x] M1.4 Define prompt-pack manifest/resolution, structure-quality, structure-scan, structure-recovery, finding, question, answer, steering, waiver, checklist, content-ledger, semantic-document, audit, RAG query/answer/citation, export, RAG-build manifest, and run models.
+- [x] M1.5 Implement relationship allow-list plus valid source/target type combinations.
+- [x] M1.6 Implement temporal/version fields and document identity/version separation.
+- [x] M1.7 Generate stable JSON Schemas from Pydantic and add schema-drift verification.
+- [x] M1.8 Add round-trip fixtures for YAML/JSON artifacts and reject unknown critical fields where forward compatibility would be unsafe.
+- [x] M1.9 Document ontology extension and deprecation rules.
 
-Acceptance: valid example artifacts round-trip without information loss; invalid IDs, dangling edges, cross-layer overwrites, missing provenance, and incompatible relation endpoints fail with precise locations.
+Acceptance: valid example artifacts round-trip without information loss; invalid IDs, dangling edges, cross-layer overwrites, missing provenance, and incompatible relation endpoints fail with precise locations. **Verified 2026-07-16 from contract commit `79b0996` and section-mapping correction `472e08b`: `src/document_enhancer/domain/`, the checked-in `schemas/`, `scripts/generate_schemas.py`, contract fixtures, `tests/contract/test_domain_schemas.py`, `tests/unit/domain/`, and `docs/ontology.md` directly cover M1.1–M1.9 and the stated negative cases.**
 
 ### M2 — Default enterprise reference pack and Gemini prompt pack
 
-- [ ] M2.1 Implement manifest loader, digest calculation, applicability filtering, and precedence resolution.
-- [ ] M2.2 Create common ontology files, ID patterns, controlled terms, and baseline glossary.
-- [ ] M2.3 Build the complete process template, requirements schema, and fictional compliant example.
-- [ ] M2.4 Build the complete methodology template, requirements schema, and fictional compliant example.
-- [ ] M2.5 Build the standard and desktop-procedure templates, requirements schemas, and examples.
-- [ ] M2.6 Create a concise style guide for plain language, normative terms, headings, tables, acronyms, cross-references, IDs, Mermaid, and accessible captions.
-- [ ] M2.7 Create fictional policy/standard context that exercises precedence without copying proprietary policy.
-- [ ] M2.8 Define common and document-type rubrics with evidence requirements and hard blockers.
-- [ ] M2.9 Implement reference validation, conflict reporting, template rendering tests, and instruction-leakage tests.
-- [ ] M2.10 Write the reference-pack authoring/versioning guide.
-- [ ] M2.11 Implement prompt-pack manifest loading, schema validation, include resolution, composition, version/digest checks, and run snapshots.
-- [ ] M2.12 Create shared prompt fragments for evidence, no invention, untrusted source/context, rubric application, provenance, structured output, and tool prohibition.
-- [ ] M2.13 Create structure triage, window recovery, and boundary reconciliation prompts.
-- [ ] M2.14 Create macro, section, process/methodology discovery, RAG-readiness, and finding-synthesis investigation prompts.
-- [ ] M2.15 Create clarification-question and rewrite-checklist prompts.
-- [ ] M2.16 Create section rewrite, semantic-object, and bounded revision prompts.
-- [ ] M2.17 Create independent content-fidelity and remediation-routing audit prompts.
-- [ ] M2.18 Create RAG history-aware query, entity-linking, retrieval-grade, grounded-answer, and citation-audit prompts.
-- [ ] M2.19 Add golden prompt-composition fixtures for each document type/model route with exact rubric/template/ontology/context inputs and fake structured outputs.
-- [ ] M2.20 Add prompt linting for variables, includes, input boundaries, incompatible schemas/model routes, size budgets, missing rubric references, and accidental inline source instructions.
+- [x] M2.1 Implement manifest loader, digest calculation, applicability filtering, and precedence resolution.
+- [x] M2.2 Create common ontology files, ID patterns, controlled terms, and baseline glossary.
+- [x] M2.3 Build the complete process template, requirements schema, and fictional compliant example.
+- [x] M2.4 Build the complete methodology template, requirements schema, and fictional compliant example.
+- [x] M2.5 Build the standard and desktop-procedure templates, requirements schemas, and examples.
+- [x] M2.6 Create a concise style guide for plain language, normative terms, headings, tables, acronyms, cross-references, IDs, Mermaid, and accessible captions.
+- [x] M2.7 Create fictional policy/standard context that exercises precedence without copying proprietary policy.
+- [x] M2.8 Define common and document-type rubrics with evidence requirements and hard blockers.
+- [x] M2.9 Implement reference validation, conflict reporting, template rendering tests, and instruction-leakage tests.
+- [x] M2.10 Write the reference-pack authoring/versioning guide.
+- [x] M2.11 Implement prompt-pack manifest loading, schema validation, include resolution, composition, version/digest checks, and run snapshots.
+- [x] M2.12 Create shared prompt fragments for evidence, no invention, untrusted source/context, rubric application, provenance, structured output, and tool prohibition.
+- [x] M2.13 Create structure triage, window recovery, and boundary reconciliation prompts.
+- [x] M2.14 Create macro, section, process/methodology discovery, RAG-readiness, and finding-synthesis investigation prompts.
+- [x] M2.15 Create clarification-question and rewrite-checklist prompts.
+- [x] M2.16 Create section rewrite, semantic-object, and bounded revision prompts.
+- [x] M2.17 Create independent content-fidelity and remediation-routing audit prompts.
+- [x] M2.18 Create RAG history-aware query, entity-linking, retrieval-grade, grounded-answer, and citation-audit prompts.
+- [x] M2.19 Add golden prompt-composition fixtures for each document type/model route with exact rubric/template/ontology/context inputs and fake structured outputs.
+- [x] M2.20 Add prompt linting for variables, includes, input boundaries, incompatible schemas/model routes, size budgets, missing rubric references, and accidental inline source instructions.
 
-Acceptance: reference and prompt pack validation passes; all templates render; every required section/table maps to machine requirements; every LLM stage resolves to a versioned Markdown prompt, exact rubric/context inputs, model route, and output schema; no production prompt text is embedded in Python.
+Acceptance: reference and prompt pack validation passes; all templates render; every required section/table maps to machine requirements; every LLM stage resolves to a versioned Markdown prompt, exact rubric/context inputs, model route, and output schema; no production prompt text is embedded in Python. **Verified 2026-07-16 from reference-pack commit `92325c9`, prompt-pack commits `fefd6e9` and `14305ce`, and distribution commits `5364090` and `7843a9a`: the governed packs, their loaders/composers/validators/snapshots, verification scripts, all reference/prompt unit and contract tests, golden compositions/fake outputs, and both authoring guides directly cover M2.1–M2.20.**
 
 ### M3 — Ingestion, normalization, artifacts, and run storage
 
-- [ ] M3.1 Implement content-addressed run paths, manifest creation, atomic writes, and stage artifact promotion.
-- [ ] M3.2 Implement Markdown/text parser with line/source positions and structural blocks.
-- [ ] M3.3 Implement DOCX parser preserving paragraph/table order, headings, list hints, captions, and relationships without executing embedded content.
-- [ ] M3.4 Run PDF extraction spike, choose parser, implement page-provenance and scanned-document detection.
-- [ ] M3.5 Implement common normalization, stable span IDs, extraction warnings, and normalized Markdown rendering.
-- [ ] M3.6 Inventory figures, links, formulas, and embedded files with digests and safety classifications.
-- [ ] M3.7 Implement local SQLite checkpoint configuration and filesystem/manifest reconciliation.
-- [ ] M3.8 Implement cache keys and invalidation dependency graph.
-- [ ] M3.9 Add parser golden fixtures for normal, malformed, lossy, hostile, and oversized inputs.
-- [ ] M3.10 Implement deterministic structure-quality signals and configurable recovery routing thresholds.
-- [ ] M3.11 Implement the always-on cheap Gemini structure scan for `auto` mode and the full `StructureRecoveryProposal` path.
-- [ ] M3.12 Implement hierarchical block-window recovery and global boundary reconciliation for documents above the single-call budget.
-- [ ] M3.13 Implement deterministic structure validation for full coverage, source order, no illegal overlap, exact text/offset preservation, valid hierarchy, and ambiguity retention.
-- [ ] M3.14 Persist raw blocks, parser outline, quality signals, scan, optional recovered outline, selected view, and their independent digests.
-- [ ] M3.15 Add messy-layout golden fixtures with gold section boundaries and parser-versus-Gemini disagreement cases.
+- [x] M3.1 Implement content-addressed run paths, manifest creation, atomic writes, and stage artifact promotion.
+- [x] M3.2 Implement Markdown/text parser with line/source positions and structural blocks.
+- [x] M3.3 Implement DOCX parser preserving paragraph/table order, headings, list hints, captions, and relationships without executing embedded content.
+- [x] M3.4 Run PDF extraction spike, choose parser, implement page-provenance and scanned-document detection.
+- [x] M3.5 Implement common normalization, stable span IDs, extraction warnings, and normalized Markdown rendering.
+- [x] M3.6 Inventory figures, links, formulas, and embedded files with digests and safety classifications.
+- [x] M3.7 Implement local SQLite checkpoint configuration and filesystem/manifest reconciliation.
+- [x] M3.8 Implement cache keys and invalidation dependency graph.
+- [x] M3.9 Add parser golden fixtures for normal, malformed, lossy, hostile, and oversized inputs.
+- [x] M3.10 Implement deterministic structure-quality signals and configurable recovery routing thresholds.
+- [x] M3.11 Implement the always-on cheap Gemini structure scan for `auto` mode and the full `StructureRecoveryProposal` path.
+- [x] M3.12 Implement hierarchical block-window recovery and global boundary reconciliation for documents above the single-call budget.
+- [x] M3.13 Implement deterministic structure validation for full coverage, source order, no illegal overlap, exact text/offset preservation, valid hierarchy, and ambiguity retention.
+- [x] M3.14 Persist raw blocks, parser outline, quality signals, scan, optional recovered outline, selected view, and their independent digests.
+- [x] M3.15 Add messy-layout golden fixtures with gold section boundaries and parser-versus-Gemini disagreement cases.
 
-Acceptance: equivalent fixture facts across Markdown/DOCX/PDF normalize to comparable ordered blocks with usable provenance; every selected structural view covers the raw source exactly and in order; severe messy-layout fixtures route to Gemini recovery; lossy or scanned input produces visible warnings/failures; interrupted writes do not corrupt a prior artifact.
+Acceptance: equivalent fixture facts across Markdown/DOCX/PDF normalize to comparable ordered blocks with usable provenance; every selected structural view covers the raw source exactly and in order; severe messy-layout fixtures route to Gemini recovery; lossy or scanned input produces visible warnings/failures; interrupted writes do not corrupt a prior artifact. **Verified 2026-07-16 from ingestion/storage commit `d18d847`, recovery commit `261a76b`, and deterministic recovery corrections `68ea14c`, `0821a1f`, `de546ff`, and `aac54cc`: `src/document_enhancer/{ingest,artifacts}/`, ingest/storage and structure-recovery tests, parser/recovery gold fixtures, and the two M3 guides directly cover M3.1–M3.15, including atomic-interruption, scan routing, multi-window reconciliation, exact coverage/order/text, ambiguity, scanned-PDF, and hostile-input cases.**
 
 ### M4 — Model gateway and analysis specialists
 
@@ -1719,6 +1719,18 @@ The first release is done only when:
 - Cross-document, version-aware, graph, follow-up, filtered, and unanswerable queries meet the RAG release thresholds.
 - Evaluation results, costs, limitations, waivers, and failed cases are recorded honestly.
 - The repository documents how to add a new reference pack and document type without changing the core workflow.
+
+**Final completion audit, 2026-07-16: blocked.** M0–M8 task evidence and milestone-level
+acceptance records are reconciled, but this repository-level Definition of Done is not yet
+satisfied. Focused disposable runs of the actual governed CLI against the complete process,
+methodology, standard, and desktop-procedure examples all exited with the expected waiting code 10
+at strict audit. Each reported `CHECK-TEMPLATE-TABLES`, `CHECK-DOCUMENT-LINT`, and
+`INDEPENDENT-AUDIT-NOT-PASSED`; no run produced a promoted RAG database or catalog ingestion.
+The checked-in M8 demo completes only without a selected governed reference pack, while the M8
+fixture report is explicitly a deterministic offline gold replay and the isolated-wheel proof
+stops at the first human-review pause. Those are valuable, passing proofs but do not establish the
+four governed end-to-end CLI completions required above. Live Gemini and public downloads remain
+honest opt-in checks that were not run.
 
 ## 29. Planning references
 

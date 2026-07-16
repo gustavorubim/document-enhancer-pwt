@@ -11,15 +11,23 @@ catalog, and the Rich CLI performs explainable retrieval and grounded cited Q&A 
 
 ## Verified status
 
-M8 (fixtures, evaluation, security, documentation, and release) is formally complete as of
-2026-07-16. The complete offline gate passed on merged code commit `d7c80c1`: 266 tests passed and 2
-opt-in tests were deselected; frozen sync, import smoke, Ruff format/check, ty, generated schemas,
-both governed packs, all 60 generated corpus files, both evaluation artifacts, package build, and
-diff checks also passed. All 21 deterministic offline release thresholds passed across 48
-fixture-format evaluations. A separate temporary clean clone and isolated-wheel proof passed at
-`5b763b8` with zero Gemini calls and zero public downloads. These are controlled offline results,
-not claims about live Gemini quality or public-source generalization; live-model and public-download
-evaluations remain explicit opt-in checks. The final plan/evidence reconciliation audit is active.
+M0–M8 task and milestone evidence is reconciled as of 2026-07-16, but the repository-level
+Definition of Done is not yet verified. The complete offline gate passed on merged code commit
+`d7c80c1`: 266 tests passed and 2 opt-in tests were deselected; frozen sync, import smoke, Ruff
+format/check, ty, generated schemas, both governed packs, all 60 generated corpus files, both
+evaluation artifacts, package build, and diff checks also passed. All 21 deterministic offline
+release thresholds passed across 48 fixture-format evaluations. A separate temporary clean clone
+and isolated-wheel proof passed at `5b763b8` with zero Gemini calls and zero public downloads.
+
+The final audit found one release blocker: actual governed CLI runs for the complete process,
+methodology, standard, and desktop-procedure examples all stop correctly at strict audit with
+missing required tables/document-type objects, so the required four end-to-end completions and
+promoted RAG outputs are not yet proven. The checked-in full demo runs without a selected governed
+reference pack, and the evaluation report is an offline gold replay. See the
+[operator guide](docs/operator-guide.md), [release proof](docs/release.md), and
+[evaluation report](evals/reports/m8-evaluation.md) for exact workflows and limitations. These are
+controlled offline results, not claims about live Gemini quality or public-source generalization;
+live-model and public-download evaluations remain explicit opt-in checks that were not run.
 
 ## Quick start
 
