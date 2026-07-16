@@ -1,0 +1,572 @@
+"""LangGraph node implementations that compose the M3/M4 ports with M5 gates."""
+
+from __future__ import annotations
+
+import json
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, cast
+
+from langgraph.types import interrupt
+
+from document_enhancer.analysis.models import AnalysisRequest
+from document_enhancer.artifacts.paths import RunPaths, content_addressed_run_id
+from document_enhancer.artifacts.run_storage import RunStorage
+from document_enhancer.clarification import (
+    build_rewrite_checklist,
+    load_yaml,
+    synthesize_questions,
+    validate_checklist_approval,
+    validate_reviewer_inputs,
+    write_checklist_artifacts,
+    write_questions_artifacts,
+)
+from document_enhancer.domain.analysis import AnalysisReport, FindingSet
+from document_enhancer.domain.enums import DocumentType
+from document_enhancer.domain.questions import (
+    AnswersArtifact,
+    QuestionsArtifact,
+    RewriteChecklist,
+    Steering,
+    WaiversArtifact,
+)
+from document_enhancer.domain.source import NormalizedDocument as DomainNormalizedDocument
+from document_enhancer.errors import ValidationError, WaitingForReviewError
+from document_enhancer.ingest.models import NormalizedDocument, RawDocument
+from document_enhancer.ingest.normalize import normalize_document
+from document_enhancer.ingest.pipeline import ParserRegistry, parse_source
+from document_enhancer.ingest.recovery import StructureRecoveryConfig, StructureRecoveryService
+
+from .cache import WorkflowCache, stage_inputs_for
+from .checkpoint import WorkflowCheckpoint
+from .prompts import resolved_prompt_artifact
+from .routing import gate1_required, gate1_satisfied, gate2_required, gate2_satisfied, next_action
+from .state import WorkflowState, state_json
+
+AnalysisRunner = Callable[[AnalysisRequest], object]
+
+
+@dataclass
+class WorkflowServices:
+    """Dependencies injected at the M5 boundary; all model calls remain optional in tests."""
+
+    run_root: Path
+    source: Path
+    run_id: str | None = None
+    document_type: DocumentType = DocumentType.PROCESS
+    parser_registry: ParserRegistry | None = None
+    structure_service: StructureRecoveryService | None = None
+    analysis_runner: AnalysisRunner | None = None
+    structure_mode: str = "parser"
+    gate2_enabled: bool = True
+    stop_after: str | None = None
+    offline: bool = True
+    input_fingerprints: dict[str, object] = field(default_factory=dict)
+    cache: WorkflowCache = field(default_factory=WorkflowCache)
+    checkpoint: WorkflowCheckpoint | None = None
+    storage: RunStorage | None = None
+    prompt_pack: Path | None = None
+    reference_pack: Path | None = None
+    prompt_ids: tuple[str, ...] = (
+        "clarification.questions",
+        "clarification.rewrite-checklist",
+    )
+
+    def attach_run(self, raw: RawDocument, *, run_id: str | None = None) -> None:
+        resolved_run_id = run_id or self.run_id or content_addressed_run_id(raw.source_digest)
+        self.run_id = resolved_run_id
+        paths = RunPaths(self.run_root, resolved_run_id)
+        self.storage = RunStorage(paths)
+        self.checkpoint = WorkflowCheckpoint(paths)
+
+    @property
+    def paths(self) -> RunPaths:
+        if self.checkpoint is None:
+            raise RuntimeError("workflow run paths are not attached yet")
+        return self.checkpoint.paths
+
+
+def _as_raw(value: object) -> RawDocument:
+    return value if isinstance(value, RawDocument) else RawDocument.model_validate(value)
+
+
+def _as_normalized(value: object) -> NormalizedDocument:
+    return (
+        value if isinstance(value, NormalizedDocument) else NormalizedDocument.model_validate(value)
+    )
+
+
+def _as_questions(value: object) -> QuestionsArtifact:
+    return (
+        value if isinstance(value, QuestionsArtifact) else QuestionsArtifact.model_validate(value)
+    )
+
+
+def _as_answers(value: object) -> AnswersArtifact:
+    return value if isinstance(value, AnswersArtifact) else AnswersArtifact.model_validate(value)
+
+
+def _as_steering(value: object | None) -> Steering | None:
+    return (
+        None
+        if value is None
+        else (value if isinstance(value, Steering) else Steering.model_validate(value))
+    )
+
+
+def _as_waivers(value: object) -> WaiversArtifact:
+    return value if isinstance(value, WaiversArtifact) else WaiversArtifact.model_validate(value)
+
+
+def _as_checklist(value: object) -> RewriteChecklist:
+    return value if isinstance(value, RewriteChecklist) else RewriteChecklist.model_validate(value)
+
+
+def _finding_set(value: object) -> FindingSet:
+    if isinstance(value, FindingSet):
+        return value
+    if isinstance(value, AnalysisReport):
+        findings = [finding for analysis in value.analyses for finding in analysis.findings]
+        return FindingSet(
+            document_id=value.document_id,
+            source_digest=value.source_digest,
+            findings=findings,
+            blocking_count=sum(finding.blocking for finding in findings),
+            generated_from_analysis_ids=[analysis.analysis_id for analysis in value.analyses],
+        )
+    if hasattr(value, "synthesis"):
+        synthesis = cast(Any, value).synthesis
+        return _finding_set(synthesis.finding_set)
+    if isinstance(value, dict):
+        mapping = cast(dict[str, object], value)
+        if "finding_set" in mapping:
+            return _finding_set(mapping["finding_set"])
+        if "synthesis" in mapping:
+            return _finding_set(mapping["synthesis"])
+        if "findings" in mapping:
+            return FindingSet.model_validate(mapping)
+    return FindingSet(
+        document_id="DOC-OFFLINE", source_digest="0" * 64, findings=[], blocking_count=0
+    )
+
+
+def _input_values(state: WorkflowState, services: WorkflowServices) -> dict[str, object]:
+    raw = state.get("raw")
+    normalized = state.get("normalized")
+    source_digest = state.get("source_digest", "")
+    values = {
+        "source": source_digest,
+        "structure": state.get("cache_keys", {}).get("selected_view", ""),
+        "analysis": state.get("cache_keys", {}).get("analysis", ""),
+        "questions": state.get("cache_keys", {}).get("question_synthesis", ""),
+        "checklist": state.get("cache_keys", {}).get("checklist", ""),
+        **services.input_fingerprints,
+    }
+    if isinstance(raw, RawDocument):
+        values["source"] = raw.source_digest
+    if isinstance(normalized, NormalizedDocument):
+        values["structure"] = normalized.selected_view_digest or normalized.raw.source_digest
+    return values
+
+
+def _stage_key(state: WorkflowState, services: WorkflowServices, stage: str) -> str:
+    values = _input_values(state, services)
+    inputs = stage_inputs_for(stage, values)
+    completed = state.get("cache_keys", {})
+    key = services.cache.key(stage, inputs, completed_keys=completed)
+    state.setdefault("stage_inputs", {})[stage] = state_json(inputs)
+    return key
+
+
+def _finish_stage(state: WorkflowState, services: WorkflowServices, stage: str) -> WorkflowState:
+    state["current_stage"] = stage
+    if stage != "complete":
+        state["status"] = "running"
+    completed = state.setdefault("completed_stages", [])
+    if stage not in completed:
+        completed.append(stage)
+    state.setdefault("cache_keys", {})[stage] = _stage_key(state, services, stage)
+    state["next_action"] = next_action(state)
+    if services.checkpoint is not None:
+        services.checkpoint.record_stage(
+            state,
+            stage=stage,
+            cache_key=state["cache_keys"][stage],
+            status="succeeded",
+        )
+        services.checkpoint.save_state(state)
+    return state
+
+
+def _persist_waiting(
+    state: WorkflowState, services: WorkflowServices, stage: str, payload: dict[str, object]
+) -> None:
+    state["current_stage"] = stage
+    state["status"] = "waiting"
+    state["next_action"] = next_action(state)
+    state["resume_entry"] = stage
+    if services.checkpoint is not None:
+        services.checkpoint.record_stage(
+            state,
+            stage=stage,
+            cache_key=_stage_key(state, services, stage),
+            status="pending",
+            payload=payload,
+        )
+        services.checkpoint.save_state(state)
+
+
+def _pause(
+    state: WorkflowState, services: WorkflowServices, stage: str, payload: dict[str, object]
+) -> None:
+    _persist_waiting(state, services, stage, payload)
+    # A real LangGraph interrupt is used when this node runs inside the compiled graph. The
+    # durable JSON snapshot above is the process-boundary recovery record; the CLI can recreate a
+    # graph after termination and start at resume_entry without replaying completed nodes.
+    interrupt({"stage": stage, **payload})
+    raise WaitingForReviewError(next_action(state))  # pragma: no cover - interrupt always raises
+
+
+def raw_ingest_node(state: WorkflowState, services: WorkflowServices) -> WorkflowState:
+    if state.get("raw") and state.get("run_id"):
+        return _finish_stage(state, services, "raw_ingest")
+    raw = parse_source(services.source, registry=services.parser_registry)
+    services.attach_run(raw)
+    state.update(
+        {
+            "run_id": services.paths.run_id,
+            "source_path": str(services.source.resolve()),
+            "source_digest": raw.source_digest,
+            # M3's immutable ingest contract intentionally does not invent a domain document
+            # identity. Until M6's governed identity assignment, use a stable source-derived
+            # provisional document ID and keep the source digest in the manifest.
+            "document_id": f"DOC-{raw.source_digest[:16].upper()}",
+            "document_type": services.document_type.value,
+            "raw": raw,
+            "status": "running",
+            "gate2_enabled": services.gate2_enabled,
+            "offline": services.offline,
+            "stop_after": services.stop_after,
+        }
+    )
+    return _finish_stage(state, services, "raw_ingest")
+
+
+def normalize_node(state: WorkflowState, services: WorkflowServices) -> WorkflowState:
+    raw = _as_raw(state["raw"])
+    normalized = normalize_document(raw)
+    state["normalized"] = normalized
+    if services.storage is None:
+        services.attach_run(raw, run_id=str(state["run_id"]))
+    assert services.storage is not None
+    services.storage.persist_ingest(normalized)
+    return _finish_stage(state, services, "normalize")
+
+
+def structure_quality_node(state: WorkflowState, services: WorkflowServices) -> WorkflowState:
+    normalized = _as_normalized(state["normalized"])
+    state["normalized"] = normalized
+    return _finish_stage(state, services, "structure_quality")
+
+
+def structure_scan_node(state: WorkflowState, services: WorkflowServices) -> WorkflowState:
+    normalized = _as_normalized(state["normalized"])
+    if services.structure_service is None:
+        config = StructureRecoveryConfig(
+            mode=cast(Any, services.structure_mode), document_type=services.document_type.value
+        )
+        services.structure_service = StructureRecoveryService(config=config)
+    assert services.storage is not None
+    result = services.structure_service.run(
+        normalized,
+        repository=services.storage,
+        run_id=str(state["run_id"]),
+    )
+    state["structure_result"] = result
+    state["normalized"] = result.normalized
+    state["document_id"] = result.authoritative_raw.document_id
+    return _finish_stage(state, services, "structure_scan")
+
+
+def structure_recovery_node(state: WorkflowState, services: WorkflowServices) -> WorkflowState:
+    # M3's StructureRecoveryService owns scan/window/reconciliation/recovery. This node keeps the
+    # LangGraph route explicit and makes the no-recovery path a deterministic no-op.
+    return _finish_stage(state, services, "structure_recovery")
+
+
+def structure_validate_node(state: WorkflowState, services: WorkflowServices) -> WorkflowState:
+    result = state.get("structure_result")
+    if result is not None:
+        validation = getattr(result, "validation", None)
+        if validation is None and isinstance(result, dict):
+            validation = result.get("validation")
+        passed = getattr(validation, "passed", None) if validation is not None else None
+        if passed is None and isinstance(validation, dict):
+            passed = validation.get("passed")
+        if passed is False and services.structure_mode not in {"parser", "off"}:
+            raise ValidationError("selected structure failed exact source coverage validation")
+    return _finish_stage(state, services, "structure_validate")
+
+
+def selected_view_node(state: WorkflowState, services: WorkflowServices) -> WorkflowState:
+    normalized = _as_normalized(state["normalized"])
+    if normalized.selected_view is None or not normalized.selected_view.validation_passed:
+        raise ValidationError("selected structural view is missing or failed validation")
+    return _finish_stage(state, services, "selected_view")
+
+
+def analysis_node(state: WorkflowState, services: WorkflowServices) -> WorkflowState:
+    normalized = _as_normalized(state["normalized"])
+    if services.analysis_runner is None:
+        # Offline/debug mode intentionally produces no answer or factual finding. The absence of
+        # a provider is visible in the workflow state and cannot invent a content claim.
+        state["analysis_result"] = FindingSet(
+            document_id=state["document_id"],
+            source_digest=state["source_digest"],
+            findings=[],
+            blocking_count=0,
+        )
+    else:
+        structure_result = cast(Any, state.get("structure_result"))
+        if structure_result is None or not hasattr(structure_result, "authoritative_raw"):
+            raise ValidationError("M4 analysis requires the validated M3 authoritative source port")
+        analysis_document = DomainNormalizedDocument(
+            raw=structure_result.authoritative_raw,
+            structural_view=structure_result.authoritative_view,
+            normalized_markdown=normalized.normalized_markdown,
+            asset_digests={
+                asset.asset_id: asset.digest
+                for asset in normalized.assets
+                if asset.digest is not None
+            },
+        )
+        request = AnalysisRequest(
+            document=analysis_document,
+            document_type=DocumentType(
+                str(state.get("document_type", services.document_type.value))
+            ),
+            metadata=(),
+            reviewer_inputs="",
+        )
+        state["analysis_result"] = services.analysis_runner(request)
+    return _finish_stage(state, services, "analysis")
+
+
+def question_synthesis_node(state: WorkflowState, services: WorkflowServices) -> WorkflowState:
+    findings = _finding_set(state.get("analysis_result"))
+    result = synthesize_questions(
+        findings,
+        document_id=str(state["document_id"]),
+        strict_blocking=True,
+    )
+    questions = _as_questions(result.questions)
+    state["questions"] = questions
+    answers = AnswersArtifact(document_id=questions.document_id, version_id=questions.version_id)
+    steering = Steering(steering_id="STEER-REVIEW-001", document_id=questions.document_id)
+    waivers = WaiversArtifact(document_id=questions.document_id)
+    state["answers"] = answers
+    state["steering"] = steering
+    state["waivers"] = waivers
+    assert services.checkpoint is not None
+    paths = services.paths
+    question_artifact_payload = {
+        "questions": questions.model_dump(mode="json"),
+        "answers": answers.model_dump(mode="json"),
+        "steering": steering.model_dump(mode="json"),
+        "waivers": waivers.model_dump(mode="json"),
+    }
+
+    def write_question_artifacts() -> None:
+        write_questions_artifacts(
+            paths.artifact_path("clarification"),
+            questions,
+            answers=answers,
+            steering=steering,
+            waivers=waivers,
+        )
+
+    services.checkpoint.side_effect_once(
+        "question_synthesis",
+        "clarification-artifacts",
+        question_artifact_payload,
+        write_question_artifacts,
+    )
+    if services.prompt_pack is not None and services.reference_pack is not None:
+        normalized = _as_normalized(state["normalized"])
+        document_type = str(state.get("document_type", services.document_type.value))
+        resolved_prompt_artifact(
+            services.prompt_pack,
+            reference_pack=services.reference_pack,
+            prompt_ids=list(services.prompt_ids),
+            document_type=document_type,
+            variables={
+                "document_type": document_type,
+                "document_metadata": {},
+                "source_text": normalized.normalized_markdown,
+                "analysis_results": json.dumps(
+                    state_json(state.get("analysis_result")), sort_keys=True
+                ),
+                "reviewer_inputs": "",
+            },
+            destination=paths.artifact_path("prompts/resolved-manifest.json"),
+        )
+    return _finish_stage(state, services, "question_synthesis")
+
+
+def _load_reviewer_inputs(
+    state: WorkflowState, services: WorkflowServices
+) -> tuple[QuestionsArtifact, AnswersArtifact, Steering | None, WaiversArtifact]:
+    questions = _as_questions(state["questions"])
+    directory = services.paths.artifact_path("clarification")
+    answers = (
+        load_yaml(directory / "answers.yaml", AnswersArtifact)
+        if (directory / "answers.yaml").exists()
+        else AnswersArtifact(document_id=questions.document_id)
+    )
+    steering = (
+        load_yaml(directory / "steering.yaml", Steering)
+        if (directory / "steering.yaml").exists()
+        else None
+    )
+    waivers = (
+        load_yaml(directory / "waivers.yaml", WaiversArtifact)
+        if (directory / "waivers.yaml").exists()
+        else WaiversArtifact(document_id=questions.document_id)
+    )
+    return questions, answers, steering, waivers
+
+
+def gate1_node(state: WorkflowState, services: WorkflowServices) -> WorkflowState:
+    questions, answers, steering, waivers = _load_reviewer_inputs(state, services)
+    raw = _as_raw(state["raw"])
+    report = validate_reviewer_inputs(
+        questions,
+        answers,
+        steering,
+        waivers,
+        source_span_ids=(block.span_id for block in raw.blocks),
+    )
+    state["questions"] = questions
+    state["answers"] = answers
+    state["steering"] = steering
+    state["waivers"] = waivers
+    state["validation_report"] = report
+    from document_enhancer.artifacts.atomic import atomic_write_json
+
+    assert services.checkpoint is not None
+
+    def write_validation_report() -> None:
+        atomic_write_json(
+            services.paths.artifact_path("clarification/validation-report.json"),
+            report.model_dump(mode="json"),
+        )
+
+    services.checkpoint.side_effect_once(
+        "gate1",
+        "validation-report",
+        report.model_dump(mode="json"),
+        write_validation_report,
+    )
+    required = gate1_required(questions, stop_after=state.get("stop_after"))
+    if required and (
+        state.get("stop_after") == "questions" or not report.valid or not gate1_satisfied(state)
+    ):
+        _pause(
+            state,
+            services,
+            "gate1",
+            {
+                "question_count": len(questions.questions),
+                "blocking_question_ids": [
+                    item.question_id for item in questions.questions if item.blocking
+                ],
+                "diagnostic_count": len(report.diagnostics),
+            },
+        )
+    return _finish_stage(state, services, "gate1")
+
+
+def checklist_node(state: WorkflowState, services: WorkflowServices) -> WorkflowState:
+    questions, answers, steering, waivers = _load_reviewer_inputs(state, services)
+    existing = services.paths.artifact_path("clarification/rewrite-checklist.yaml")
+    checklist = build_rewrite_checklist(
+        questions,
+        answers=answers,
+        steering=steering,
+        waivers=waivers,
+    )
+    # Gate 2 edits are human-owned once approval exists; otherwise regeneration is safe and
+    # reflects changed reviewer inputs without duplicating side effects.
+    if existing.exists():
+        try:
+            prior = load_yaml(existing, RewriteChecklist)
+            if prior.approved_by:
+                checklist = prior
+        except ValueError:
+            pass
+    state["questions"] = questions
+    state["answers"] = answers
+    state["steering"] = steering
+    state["waivers"] = waivers
+    state["checklist"] = checklist
+    assert services.checkpoint is not None
+
+    def write_checklist() -> None:
+        write_checklist_artifacts(services.paths.artifact_path("clarification"), checklist)
+
+    services.checkpoint.side_effect_once(
+        "checklist",
+        "rewrite-checklist-artifacts",
+        checklist.model_dump(mode="json"),
+        write_checklist,
+    )
+    return _finish_stage(state, services, "checklist")
+
+
+def gate2_node(state: WorkflowState, services: WorkflowServices) -> WorkflowState:
+    checklist_path = services.paths.artifact_path("clarification/rewrite-checklist.yaml")
+    checklist = load_yaml(checklist_path, RewriteChecklist)
+    waivers = _as_waivers(state.get("waivers", WaiversArtifact(document_id=checklist.document_id)))
+    report = validate_checklist_approval(checklist, waivers=waivers)
+    state["checklist"] = checklist
+    state["validation_report"] = report
+    if gate2_required(state) and (not report.valid or not gate2_satisfied(state)):
+        _pause(
+            state,
+            services,
+            "gate2",
+            {
+                "checklist_item_count": len(checklist.items),
+                "unresolved_blocking_item_ids": [
+                    item.checklist_item_id for item in checklist.unresolved_blocking_items
+                ],
+                "diagnostic_count": len(report.diagnostics),
+            },
+        )
+    return _finish_stage(state, services, "gate2")
+
+
+def complete_node(state: WorkflowState, services: WorkflowServices) -> WorkflowState:
+    state["status"] = "succeeded"
+    state["current_stage"] = "complete"
+    state["next_action"] = next_action(state)
+    return _finish_stage(state, services, "complete")
+
+
+__all__ = [
+    "WorkflowServices",
+    "analysis_node",
+    "checklist_node",
+    "complete_node",
+    "gate1_node",
+    "gate2_node",
+    "normalize_node",
+    "question_synthesis_node",
+    "raw_ingest_node",
+    "selected_view_node",
+    "structure_quality_node",
+    "structure_recovery_node",
+    "structure_scan_node",
+    "structure_validate_node",
+]

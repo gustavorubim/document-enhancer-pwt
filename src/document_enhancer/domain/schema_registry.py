@@ -6,6 +6,7 @@ from collections.abc import Mapping
 
 from pydantic import BaseModel
 
+from document_enhancer.clarification.models import ReviewerValidationReport
 from document_enhancer.domain.analysis import (
     AnalysisReport,
     StructureQuality,
@@ -59,6 +60,7 @@ SCHEMA_MODELS: Mapping[str, type[BaseModel]] = {
     "structure-scan.schema.json": StructureScan,
     "waivers.schema.json": WaiversArtifact,
     "rewrite-checklist.schema.json": RewriteChecklist,
+    "validation-report.schema.json": ReviewerValidationReport,
 }
 
 

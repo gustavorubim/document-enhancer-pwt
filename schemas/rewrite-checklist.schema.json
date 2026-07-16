@@ -57,6 +57,13 @@
           "title": "Checklist Item Id",
           "type": "string"
         },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceQuote"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
         "question_id": {
           "anyOf": [
             {
@@ -170,6 +177,51 @@
         "blocking"
       ],
       "title": "ChecklistItem",
+      "type": "object"
+    },
+    "EvidenceQuote": {
+      "additionalProperties": false,
+      "properties": {
+        "end_offset": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End Offset"
+        },
+        "quote": {
+          "title": "Quote",
+          "type": "string"
+        },
+        "span_id": {
+          "title": "Span Id",
+          "type": "string"
+        },
+        "start_offset": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start Offset"
+        }
+      },
+      "required": [
+        "span_id",
+        "quote"
+      ],
+      "title": "EvidenceQuote",
       "type": "object"
     },
     "QuestionStatus": {
