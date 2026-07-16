@@ -158,6 +158,26 @@ def allocate_span_id(document_digest: str, ordinal: int, block_type: str, text: 
     return f"SPAN-{token}"
 
 
+def allocate_segment_id(
+    parent_span_id: str,
+    char_start: int,
+    char_end: int,
+    slice_sha256: str,
+) -> str:
+    """Derive a reproducible segment ID from its parent and exact slice identity."""
+
+    validate_span_id(parent_span_id)
+    slice_sha256 = validate_sha256(slice_sha256)
+    if char_start < 0 or char_end <= char_start:
+        raise ValueError("segment character range must be strictly positive")
+    token = (
+        hashlib.sha256(f"{parent_span_id}\0{char_start}\0{char_end}\0{slice_sha256}".encode())
+        .hexdigest()[:16]
+        .upper()
+    )
+    return f"SEG-{token}"
+
+
 def ensure_unique_ids(ids: Iterable[str]) -> None:
     seen: set[str] = set()
     duplicates: set[str] = set()
@@ -177,6 +197,7 @@ __all__ = [
     "SHA256_RE",
     "SPAN_ID_RE",
     "allocate_provisional_id",
+    "allocate_segment_id",
     "allocate_span_id",
     "ensure_unique_ids",
     "validate_entity_id",

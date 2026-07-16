@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import hashlib
 from datetime import UTC, datetime
 from typing import Literal
 
 from pydantic import (
+    AliasChoices,
     Field,
     StrictBool,
     StrictFloat,
@@ -23,7 +25,13 @@ from document_enhancer.domain.enums import (
     StructureDecision,
     StructureDisposition,
 )
-from document_enhancer.domain.ids import ensure_unique_ids, validate_identifier, validate_span_id
+from document_enhancer.domain.ids import (
+    allocate_segment_id,
+    ensure_unique_ids,
+    validate_identifier,
+    validate_sha256,
+    validate_span_id,
+)
 from document_enhancer.domain.ontology import Relationship, SemanticObject
 from document_enhancer.domain.source import RawDocument
 
@@ -133,6 +141,52 @@ class RecoveredSection(StrictModel):
         return non_empty(value, field_name="recovered section label")
 
 
+class BlockSegment(StrictModel):
+    """A deterministic Python-character slice of one immutable source block."""
+
+    segment_id: StrictStr = Field(
+        pattern=r"^SEG-[A-F0-9]{16}$",
+        validation_alias=AliasChoices("segment_id", "id"),
+    )
+    char_start: StrictInt = Field(ge=0)
+    char_end: StrictInt = Field(ge=0)
+    offset_unit: Literal["python_characters"] = "python_characters"
+    disposition: StructureDisposition
+    section_id: StrictStr | None = Field(default=None, pattern=r"^(SEC|PROV-SEC)-[A-Z0-9-]+$")
+    confidence: StrictFloat = Field(ge=0.0, le=1.0)
+    rationale: StrictStr | None = None
+    slice_sha256: StrictStr = Field(validation_alias=AliasChoices("slice_sha256", "text_digest"))
+
+    @field_validator("segment_id")
+    @classmethod
+    def validate_segment_id(cls, value: StrictStr) -> StrictStr:
+        value = validate_identifier(value, label="segment id")
+        if not value.startswith("SEG-"):
+            raise ValueError("segment id must use the SEG- prefix")
+        return value
+
+    @field_validator("slice_sha256")
+    @classmethod
+    def validate_slice_digest(cls, value: StrictStr) -> StrictStr:
+        return validate_sha256(value)
+
+    @model_validator(mode="after")
+    def validate_positive_range(self) -> BlockSegment:
+        if self.char_end <= self.char_start:
+            raise ValueError("segment char_end must be greater than char_start")
+        return self
+
+    @property
+    def text_digest(self) -> str:
+        """Compatibility accessor for callers using the source-block digest name."""
+
+        return self.slice_sha256
+
+
+SourceBlockSegment = BlockSegment
+BlockSlice = BlockSegment
+
+
 class BlockDisposition(StrictModel):
     span_id: StrictStr
     disposition: StructureDisposition
@@ -140,11 +194,33 @@ class BlockDisposition(StrictModel):
     source_text_digest: StrictStr
     confidence: StrictFloat = Field(ge=0.0, le=1.0)
     rationale: StrictStr | None = None
+    segments: list[BlockSegment] | None = Field(
+        default=None,
+        min_length=2,
+        validation_alias=AliasChoices("segments", "slices"),
+    )
 
     @field_validator("span_id")
     @classmethod
     def validate_span(cls, value: StrictStr) -> StrictStr:
         return validate_span_id(value)
+
+    @field_validator("source_text_digest")
+    @classmethod
+    def validate_source_text_digest(cls, value: StrictStr) -> StrictStr:
+        return validate_sha256(value)
+
+    @model_validator(mode="after")
+    def validate_split_shape(self) -> BlockDisposition:
+        if self.segments is not None and len(self.segments) < 2:
+            raise ValueError("split disposition requires at least two segments")
+        if self.segments is not None:
+            ensure_unique_ids(segment.segment_id for segment in self.segments)
+        return self
+
+    @property
+    def slices(self) -> tuple[BlockSegment, ...] | None:
+        return None if self.segments is None else tuple(self.segments)
 
 
 class StructureAssociation(StrictModel):
@@ -219,12 +295,21 @@ class StructureRecoveryProposal(StrictModel):
                 errors.append(f"unknown span {item.span_id}")
             elif block.text_digest != item.source_text_digest:
                 errors.append(f"source text digest mismatch for {item.span_id}")
+            elif item.segments is not None:
+                errors.extend(self._validate_segments(item, block.text))
         known_sections = {section.section_id for section in self.sections}
         for item in self.dispositions:
             if item.section_id is not None and item.section_id not in known_sections:
                 errors.append(
                     f"disposition {item.span_id} references unknown section {item.section_id}"
                 )
+            if item.segments is not None:
+                for segment in item.segments:
+                    if segment.section_id is not None and segment.section_id not in known_sections:
+                        errors.append(
+                            f"segment {segment.segment_id} references unknown section "
+                            f"{segment.section_id}"
+                        )
         result = StructureValidation(
             passed=not errors,
             covered_span_ids=actual,
@@ -232,6 +317,72 @@ class StructureRecoveryProposal(StrictModel):
         )
         object.__setattr__(self, "validation", result)
         return result
+
+    @staticmethod
+    def _validate_segments(disposition: BlockDisposition, original_text: str) -> list[str]:
+        """Validate exact contiguous Python-character coverage of one source block."""
+
+        if disposition.segments is None:  # pragma: no cover - caller guards this
+            return []
+        errors: list[str] = []
+        segments = disposition.segments
+        if len(segments) < 2:
+            errors.append(f"span {disposition.span_id} split requires at least two segments")
+            return errors
+        previous_end = 0
+        for index, segment in enumerate(segments):
+            start = segment.char_start
+            end = segment.char_end
+            if index == 0 and start != 0:
+                errors.append(
+                    f"segment {segment.segment_id} is out of source order: first segment must "
+                    f"start at character 0, got {start}"
+                )
+            elif start != previous_end:
+                if start < previous_end:
+                    errors.append(
+                        f"segment {segment.segment_id} overlaps or is reordered at index {index}: "
+                        f"starts at {start}, expected {previous_end}"
+                    )
+                else:
+                    errors.append(
+                        f"segment {segment.segment_id} leaves a gap at index {index}: "
+                        f"starts at {start}, expected {previous_end}"
+                    )
+            if end <= start:
+                errors.append(
+                    f"segment {segment.segment_id} must have a strictly positive character range"
+                )
+            if end > len(original_text):
+                errors.append(
+                    f"segment {segment.segment_id} ends at {end}, beyond original text length "
+                    f"{len(original_text)}"
+                )
+            if 0 <= start < end <= len(original_text):
+                expected_digest = hashlib.sha256(original_text[start:end].encode()).hexdigest()
+                expected_segment_id = allocate_segment_id(
+                    disposition.span_id,
+                    start,
+                    end,
+                    expected_digest,
+                )
+                if segment.segment_id != expected_segment_id:
+                    errors.append(
+                        f"segment {segment.segment_id} does not match deterministic expected id "
+                        f"{expected_segment_id}"
+                    )
+                if segment.slice_sha256 != expected_digest:
+                    errors.append(
+                        f"segment {segment.segment_id} slice_sha256 does not match the original "
+                        "Python-character slice"
+                    )
+            previous_end = end
+        if previous_end != len(original_text):
+            errors.append(
+                f"split segments cover through {previous_end}, expected full original text length "
+                f"{len(original_text)}"
+            )
+        return errors
 
 
 class Finding(StrictModel):
@@ -380,6 +531,8 @@ __all__ = [
     "BoundaryAlternative",
     "BoundaryRegion",
     "BlockDisposition",
+    "BlockSegment",
+    "BlockSlice",
     "ChunkCandidate",
     "DiscoveryAnalysis",
     "EvidenceQuote",
@@ -396,4 +549,5 @@ __all__ = [
     "StructureRecoveryProposal",
     "StructureScan",
     "StructureValidation",
+    "SourceBlockSegment",
 ]

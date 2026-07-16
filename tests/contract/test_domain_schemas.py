@@ -30,6 +30,20 @@ def test_schemas_are_json_objects_with_closed_critical_roots() -> None:
         assert schema["additionalProperties"] is False, filename
 
 
+def test_structure_recovery_schema_declares_typed_python_character_segments() -> None:
+    schema = json.loads(
+        (ROOT / "schemas" / "structure-recovery.schema.json").read_text(encoding="utf-8")
+    )
+    segment = schema["$defs"]["BlockSegment"]
+    assert segment["additionalProperties"] is False
+    assert {"char_start", "char_end", "offset_unit", "slice_sha256"} <= set(segment["properties"])
+    assert segment["properties"]["segment_id"]["pattern"] == r"^SEG-[A-F0-9]{16}$"
+    assert segment["properties"]["offset_unit"]["const"] == "python_characters"
+    disposition = schema["$defs"]["BlockDisposition"]
+    segments_schema = disposition["properties"]["segments"]["anyOf"][0]
+    assert segments_schema["minItems"] == 2
+
+
 def test_valid_yaml_fixture_round_trips_and_negative_fixtures_fail() -> None:
     fixtures = ROOT / "tests" / "contract" / "fixtures"
     questions = model_from_yaml(

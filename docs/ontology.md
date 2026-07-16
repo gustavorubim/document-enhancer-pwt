@@ -40,6 +40,30 @@ predicate and endpoint type; generic `RELATED_TO` is intentionally absent.
 Cross-document references must use `RELATED_TO_DOCUMENT`, with the referenced
 document represented explicitly when a graph needs to resolve it.
 
+### Split-block structure recovery
+
+Structure recovery preserves exactly one top-level `BlockDisposition` for each
+raw source span. When a compound block needs deterministic structural splitting,
+the disposition may carry two or more typed `BlockSegment` records. Segments are
+metadata over the immutable original block; they do not create new raw spans or
+authoritative source objects.
+
+Each segment uses Python `str` character/code-point offsets, not UTF-8 byte
+offsets, and declares `offset_unit=python_characters`. The proposal validator
+requires contiguous positive ranges from `0` through `len(original_text)`, in
+source order, with no overlap or gap. It recomputes the SHA-256 of each exact
+`original_text[char_start:char_end]` slice and rejects any mismatch, out-of-range
+offset, Unicode/byte-offset assumption, or unknown section reference. A segment
+inherits its source provenance from the parent raw span and may add only its
+typed section/disposition metadata.
+
+Segment IDs are derived as `SEG-` plus a 16-character uppercase hexadecimal
+token from the parent `SPAN-...` ID, the two character offsets, and the slice
+digest. A model may not choose a
+different syntactically valid ID. Changing the offsets or digest changes the
+expected ID and invalidates the proposal. Unsplit dispositions remain valid
+without a `segments` field.
+
 ## Adding an ontology extension
 
 Extensions are reviewed changes, not per-run invention. To add a new entity or
