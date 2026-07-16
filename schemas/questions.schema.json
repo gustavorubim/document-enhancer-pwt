@@ -118,6 +118,13 @@
           "title": "Question Id",
           "type": "string"
         },
+        "source_finding_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Finding Ids",
+          "type": "array"
+        },
         "target_object_id": {
           "anyOf": [
             {

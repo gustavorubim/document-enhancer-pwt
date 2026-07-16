@@ -25,6 +25,7 @@ _RAW_KEYS = {
     "steering",
     "waivers",
     "checklist",
+    "analysis_results",
 }
 _SECRET_TEXT = re.compile(
     r"(?:GOOGLE_API_KEY|GEMINI_API_KEY|BEGIN (?:RSA|OPENSSH|EC) PRIVATE KEY|sk-[A-Za-z0-9]{12,})"

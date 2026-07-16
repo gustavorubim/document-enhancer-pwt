@@ -27,6 +27,7 @@ class Question(StrictModel):
     question: StrictStr
     why_it_matters: StrictStr
     evidence: list[EvidenceQuote] = Field(default_factory=list)
+    source_finding_ids: list[StrictStr] = Field(default_factory=list)
     target_section_id: StrictStr | None = None
     target_object_id: StrictStr | None = None
     expected_answer_shape: StrictStr | None = None
@@ -51,6 +52,13 @@ class Question(StrictModel):
     @classmethod
     def validate_question_text(cls, value: StrictStr | None) -> StrictStr | None:
         return None if value is None else non_empty(value, field_name="question text")
+
+    @field_validator("source_finding_ids")
+    @classmethod
+    def validate_finding_ids(cls, values: list[StrictStr]) -> list[StrictStr]:
+        for value in values:
+            validate_identifier(value, label="source finding id")
+        return values
 
 
 class Answer(StrictModel):
@@ -179,6 +187,7 @@ class ChecklistItem(StrictModel):
     checklist_item_id: StrictStr
     source_finding_id: StrictStr | None = None
     question_id: StrictStr | None = None
+    evidence: list[EvidenceQuote] = Field(default_factory=list)
     answer_id: StrictStr | None = None
     steering_id: StrictStr | None = None
     reference_rule_id: StrictStr | None = None
