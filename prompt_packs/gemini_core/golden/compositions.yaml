@@ -1,0 +1,15 @@
+schema_version: "1.0"
+purpose: offline composition coverage; source and reviewer values are supplied by tests
+document_types:
+  process:
+    model_families: [gemini-3.1-flash-lite, gemini-3.5-flash, gemini-3.1-pro-preview]
+    prompt_ids: [structure.triage, structure.recover-window, structure.reconcile-boundaries, analysis.macro, analysis.sections, analysis.process-methodology-discovery, analysis.rag-readiness, analysis.synthesize-findings, clarification.questions, clarification.rewrite-checklist, rewrite.section, rewrite.semantic-objects, rewrite.revision, audit.content-fidelity, audit.remediation-routing, rag.history-aware-query, rag.entity-linking, rag.retrieval-grading, rag.grounded-answer, rag.citation-audit]
+  methodology:
+    model_families: [gemini-3.1-flash-lite, gemini-3.5-flash, gemini-3.1-pro-preview]
+    prompt_ids: [structure.triage, structure.recover-window, structure.reconcile-boundaries, analysis.macro, analysis.sections, analysis.process-methodology-discovery, analysis.rag-readiness, analysis.synthesize-findings, clarification.questions, clarification.rewrite-checklist, rewrite.section, rewrite.semantic-objects, rewrite.revision, audit.content-fidelity, audit.remediation-routing, rag.history-aware-query, rag.entity-linking, rag.retrieval-grading, rag.grounded-answer, rag.citation-audit]
+  standard:
+    model_families: [gemini-3.1-flash-lite, gemini-3.5-flash, gemini-3.1-pro-preview]
+    prompt_ids: [structure.triage, structure.recover-window, structure.reconcile-boundaries, analysis.macro, analysis.sections, analysis.process-methodology-discovery, analysis.rag-readiness, analysis.synthesize-findings, clarification.questions, clarification.rewrite-checklist, rewrite.section, rewrite.semantic-objects, rewrite.revision, audit.content-fidelity, audit.remediation-routing, rag.history-aware-query, rag.entity-linking, rag.retrieval-grading, rag.grounded-answer, rag.citation-audit]
+  desktop_procedure:
+    model_families: [gemini-3.1-flash-lite, gemini-3.5-flash, gemini-3.1-pro-preview]
+    prompt_ids: [structure.triage, structure.recover-window, structure.reconcile-boundaries, analysis.macro, analysis.sections, analysis.process-methodology-discovery, analysis.rag-readiness, analysis.synthesize-findings, clarification.questions, clarification.rewrite-checklist, rewrite.section, rewrite.semantic-objects, rewrite.revision, audit.content-fidelity, audit.remediation-routing, rag.history-aware-query, rag.entity-linking, rag.retrieval-grading, rag.grounded-answer, rag.citation-audit]
