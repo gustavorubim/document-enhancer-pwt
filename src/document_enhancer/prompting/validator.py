@@ -68,9 +68,9 @@ EXPECTED_SCHEMAS: dict[str, str] = {
     "audit.remediation-routing": "audit.schema.json",
     "rag.history-aware-query": "rag-query.schema.json",
     "rag.entity-linking": "entity.schema.json",
-    "rag.retrieval-grading": "analysis.schema.json",
+    "rag.retrieval-grading": "rag-relevance-grade.schema.json",
     "rag.grounded-answer": "rag-answer.schema.json",
-    "rag.citation-audit": "audit.schema.json",
+    "rag.citation-audit": "rag-grounding-audit.schema.json",
 }
 
 EXPECTED_REFERENCES = {

@@ -32,7 +32,9 @@ from document_enhancer.domain.run import (
     RagAnswer,
     RagBuildManifest,
     RagCitation,
+    RagGroundingAudit,
     RagQuery,
+    RagRelevanceGrade,
     RunManifest,
 )
 from document_enhancer.domain.semantic import SemanticDocument
@@ -54,7 +56,9 @@ SCHEMA_MODELS: Mapping[str, type[BaseModel]] = {
     "rag-answer.schema.json": RagAnswer,
     "rag-build-manifest.schema.json": RagBuildManifest,
     "rag-citation.schema.json": RagCitation,
+    "rag-grounding-audit.schema.json": RagGroundingAudit,
     "rag-query.schema.json": RagQuery,
+    "rag-relevance-grade.schema.json": RagRelevanceGrade,
     "relationship.schema.json": Relationship,
     "run-manifest.schema.json": RunManifest,
     "semantic-document.schema.json": SemanticDocument,

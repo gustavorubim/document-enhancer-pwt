@@ -384,14 +384,37 @@ class RagAnswer(StrictModel):
 
     @model_validator(mode="after")
     def validate_citation_references(self) -> RagAnswer:
+        ensure_unique_ids(citation.citation_id for citation in self.citations)
         citation_ids = {citation.citation_id for citation in self.citations}
         for claim in self.claim_citations:
+            if not claim.citation_ids:
+                raise ValueError("substantive claims require at least one citation handle")
             missing = set(claim.citation_ids) - citation_ids
             if missing:
                 raise ValueError(f"claim citations reference unknown handles: {sorted(missing)}")
         if self.status is RagAnswerStatus.ANSWERED and self.unsupported_claims:
             raise ValueError("answered RAG responses cannot contain unsupported_claims")
+        if self.status in {RagAnswerStatus.ANSWERED, RagAnswerStatus.PARTIAL} and (
+            not self.citations or not self.claim_citations
+        ):
+            raise ValueError("answered and partial RAG responses require claim-level citations")
+        if self.status is RagAnswerStatus.INSUFFICIENT and self.claim_citations:
+            raise ValueError("insufficient RAG responses cannot assert substantive claims")
         return self
+
+
+class RagRelevanceGrade(StrictModel):
+    sufficient: StrictBool
+    relevant_chunk_ids: tuple[StrictStr, ...] = ()
+    reason: StrictStr
+    rewritten_query: StrictStr | None = None
+
+
+class RagGroundingAudit(StrictModel):
+    passed: StrictBool
+    unsupported_claims: tuple[StrictStr, ...] = ()
+    invalid_citation_ids: tuple[StrictStr, ...] = ()
+    reason: StrictStr
 
 
 class ModelCallManifest(StrictModel):

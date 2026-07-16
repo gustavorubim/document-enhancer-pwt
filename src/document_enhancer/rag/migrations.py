@@ -7,7 +7,7 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 MINIMUM_READER_VERSION = 1
 
 
@@ -312,6 +312,80 @@ MIGRATIONS = (
                 REFERENCES catalog_generations(generation) ON DELETE RESTRICT,
             ingested_at TEXT NOT NULL,
             UNIQUE (document_id, version_id, enhanced_digest, embedding_profile)
+        );
+        """,
+    ),
+    Migration(
+        3,
+        "rag_sessions_and_query_audit",
+        """
+        CREATE TABLE rag_sessions (
+            session_id TEXT PRIMARY KEY,
+            catalog_generation INTEGER NOT NULL
+                REFERENCES catalog_generations(generation) ON DELETE RESTRICT,
+            filters_json TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE rag_messages (
+            message_id TEXT PRIMARY KEY,
+            session_id TEXT NOT NULL REFERENCES rag_sessions(session_id) ON DELETE CASCADE,
+            role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+            content TEXT NOT NULL,
+            query_id TEXT,
+            answer_id TEXT,
+            citations_json TEXT NOT NULL DEFAULT '[]',
+            model_metadata_json TEXT NOT NULL DEFAULT '{}',
+            created_at TEXT NOT NULL
+        );
+        CREATE INDEX rag_messages_session_idx
+            ON rag_messages(session_id, created_at, message_id);
+
+        CREATE TABLE rag_queries (
+            query_id TEXT PRIMARY KEY,
+            session_id TEXT REFERENCES rag_sessions(session_id) ON DELETE CASCADE,
+            original_question TEXT NOT NULL,
+            normalized_question TEXT NOT NULL,
+            catalog_generation INTEGER NOT NULL
+                REFERENCES catalog_generations(generation) ON DELETE RESTRICT,
+            embedding_profile TEXT NOT NULL,
+            filters_json TEXT NOT NULL,
+            diagnostics_json TEXT NOT NULL,
+            status TEXT NOT NULL CHECK (status IN ('answered', 'partial', 'insufficient', 'failed')),
+            created_at TEXT NOT NULL
+        );
+
+        CREATE TABLE rag_retrieval_hits (
+            query_id TEXT NOT NULL REFERENCES rag_queries(query_id) ON DELETE CASCADE,
+            chunk_id TEXT NOT NULL REFERENCES chunks(chunk_id) ON DELETE RESTRICT,
+            rank INTEGER NOT NULL CHECK (rank > 0),
+            fused_score REAL,
+            channel_ranks_json TEXT NOT NULL,
+            channel_scores_json TEXT NOT NULL,
+            graph_paths_json TEXT NOT NULL,
+            selected_context INTEGER NOT NULL CHECK (selected_context IN (0, 1)),
+            PRIMARY KEY (query_id, chunk_id)
+        );
+
+        CREATE TABLE rag_answers (
+            answer_id TEXT PRIMARY KEY,
+            query_id TEXT NOT NULL UNIQUE REFERENCES rag_queries(query_id) ON DELETE CASCADE,
+            answer_markdown TEXT NOT NULL,
+            status TEXT NOT NULL CHECK (status IN ('answered', 'partial', 'insufficient')),
+            grounding_passed INTEGER NOT NULL CHECK (grounding_passed IN (0, 1)),
+            caveats_json TEXT NOT NULL,
+            unsupported_claims_json TEXT NOT NULL,
+            model_route TEXT,
+            created_at TEXT NOT NULL
+        );
+
+        CREATE TABLE rag_answer_citations (
+            answer_id TEXT NOT NULL REFERENCES rag_answers(answer_id) ON DELETE CASCADE,
+            citation_id TEXT NOT NULL,
+            chunk_id TEXT NOT NULL REFERENCES chunks(chunk_id) ON DELETE RESTRICT,
+            citation_json TEXT NOT NULL,
+            PRIMARY KEY (answer_id, citation_id)
         );
         """,
     ),

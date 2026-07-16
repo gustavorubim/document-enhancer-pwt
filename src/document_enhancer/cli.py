@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 import json
+import os
+import sys
 from pathlib import Path
 from typing import Annotated, cast
 
 import typer
 from rich.console import Console
+from rich.markdown import Markdown
+from rich.panel import Panel
+from rich.table import Table
 
 from . import __version__
 from .config import config_as_public_dict, load_config
@@ -17,18 +22,41 @@ from .domain.enums import DocumentType
 from .domain.run import ExportBundleManifest
 from .errors import DocumentEnhancerError
 from .export import validate_export_bundle
-from .llm import EmbeddingProfile, GeminiEmbeddingAdapter
+from .llm import (
+    EmbeddingProfile,
+    GeminiEmbeddingAdapter,
+    GeminiGatewayConfig,
+    GeminiModelGateway,
+)
 from .logging import configure_logging, get_logger
-from .prompting import ComposedPrompt, PromptPack, list_prompts, load_prompt_pack, show_prompt
+from .prompting import (
+    ComposedPrompt,
+    PromptPack,
+    PromptPackComposer,
+    list_prompts,
+    load_prompt_pack,
+    show_prompt,
+)
 from .prompting import validate as validate_prompts
 from .rag import (
+    DeterministicRagModel,
     OfflineDeterministicEmbedder,
+    PromptPackRagModelPort,
     RagBuildError,
+    RagRuntime,
+    RetrievalFilters,
+    SessionError,
+    SessionStore,
+    build_hybrid_retriever,
     build_package,
+    catalog_embedding_profile,
     ingest_package,
+    inspect_catalog,
     inspect_package,
     verify_package,
 )
+from .rag.catalog_reader import CatalogReadError
+from .rag.retrievers import GraphRetriever
 from .references.loader import load_reference_pack
 from .workflow import (
     DocumentWorkflow,
@@ -66,7 +94,12 @@ def _emit_json(payload: object) -> None:
 @app.callback()
 def main_callback(
     verbose: Annotated[bool, typer.Option("--verbose", help="Enable diagnostic logging.")] = False,
+    no_color: Annotated[
+        bool, typer.Option("--no-color", help="Disable ANSI color in human-readable output.")
+    ] = False,
 ) -> None:
+    global console
+    console = Console(no_color=no_color or bool(os.getenv("NO_COLOR")))
     configure_logging(verbose=verbose)
 
 
@@ -555,6 +588,504 @@ def rag_ingest(
             f"[green]PROMOTED[/green] catalog generation {receipt.catalog_generation}{suffix}"
         )
         console.print(f"catalog: {receipt.catalog_path}")
+
+
+def _retrieval_filters(
+    *,
+    document_ids: list[str] | None = None,
+    document_types: list[str] | None = None,
+    domains: list[str] | None = None,
+    statuses: list[str] | None = None,
+    confidentiality: list[str] | None = None,
+    authorities: list[str] | None = None,
+    review_statuses: list[str] | None = None,
+    effective_at: str | None = None,
+    include_history: bool = False,
+    catalog_generation: int | None = None,
+) -> RetrievalFilters:
+    return RetrievalFilters(
+        document_ids=tuple(document_ids or ()),
+        document_types=tuple(document_types or ()),
+        domains=tuple(domains or ()),
+        statuses=tuple(statuses or ()),
+        confidentiality=tuple(confidentiality or ()),
+        authorities=(
+            tuple(authorities) if authorities is not None else RetrievalFilters().authorities
+        ),
+        review_statuses=(
+            tuple(review_statuses)
+            if review_statuses is not None
+            else RetrievalFilters().review_statuses
+        ),
+        effective_at=effective_at,
+        current_versions_only=not include_history,
+        catalog_generation=catalog_generation,
+    )
+
+
+def _rag_retriever(
+    catalog: Path,
+    *,
+    filters: RetrievalFilters,
+    top_k: int,
+    offline: bool,
+):
+    profile, _identity = catalog_embedding_profile(catalog)
+    embedder = OfflineDeterministicEmbedder(profile.dimensions) if offline else None
+    embedding = GeminiEmbeddingAdapter(profile=profile, embedder=embedder)
+    return build_hybrid_retriever(
+        catalog,
+        embedding,
+        filters=filters,
+        top_k=top_k,
+        candidate_count=max(top_k * 3, 10),
+    )
+
+
+def _rag_runtime(
+    catalog: Path,
+    *,
+    filters: RetrievalFilters,
+    top_k: int,
+    offline: bool,
+) -> RagRuntime:
+    retriever = _rag_retriever(catalog, filters=filters, top_k=top_k, offline=offline)
+    if offline:
+        model = DeterministicRagModel()
+    else:
+        config = load_config()
+        pack = load_prompt_pack(config.references.prompt_pack)
+        composer = PromptPackComposer(
+            pack,
+            reference_pack=load_reference_pack(config.references.reference_pack),
+        )
+        gateway = GeminiModelGateway(
+            GeminiGatewayConfig.from_env(
+                backend=config.gemini.backend,
+                project=config.gemini.project,
+                location=config.gemini.location,
+                allow_pro_fallback=config.gemini.allow_pro_fallback,
+            )
+        )
+        model = PromptPackRagModelPort(composer, gateway)
+    return RagRuntime(retriever, model)
+
+
+def _render_search(result: object, *, explain: bool) -> None:
+    from document_enhancer.rag.models import RetrievalResult
+
+    value = cast(RetrievalResult, result)
+    table = Table(title="Hybrid retrieval", show_lines=True)
+    table.add_column("Rank", justify="right")
+    table.add_column("Source")
+    table.add_column("Section")
+    table.add_column("Fused", justify="right")
+    table.add_column("Channels")
+    table.add_column("Graph path")
+    table.add_column("Snippet")
+    for hit in value.hits:
+        channels = ", ".join(
+            f"{name}#{rank}={hit.channel_scores.get(name, 0.0):.4f}"
+            for name, rank in sorted(hit.channel_ranks.items())
+        )
+        graph = "; ".join(" -> ".join(step.predicate for step in path) for path in hit.graph_paths)
+        table.add_row(
+            str(hit.rank),
+            f"{hit.document_id}@{hit.version_id}",
+            hit.section_path,
+            f"{(hit.fused_score or 0.0):.6f}",
+            channels,
+            graph,
+            " ".join(hit.text.split())[:180],
+        )
+    console.print(table)
+    if explain:
+        diagnostics = value.diagnostics
+        console.print(
+            Panel(
+                "\n".join(
+                    [
+                        f"Normalized query: {diagnostics.normalized_query}",
+                        f"Catalog generation: {diagnostics.catalog_generation}",
+                        f"Embedding profile: {diagnostics.embedding_profile}",
+                        "Filters: " + diagnostics.filters.model_dump_json(),
+                        "Channels: " + json.dumps(diagnostics.channel_counts, sort_keys=True),
+                        "Latency ms: " + json.dumps(diagnostics.latency_ms, sort_keys=True),
+                    ]
+                ),
+                title="Retrieval explanation",
+            )
+        )
+
+
+def _render_answer(result: object, *, explain: bool) -> None:
+    from document_enhancer.rag.models import RagRunResult
+
+    value = cast(RagRunResult, result)
+    answer = value.answer
+    style = "green" if answer.status.value == "answered" else "yellow"
+    console.print(
+        Panel(
+            Markdown(answer.answer_markdown), title=answer.status.value.upper(), border_style=style
+        )
+    )
+    if answer.citations:
+        table = Table(title="Validated sources")
+        table.add_column("Handle")
+        table.add_column("Document/version")
+        table.add_column("Section")
+        table.add_column("Chunk")
+        for citation in answer.citations:
+            table.add_row(
+                citation.citation_id,
+                f"{citation.document_id}@{citation.version_id}",
+                " / ".join(citation.section_path),
+                citation.chunk_id,
+            )
+        console.print(table)
+    if explain:
+        console.print(
+            Panel(
+                "\n".join(
+                    [
+                        f"Rewritten query: {value.rewritten_query}",
+                        f"Retrieval retries: {value.retrieval_retry_count}",
+                        f"Grounding repairs: {value.grounding_repair_count}",
+                        f"Grounding passed: {value.grounding.passed}",
+                        f"Answer model route: {value.answer.model_route or 'none'}",
+                        "Latency ms: "
+                        + json.dumps(value.retrieval.diagnostics.latency_ms, sort_keys=True),
+                        "Stages: " + " -> ".join(value.retrieval.diagnostics.stages),
+                        "Selected context: "
+                        + ", ".join(value.retrieval.diagnostics.selected_context_ids),
+                    ]
+                ),
+                title="RAG explanation",
+            )
+        )
+
+
+@rag_app.command("search")
+def rag_search(
+    query: Annotated[str, typer.Argument(help="Retrieval query.")],
+    catalog: Annotated[Path | None, typer.Option("--catalog")] = None,
+    top_k: Annotated[int, typer.Option("--top-k", min=1, max=1000)] = 10,
+    explain: Annotated[bool, typer.Option("--explain")] = False,
+    offline: Annotated[bool, typer.Option("--offline")] = False,
+    document_id: Annotated[list[str] | None, typer.Option("--document-id")] = None,
+    document_type: Annotated[list[str] | None, typer.Option("--document-type")] = None,
+    domain: Annotated[list[str] | None, typer.Option("--domain")] = None,
+    status: Annotated[list[str] | None, typer.Option("--status")] = None,
+    confidentiality: Annotated[list[str] | None, typer.Option("--confidentiality")] = None,
+    authority: Annotated[list[str] | None, typer.Option("--authority")] = None,
+    review_status: Annotated[list[str] | None, typer.Option("--review-status")] = None,
+    effective_at: Annotated[str | None, typer.Option("--effective-at")] = None,
+    include_history: Annotated[bool, typer.Option("--include-history")] = False,
+    json_output: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    """Retrieve only, with fused channel ranks, graph paths, and filters."""
+
+    path = (catalog or load_config().workspace.catalog_path).expanduser().resolve()
+    filters = _retrieval_filters(
+        document_ids=document_id,
+        document_types=document_type,
+        domains=domain,
+        statuses=status,
+        confidentiality=confidentiality,
+        authorities=authority,
+        review_statuses=review_status,
+        effective_at=effective_at,
+        include_history=include_history,
+    )
+    try:
+        result = _rag_retriever(path, filters=filters, top_k=top_k, offline=offline).search(query)
+    except (CatalogReadError, ValueError, RuntimeError) as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(30) from exc
+    if json_output:
+        _emit_json(result.model_dump(mode="json"))
+    else:
+        _render_search(result, explain=explain)
+
+
+@rag_app.command("ask")
+def rag_ask(
+    question: Annotated[str, typer.Argument(help="Question answered only from catalog evidence.")],
+    catalog: Annotated[Path | None, typer.Option("--catalog")] = None,
+    top_k: Annotated[int, typer.Option("--top-k", min=1, max=1000)] = 10,
+    explain: Annotated[bool, typer.Option("--explain")] = False,
+    offline: Annotated[bool, typer.Option("--offline")] = False,
+    document_id: Annotated[list[str] | None, typer.Option("--document-id")] = None,
+    document_type: Annotated[list[str] | None, typer.Option("--document-type")] = None,
+    domain: Annotated[list[str] | None, typer.Option("--domain")] = None,
+    status: Annotated[list[str] | None, typer.Option("--status")] = None,
+    confidentiality: Annotated[list[str] | None, typer.Option("--confidentiality")] = None,
+    authority: Annotated[list[str] | None, typer.Option("--authority")] = None,
+    review_status: Annotated[list[str] | None, typer.Option("--review-status")] = None,
+    effective_at: Annotated[str | None, typer.Option("--effective-at")] = None,
+    json_output: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    """Produce one structured answer after citation and grounding validation."""
+
+    path = (catalog or load_config().workspace.catalog_path).expanduser().resolve()
+    filters = _retrieval_filters(
+        document_ids=document_id,
+        document_types=document_type,
+        domains=domain,
+        statuses=status,
+        confidentiality=confidentiality,
+        authorities=authority,
+        review_statuses=review_status,
+        effective_at=effective_at,
+    )
+    try:
+        runtime = _rag_runtime(path, filters=filters, top_k=top_k, offline=offline)
+        if console.is_terminal and not json_output:
+            with console.status("Running retrieval and grounding stages..."):
+                result = runtime.answer(question)
+        else:
+            result = runtime.answer(question)
+    except (CatalogReadError, ValueError, RuntimeError) as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(30) from exc
+    if json_output:
+        _emit_json(result.model_dump(mode="json"))
+    else:
+        _render_answer(result, explain=explain)
+
+
+@rag_app.command("sources")
+def rag_sources(
+    identifier: Annotated[str, typer.Argument(help="Saved answer or session ID.")],
+    catalog: Annotated[Path | None, typer.Option("--catalog")] = None,
+    json_output: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    """Resolve stable citations for a saved answer or session."""
+
+    path = (catalog or load_config().workspace.catalog_path).expanduser().resolve()
+    try:
+        sources = SessionStore(path).sources(identifier)
+    except (SessionError, RuntimeError) as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(30) from exc
+    if json_output:
+        _emit_json(
+            {"schema_version": "m7.rag-sources.v1", "identifier": identifier, "sources": sources}
+        )
+        return
+    table = Table(title=f"Sources for {identifier}")
+    table.add_column("Handle")
+    table.add_column("Title")
+    table.add_column("Section")
+    table.add_column("Snippet")
+    for source in sources:
+        citation = cast(dict[str, object], source["citation"])
+        table.add_row(
+            str(citation["citation_id"]),
+            str(source["title"]),
+            str(source["section_path"]),
+            " ".join(str(source["text"]).split())[:200],
+        )
+    console.print(table)
+
+
+@rag_app.command("graph")
+def rag_graph(
+    entity_id: Annotated[str, typer.Argument(help="Stable entity ID, alias, or canonical name.")],
+    catalog: Annotated[Path | None, typer.Option("--catalog")] = None,
+    depth: Annotated[int, typer.Option("--depth", min=1, max=2)] = 1,
+    authority: Annotated[list[str] | None, typer.Option("--authority")] = None,
+    json_output: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    """Show bounded, authority-filtered graph paths and connected chunks."""
+
+    path = (catalog or load_config().workspace.catalog_path).expanduser().resolve()
+    filters = _retrieval_filters(authorities=authority)
+    try:
+        documents = GraphRetriever(
+            catalog_path=path, filters=filters, max_depth=depth, candidate_count=100
+        ).invoke(entity_id)
+    except (CatalogReadError, ValueError, RuntimeError) as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(30) from exc
+    payload = {
+        "schema_version": "m7.rag-graph.v1",
+        "entity": entity_id,
+        "depth": depth,
+        "hits": [
+            {
+                "chunk_id": item.metadata["chunk_id"],
+                "document_id": item.metadata["document_id"],
+                "section_path": item.metadata["section_path"],
+                "graph_paths": item.metadata.get("graph_paths", []),
+            }
+            for item in documents
+        ],
+    }
+    if json_output:
+        _emit_json(payload)
+    else:
+        table = Table(title=f"Graph neighborhood: {entity_id}")
+        table.add_column("Chunk")
+        table.add_column("Source")
+        table.add_column("Paths")
+        for hit in cast(list[dict[str, object]], payload["hits"]):
+            table.add_row(
+                str(hit["chunk_id"]),
+                f"{hit['document_id']} / {hit['section_path']}",
+                json.dumps(hit["graph_paths"], sort_keys=True),
+            )
+        console.print(table)
+
+
+@rag_app.command("stats")
+def rag_stats(
+    catalog: Annotated[Path | None, typer.Option("--catalog")] = None,
+    json_output: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    """Show catalog, graph, vector, and saved-session counts."""
+
+    path = (catalog or load_config().workspace.catalog_path).expanduser().resolve()
+    try:
+        payload = inspect_catalog(path)
+    except (CatalogReadError, ValueError, RuntimeError) as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(30) from exc
+    if json_output:
+        _emit_json(payload)
+    else:
+        table = Table(title="RAG catalog statistics")
+        table.add_column("Metric")
+        table.add_column("Value", justify="right")
+        for key, value in payload.items():
+            table.add_row(key, str(value))
+        console.print(table)
+
+
+@rag_app.command("chat")
+def rag_chat(
+    catalog: Annotated[Path | None, typer.Option("--catalog")] = None,
+    session: Annotated[str | None, typer.Option("--session")] = None,
+    no_save: Annotated[bool, typer.Option("--no-save")] = False,
+    top_k: Annotated[int, typer.Option("--top-k", min=1, max=1000)] = 10,
+    explain: Annotated[bool, typer.Option("--explain")] = False,
+    offline: Annotated[bool, typer.Option("--offline")] = False,
+    json_output: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    """Interactive or line-oriented chat with visible history and explicit persistence."""
+
+    if session and no_save:
+        typer.echo("error: --session and --no-save cannot be combined", err=True)
+        raise typer.Exit(30)
+    path = (catalog or load_config().workspace.catalog_path).expanduser().resolve()
+    store = SessionStore(path) if session else None
+    filters = RetrievalFilters()
+    history = []
+    session_id = session
+    try:
+        if store is not None:
+            session_id, filters = store.open(session)
+            history = list(store.history(session_id))
+        runtime = _rag_runtime(path, filters=filters, top_k=top_k, offline=offline)
+    except (CatalogReadError, SessionError, ValueError, RuntimeError) as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(30) from exc
+    transcript: list[dict[str, object]] = []
+    last_result = None
+    explain_enabled = explain
+    if not json_output:
+        console.print(
+            Panel(
+                f"Session: {session_id or 'in-memory'}\nType /help for commands.",
+                title="Document Enhancer RAG chat",
+            )
+        )
+    while True:
+        if sys.stdin.isatty():
+            value = typer.prompt("question", prompt_suffix="> ")
+        else:
+            value = sys.stdin.readline()
+            if value == "":
+                break
+            value = value.rstrip("\r\n")
+        command = value.strip()
+        if not command:
+            continue
+        if command.startswith("/"):
+            name = command.casefold()
+            if name in {"/exit", "/quit"}:
+                break
+            if name == "/help":
+                if not json_output:
+                    console.print("/sources /explain /filters /clear /session /refresh /help /exit")
+            elif name == "/explain":
+                explain_enabled = not explain_enabled
+                if not json_output:
+                    console.print(f"explain: {explain_enabled}")
+            elif name == "/filters":
+                if not json_output:
+                    console.print(filters.model_dump_json(indent=2))
+            elif name == "/session":
+                if not json_output:
+                    console.print(session_id or "in-memory (not persisted)")
+            elif name == "/clear":
+                history.clear()
+                if store is not None and session_id is not None:
+                    store.clear(session_id)
+                if not json_output:
+                    console.print("history cleared")
+            elif name == "/refresh":
+                if store is None or session_id is None:
+                    if not json_output:
+                        console.print("refresh requires --session")
+                else:
+                    filters = store.refresh(session_id)
+                    runtime = _rag_runtime(path, filters=filters, top_k=top_k, offline=offline)
+                    if not json_output:
+                        console.print(
+                            f"session refreshed to generation {filters.catalog_generation}"
+                        )
+            elif name == "/sources":
+                if last_result is None:
+                    if not json_output:
+                        console.print("no answer sources yet")
+                elif not json_output:
+                    _render_answer(last_result, explain=False)
+            elif not json_output:
+                console.print(f"unknown command: {command}")
+            continue
+        try:
+            if console.is_terminal and not json_output:
+                with console.status("Running retrieval and grounding stages..."):
+                    result = runtime.answer(command, history=history)
+            else:
+                result = runtime.answer(command, history=history)
+            if store is not None and session_id is not None:
+                store.save_exchange(session_id, command, result)
+            from document_enhancer.rag.models import ChatMessage
+
+            history.extend(
+                [
+                    ChatMessage(role="user", content=command),
+                    ChatMessage(role="assistant", content=result.answer.answer_markdown),
+                ]
+            )
+            last_result = result
+            transcript.append(result.model_dump(mode="json"))
+            if not json_output:
+                _render_answer(result, explain=explain_enabled)
+        except (SessionError, ValueError, RuntimeError) as exc:
+            typer.echo(f"error: {exc}", err=True)
+            raise typer.Exit(30) from exc
+    if json_output:
+        _emit_json(
+            {
+                "schema_version": "m7.rag-chat.v1",
+                "session_id": session_id,
+                "saved": store is not None,
+                "turns": transcript,
+            }
+        )
 
 
 def _prompt_variables(pack: PromptPack, prompt_id: str, document_type: str) -> dict[str, object]:

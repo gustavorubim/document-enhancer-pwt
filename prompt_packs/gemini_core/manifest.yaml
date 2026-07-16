@@ -1,6 +1,6 @@
 schema_version: "1.0"
 pack_id: gemini_core
-version: "1.0.2"
+version: "1.0.3"
 description: >-
   Versioned, Gemini-first prompt pack for governed document enhancement and grounded local RAG.
 owner: Document Enhancer Prompt Governance
@@ -106,8 +106,8 @@ file_digests:
   audit/remediation-routing.md: aad1588c9bd94cd173e8d23a2ad70c860721da474af30cc2009fbcf997a61118
   clarification/questions.md: 5f99be2b4e90b811d572ed503b8d0a21a67dc1c24eb005889c6a6835dbb45371
   clarification/rewrite-checklist.md: 356a6a5cc0060c461fe6dcb58577f770be2d45c190a1262da15a68833d97e4a0
-  golden/compositions.yaml: 9990c80f839f0ee933615a7431c26eaaeeba8a2db4d19e2d87a40094824f8591
-  golden/fake_outputs.json: a792aae7bbebc26ad9feb9010841af4751e315a285af758b70a7882eb1616237
+  golden/compositions.yaml: 5e541ca6eeab021cecdd2fd466e117325a6ec3a153594a7fd2cd4fde13255fcc
+  golden/fake_outputs.json: c56cd2b5738027a726b1621f6df08b16aa7a56d3b391be9fd74b393bb35b8531
   rag/citation-audit.md: 60a64d31aa960cbf280c3954fe9aeb3cbbde6f99cf7280cfcc605748d947b4c5
   rag/entity-linking.md: 579717547253ccf0e0399423c3dbb92ba1c594e16031534a5e69618c66a6d4dd
   rag/grounded-answer.md: d893514a6621486a69040533008e6c0854c6a4f5e4208f954c8a2aaae3dfb63c
@@ -426,7 +426,7 @@ prompts:
     template_path: rag/retrieval-grading.md
     shared_fragments: [shared/system.md, shared/evidence-and-no-invention.md, shared/source-as-untrusted-data.md, shared/provenance.md, shared/prompt-injection-resistance.md, shared/structured-output.md, shared/tool-prohibition.md]
     model_route: gemini-3.1-flash-lite
-    output_schema: analysis.schema.json
+    output_schema: rag-relevance-grade.schema.json
     allowed_inputs: [question, retrieved_chunks, document_metadata]
     optional_tools: []
     token_budget: 18000
@@ -459,7 +459,7 @@ prompts:
     template_path: rag/citation-audit.md
     shared_fragments: [shared/system.md, shared/evidence-and-no-invention.md, shared/source-as-untrusted-data.md, shared/provenance.md, shared/prompt-injection-resistance.md, shared/structured-output.md, shared/tool-prohibition.md]
     model_route: gemini-3.1-flash-lite
-    output_schema: audit.schema.json
+    output_schema: rag-grounding-audit.schema.json
     allowed_inputs: [question, retrieved_chunks, answer, document_metadata]
     optional_tools: []
     token_budget: 16000
