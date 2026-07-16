@@ -26,6 +26,7 @@ from document_enhancer.domain.questions import (
 )
 from document_enhancer.domain.run import (
     ExportBundle,
+    ExportChunk,
     PromptPackManifest,
     RagAnswer,
     RagBuildManifest,
@@ -42,6 +43,7 @@ SCHEMA_MODELS: Mapping[str, type[BaseModel]] = {
     "answers.schema.json": AnswersArtifact,
     "audit.schema.json": Audit,
     "content-ledger.schema.json": ContentLedger,
+    "chunk.schema.json": ExportChunk,
     "entity.schema.json": Entity,
     "export.schema.json": ExportBundle,
     "provenance.schema.json": Provenance,

@@ -43,6 +43,15 @@ def test_cache_proofs_change_only_the_dependent_suffix() -> None:
     assert prompt.before_keys["raw_ingest"] == prompt.after_keys["raw_ingest"]
     assert prompt.before_keys["analysis"] != prompt.after_keys["analysis"]
 
+    live = _inputs() | {
+        "ledger": "ledger-a",
+        "rewrite": "rewrite-a",
+        "semantic_model": "semantic-a",
+    }
+    waiver = cache.prove_change(live, changed_input="waiver", changed_value="waiver-b")
+    assert waiver.valid
+    assert {"audit", "diff", "chunk", "export", "complete"} <= set(waiver.changed_stages)
+
 
 def test_side_effect_receipts_are_idempotent(tmp_path) -> None:
     ledger = SideEffectLedger(tmp_path / "checkpoint.sqlite3")

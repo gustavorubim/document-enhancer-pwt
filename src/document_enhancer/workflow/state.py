@@ -40,6 +40,10 @@ class WorkflowState(TypedDict, total=False):
     semantic_document: object
     mermaid_validation: object
     revision_counters: object
+    audit_result: object
+    audit_route: str
+    chunks: object
+    export_bundle: object
     errors: list[str]
     stop_after: str | None
     gate2_enabled: bool
@@ -49,7 +53,7 @@ class WorkflowState(TypedDict, total=False):
 class WorkflowSnapshot(StrictModel):
     """JSON-safe state stored beside the run artifacts after every transition."""
 
-    schema_version: StrictStr = "m5.workflow-state.v1"
+    schema_version: StrictStr = "m7.workflow-state.v1"
     run_id: StrictStr
     status: Literal["created", "running", "waiting", "succeeded", "failed"]
     current_stage: StrictStr

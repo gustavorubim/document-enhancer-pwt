@@ -76,8 +76,14 @@ def next_action(state: Mapping[str, object]) -> str:
         "render",
         "semantic",
         "mermaid_validate",
+        "audit",
+        "diff",
+        "chunk",
+        "export",
     }:
         return f"Run the {stage} stage or resume the persisted task."
+    if stage == "audit_gate":
+        return "Resolve or explicitly waive the cited audit blockers, then run docenhance resume."
     if stage in {"succeeded", "complete"} or state.get("status") == "succeeded":
         return "No action required; the run is complete."
     return f"Run the {stage} stage or resume the persisted task."

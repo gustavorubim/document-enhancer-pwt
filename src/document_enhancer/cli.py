@@ -12,8 +12,11 @@ from rich.console import Console
 from . import __version__
 from .config import config_as_public_dict, load_config
 from .doctor import doctor_json, run_doctor
+from .domain.audit import Audit
 from .domain.enums import DocumentType
+from .domain.run import ExportBundleManifest
 from .errors import DocumentEnhancerError
+from .export import validate_export_bundle
 from .logging import configure_logging, get_logger
 from .prompting import ComposedPrompt, PromptPack, list_prompts, load_prompt_pack, show_prompt
 from .prompting import validate as validate_prompts
@@ -181,7 +184,7 @@ def _load_snapshot(run_dir: Path, run_id: str) -> WorkflowSnapshot:
 
 def _status_payload(snapshot: WorkflowSnapshot, *, command: str) -> dict[str, object]:
     return {
-        "schema_version": "m5.cli.v1",
+        "schema_version": "m7.cli.v1",
         "command": command,
         "run_id": snapshot.run_id,
         "status": snapshot.status,
@@ -266,6 +269,7 @@ def resume_workflow(
     try:
         root = (run_dir or load_config().workspace.run_dir).expanduser()
         snapshot = _load_snapshot(root, run_id)
+        config = load_config()
         services = WorkflowServices(
             run_root=root,
             source=Path(),
@@ -274,6 +278,12 @@ def resume_workflow(
             structure_mode="parser",
             gate2_enabled=snapshot.gate2_enabled,
             offline=True,
+            input_fingerprints=workflow_input_fingerprints(
+                prompt_pack=config.references.prompt_pack,
+                reference_pack=config.references.reference_pack,
+            ),
+            prompt_pack=config.references.prompt_pack,
+            reference_pack=config.references.reference_pack,
         )
         result = DocumentWorkflow(services).resume()
         if json_output:
@@ -288,6 +298,91 @@ def resume_workflow(
     except DocumentEnhancerError as error:
         _emit_error(error)
         raise typer.Exit(int(error.exit_code)) from error
+
+
+@app.command("audit")
+def inspect_audit(
+    run_id: Annotated[str, typer.Argument(help="Persisted run ID.")],
+    run_dir: Annotated[Path | None, typer.Option("--run-dir", help="Run artifact root.")] = None,
+    json_output: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    """Inspect the final fail-closed audit result for a run."""
+
+    root = (run_dir or load_config().workspace.run_dir).expanduser() / run_id
+    path = root / "audit/audit.json"
+    if not path.is_file():
+        raise typer.Exit(20)
+    try:
+        audit = Audit.model_validate_json(path.read_text(encoding="utf-8"))
+    except ValueError as exc:
+        typer.echo(f"error: invalid audit artifact: {exc}", err=True)
+        raise typer.Exit(20) from exc
+    payload = {
+        "schema_version": "m7.cli.audit.v1",
+        "run_id": run_id,
+        "status": audit.status.value,
+        "route": audit.routing.route,
+        "blocker_ids": audit.routing.blocker_ids,
+        "independent_audit_status": audit.independent_audit.status,
+        "passed_checks": sum(item.passed for item in audit.deterministic_checks),
+        "failed_checks": sum(not item.passed for item in audit.deterministic_checks),
+        "report": str(root / "audit/report.md"),
+    }
+    if json_output:
+        _emit_json(payload)
+    else:
+        style = "green" if audit.status.value == "pass" else "red"
+        console.print(f"[{style}]{audit.status.value.upper()}[/{style}] audit {audit.audit_id}")
+        console.print(f"route: {audit.routing.route}")
+        console.print(f"independent: {audit.independent_audit.status}")
+        console.print(f"blockers: {', '.join(audit.routing.blocker_ids) or 'none'}")
+        console.print(f"report: {root / 'audit/report.md'}")
+    if audit.status.value != "pass":
+        raise typer.Exit(30)
+
+
+@app.command("export")
+def inspect_export(
+    run_id: Annotated[str, typer.Argument(help="Persisted run ID.")],
+    run_dir: Annotated[Path | None, typer.Option("--run-dir", help="Run artifact root.")] = None,
+    json_output: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    """Inspect and reconcile a completed JSONL export bundle."""
+
+    directory = (run_dir or load_config().workspace.run_dir).expanduser() / run_id / "export"
+    errors = validate_export_bundle(directory)
+    manifest_path = directory / "bundle-manifest.json"
+    if not manifest_path.is_file():
+        typer.echo("error: export bundle is incomplete", err=True)
+        raise typer.Exit(30)
+    try:
+        manifest = ExportBundleManifest.model_validate_json(
+            manifest_path.read_text(encoding="utf-8")
+        )
+    except ValueError as exc:
+        typer.echo(f"error: invalid export manifest: {exc}", err=True)
+        raise typer.Exit(30) from exc
+    payload = {
+        "schema_version": "m7.cli.export.v1",
+        "run_id": run_id,
+        "bundle_id": manifest.bundle_id,
+        "valid": not errors,
+        "errors": list(errors),
+        "counts": manifest.artifact_counts,
+        "digests": manifest.artifact_digests,
+    }
+    if json_output:
+        _emit_json(payload)
+    else:
+        console.print(
+            f"[{'green' if not errors else 'red'}]{'VALID' if not errors else 'INVALID'}[/] export {manifest.bundle_id}"
+        )
+        for name, count in sorted(manifest.artifact_counts.items()):
+            console.print(f"{name}: {count}")
+        for error in errors:
+            console.print(f"- {error}")
+    if errors:
+        raise typer.Exit(30)
 
 
 def _prompt_variables(pack: PromptPack, prompt_id: str, document_type: str) -> dict[str, object]:

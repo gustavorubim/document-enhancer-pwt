@@ -14,6 +14,8 @@ from langgraph.types import interrupt
 from document_enhancer.analysis.models import AnalysisRequest
 from document_enhancer.artifacts.paths import RunPaths, content_addressed_run_id
 from document_enhancer.artifacts.run_storage import RunStorage
+from document_enhancer.audit import ContentAuditor, build_audit, write_audit_artifacts
+from document_enhancer.chunking import build_chunks
 from document_enhancer.clarification import (
     build_rewrite_checklist,
     load_yaml,
@@ -25,6 +27,7 @@ from document_enhancer.clarification import (
 )
 from document_enhancer.config import yaml_parser
 from document_enhancer.domain.analysis import AnalysisReport, FindingSet
+from document_enhancer.domain.audit import Audit
 from document_enhancer.domain.enums import DocumentType
 from document_enhancer.domain.questions import (
     AnswersArtifact,
@@ -34,9 +37,16 @@ from document_enhancer.domain.questions import (
     Steering,
     WaiversArtifact,
 )
+from document_enhancer.domain.run import ExportChunk
+from document_enhancer.domain.semantic import SemanticDocument
 from document_enhancer.domain.serialization import model_to_yaml
 from document_enhancer.domain.source import NormalizedDocument as DomainNormalizedDocument
 from document_enhancer.errors import ValidationError, WaitingForReviewError
+from document_enhancer.export import (
+    build_export_bundle,
+    validate_export_bundle,
+    write_export_bundle,
+)
 from document_enhancer.ingest.models import NormalizedDocument, RawDocument
 from document_enhancer.ingest.normalize import normalize_document
 from document_enhancer.ingest.pipeline import ParserRegistry, parse_source
@@ -64,6 +74,7 @@ from .state import WorkflowState, state_json
 
 AnalysisRunner = Callable[[AnalysisRequest], object]
 RewriteRunner = Callable[[tuple[SectionRewriteInput, ...]], object]
+AuditRevisionRunner = Callable[[EnhancedDocumentModel, Audit], object]
 
 
 @dataclass
@@ -78,6 +89,8 @@ class WorkflowServices:
     structure_service: StructureRecoveryService | None = None
     analysis_runner: AnalysisRunner | None = None
     rewrite_runner: RewriteRunner | None = None
+    content_auditor: ContentAuditor | None = None
+    audit_revision_runner: AuditRevisionRunner | None = None
     structure_mode: str = "parser"
     gate2_enabled: bool = True
     stop_after: str | None = None
@@ -168,6 +181,14 @@ def _as_enhanced_model(value: object) -> EnhancedDocumentModel:
     )
 
 
+def _as_semantic(value: object) -> SemanticDocument:
+    return value if isinstance(value, SemanticDocument) else SemanticDocument.model_validate(value)
+
+
+def _as_audit(value: object) -> Audit:
+    return value if isinstance(value, Audit) else Audit.model_validate(value)
+
+
 def _as_revision_counters(value: object, services: WorkflowServices) -> RevisionCounters:
     if value is None:
         return RevisionCounters(
@@ -218,6 +239,7 @@ def _input_values(state: WorkflowState, services: WorkflowServices) -> dict[str,
         "ledger": state.get("cache_keys", {}).get("content_ledger", ""),
         "rewrite": state.get("cache_keys", {}).get("rewrite_model", ""),
         "semantic_model": state.get("cache_keys", {}).get("semantic", ""),
+        "waivers": state_json(state.get("waivers", "")),
         **services.input_fingerprints,
     }
     if isinstance(raw, RawDocument):
@@ -864,6 +886,128 @@ def mermaid_validate_node(state: WorkflowState, services: WorkflowServices) -> W
     return _finish_stage(state, services, "mermaid_validate")
 
 
+def _m7_requirements(services: WorkflowServices) -> Mapping[str, object] | None:
+    if services.reference_pack is None:
+        return None
+    pack = load_reference_pack(services.reference_pack)
+    value = yaml_parser().load(
+        pack.requirements_path(services.document_type.value).read_text(encoding="utf-8")
+    )
+    return cast(Mapping[str, object], value) if isinstance(value, Mapping) else None
+
+
+def audit_node(state: WorkflowState, services: WorkflowServices) -> WorkflowState:
+    model = _as_enhanced_model(state["enhanced_model"])
+    semantic = _as_semantic(state["semantic_document"])
+    ledger = _as_ledger(state["content_ledger"])
+    raw = _as_raw(state["raw"])
+    normalized = _as_normalized(state["normalized"])
+    enhanced_path = services.paths.artifact_path("output/enhanced.md")
+    if not enhanced_path.is_file():
+        raise ValidationError("enhanced Markdown is missing before audit")
+    counters = _as_revision_counters(state.get("revision_counters"), services)
+    _questions, _answers, _steering, waivers = _load_reviewer_inputs(state, services)
+    state["waivers"] = waivers
+    audit = build_audit(
+        run_id=str(state["run_id"]),
+        model=model,
+        semantic=semantic,
+        ledger=ledger,
+        raw=raw,
+        source_markdown=normalized.normalized_markdown,
+        enhanced_markdown=enhanced_path.read_text(encoding="utf-8"),
+        counters=counters,
+        requirements=_m7_requirements(services),
+        waivers=waivers,
+        content_auditor=services.content_auditor,
+    )
+    state["audit_result"] = audit
+    state["audit_route"] = audit.routing.route
+    assert services.checkpoint is not None
+    services.checkpoint.side_effect_once(
+        "audit",
+        "audit-artifacts",
+        audit.model_dump(mode="json"),
+        lambda: write_audit_artifacts(audit, services.paths.artifact_path("audit")),
+    )
+    if audit.routing.route == "auto_revise":
+        if services.audit_revision_runner is None:
+            state["audit_route"] = "human_review"
+        else:
+            counters = counters.consume_audit()
+            candidate = services.audit_revision_runner(model, audit)
+            revised = _as_enhanced_model(candidate)
+            revised = revised.model_copy(update={"revision_counters": counters})
+            state["enhanced_model"] = revised
+            state["revision_counters"] = counters
+            state["audit_route"] = "auto_revise"
+    return _finish_stage(state, services, "audit")
+
+
+def audit_gate_node(state: WorkflowState, services: WorkflowServices) -> WorkflowState:
+    audit = _as_audit(state["audit_result"])
+    _pause(
+        state,
+        services,
+        "audit",
+        {
+            "audit_status": audit.status.value,
+            "route": audit.routing.route,
+            "blocker_ids": audit.routing.blocker_ids,
+        },
+    )
+    return state  # pragma: no cover
+
+
+def audit_failed_node(state: WorkflowState, services: WorkflowServices) -> WorkflowState:
+    audit = _as_audit(state["audit_result"])
+    raise ValidationError("audit failed closed: " + audit.routing.reason)
+
+
+def diff_node(state: WorkflowState, services: WorkflowServices) -> WorkflowState:
+    audit = _as_audit(state["audit_result"])
+    audit.assert_pass()
+    return _finish_stage(state, services, "diff")
+
+
+def chunk_node(state: WorkflowState, services: WorkflowServices) -> WorkflowState:
+    audit = _as_audit(state["audit_result"])
+    audit.assert_pass()
+    chunks = build_chunks(_as_enhanced_model(state["enhanced_model"]))
+    if not chunks:
+        raise ValidationError("audit passed but no authoritative semantic chunks were produced")
+    state["chunks"] = list(chunks)
+    return _finish_stage(state, services, "chunk")
+
+
+def export_node(state: WorkflowState, services: WorkflowServices) -> WorkflowState:
+    audit = _as_audit(state["audit_result"])
+    chunks = tuple(
+        item if isinstance(item, ExportChunk) else ExportChunk.model_validate(item)
+        for item in cast(list[object], state["chunks"])
+    )
+    bundle = build_export_bundle(
+        run_id=str(state["run_id"]),
+        source_digest=str(state["source_digest"]),
+        semantic=_as_semantic(state["semantic_document"]),
+        chunks=chunks,
+        audit=audit,
+    )
+    assert services.checkpoint is not None
+    export_dir = services.paths.artifact_path("export")
+    services.checkpoint.side_effect_once(
+        "export",
+        "export-bundle",
+        bundle.manifest.model_dump(mode="json"),
+        lambda: write_export_bundle(bundle, export_dir),
+    )
+    errors = validate_export_bundle(export_dir)
+    if errors:
+        raise ValidationError("export reconciliation failed: " + "; ".join(errors))
+    state["export_bundle"] = bundle
+    return _finish_stage(state, services, "export")
+
+
 def complete_node(state: WorkflowState, services: WorkflowServices) -> WorkflowState:
     state["status"] = "succeeded"
     state["current_stage"] = "complete"
@@ -873,10 +1017,16 @@ def complete_node(state: WorkflowState, services: WorkflowServices) -> WorkflowS
 
 __all__ = [
     "WorkflowServices",
+    "audit_failed_node",
+    "audit_gate_node",
+    "audit_node",
     "analysis_node",
     "checklist_node",
     "content_ledger_node",
     "complete_node",
+    "chunk_node",
+    "diff_node",
+    "export_node",
     "gate1_node",
     "gate2_node",
     "mermaid_validate_node",

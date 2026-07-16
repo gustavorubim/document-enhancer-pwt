@@ -20,9 +20,15 @@ from document_enhancer.errors import DocumentEnhancerError, ValidationError, Wai
 from .nodes import (
     WorkflowServices,
     analysis_node,
+    audit_failed_node,
+    audit_gate_node,
+    audit_node,
     checklist_node,
+    chunk_node,
     complete_node,
     content_ledger_node,
+    diff_node,
+    export_node,
     gate1_node,
     gate2_node,
     mermaid_validate_node,
@@ -44,7 +50,7 @@ from .state import WorkflowSnapshot, WorkflowState
 
 
 class WorkflowResult(StrictModel):
-    schema_version: StrictStr = "m5.workflow-result.v1"
+    schema_version: StrictStr = "m7.workflow-result.v1"
     run_id: StrictStr
     status: Literal["created", "running", "waiting", "succeeded", "failed"]
     current_stage: StrictStr
@@ -72,6 +78,10 @@ def _gate1_route(state: WorkflowState) -> str:
 
 def _gate2_route(state: WorkflowState) -> str:
     return "content_ledger"
+
+
+def _audit_route(state: WorkflowState) -> str:
+    return str(state.get("audit_route", "failed"))
 
 
 def _node_call(
@@ -108,6 +118,12 @@ def build_graph(services: WorkflowServices):
     builder.add_node("render", _node_call(render_node, services))
     builder.add_node("semantic", _node_call(semantic_node, services))
     builder.add_node("mermaid_validate", _node_call(mermaid_validate_node, services))
+    builder.add_node("audit", _node_call(audit_node, services))
+    builder.add_node("audit_gate", _node_call(audit_gate_node, services))
+    builder.add_node("audit_failed", _node_call(audit_failed_node, services))
+    builder.add_node("diff", _node_call(diff_node, services))
+    builder.add_node("chunk", _node_call(chunk_node, services))
+    builder.add_node("export", _node_call(export_node, services))
     builder.add_node("complete", _node_call(complete_node, services))
 
     builder.add_conditional_edges(
@@ -132,6 +148,12 @@ def build_graph(services: WorkflowServices):
             "render": "render",
             "semantic": "semantic",
             "mermaid_validate": "mermaid_validate",
+            "audit": "audit",
+            "audit_gate": "audit_gate",
+            "audit_failed": "audit_failed",
+            "diff": "diff",
+            "chunk": "chunk",
+            "export": "export",
             "complete": "complete",
         },
     )
@@ -158,7 +180,20 @@ def build_graph(services: WorkflowServices):
     builder.add_edge("rewrite_model", "render")
     builder.add_edge("render", "semantic")
     builder.add_edge("semantic", "mermaid_validate")
-    builder.add_edge("mermaid_validate", "complete")
+    builder.add_edge("mermaid_validate", "audit")
+    builder.add_conditional_edges(
+        "audit",
+        _audit_route,
+        {
+            "export": "diff",
+            "auto_revise": "render",
+            "human_review": "audit_gate",
+            "failed": "audit_failed",
+        },
+    )
+    builder.add_edge("diff", "chunk")
+    builder.add_edge("chunk", "export")
+    builder.add_edge("export", "complete")
     builder.add_edge("complete", END)
     return builder.compile(checkpointer=InMemorySaver())
 
@@ -181,7 +216,7 @@ def _result_from_state(state: WorkflowState, *, exit_code: int | None = None) ->
 
 @dataclass
 class DocumentWorkflow:
-    """Run one document through M5 and resume it after a process-boundary interrupt."""
+    """Run one document through governed M3-M7 stages and resume process-boundary interrupts."""
 
     services: WorkflowServices
 
@@ -219,7 +254,16 @@ class DocumentWorkflow:
                 raise
             result = self.services.checkpoint.load_state()
             return _result_from_state(result, exit_code=10)
-        except DocumentEnhancerError:
+        except DocumentEnhancerError as exc:
+            if self.services.checkpoint is not None:
+                durable = (
+                    self.services.checkpoint.load_state()
+                    if self.services.checkpoint.has_state()
+                    else state
+                )
+                durable["status"] = "failed"
+                durable.setdefault("errors", []).append(type(exc).__name__ + ": " + exc.message)
+                self.services.checkpoint.save_state(durable)
             raise
         except Exception as exc:
             if self.services.checkpoint is not None:

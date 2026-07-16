@@ -33,7 +33,7 @@
   },
   "questions.schema.json": {"document_id": "DOC-TEST-0001", "questions": []},
   "rewrite-checklist.schema.json": {"checklist_id": "CHECK-TEST-001", "document_id": "DOC-TEST-0001", "items": []},
-  "audit.schema.json": {"audit_id": "AUDIT-TEST-001", "document_id": "DOC-TEST-0001", "status": "pass", "deterministic_checks": [], "content_findings": [], "waivers": []},
+  "audit.schema.json": {"audit_id": "AUDIT-TEST-001", "document_id": "DOC-TEST-0001", "status": "pass", "deterministic_checks": [], "independent_audit": {"audit_id": "INDAUD-TEST-001", "status": "pass", "findings": [], "provider": "golden-fake", "isolated_context": true}, "routing": {"route": "export", "reason": "all gates passed", "blocker_ids": [], "audit_revision": 0, "remaining_audit_revisions": 1}, "waivers": []},
   "rag-query.schema.json": {"query_id": "QUERY-TEST-001", "question": "What is supported?", "embedding_profile": "gemini-embedding-2-768"},
   "rag-answer.schema.json": {"answer_id": "ANSWER-TEST-001", "query_id": "QUERY-TEST-001", "status": "insufficient", "answer_markdown": "Insufficient evidence."},
   "entity.schema.json": {
