@@ -1925,6 +1925,100 @@
       "title": "DocumentVersion",
       "type": "object"
     },
+    "EnhancedSection": {
+      "additionalProperties": false,
+      "description": "One target section and its approved, traceable body.",
+      "properties": {
+        "anchor": {
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "title": "Anchor",
+          "type": "string"
+        },
+        "approved_answer_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Approved Answer Ids",
+          "type": "array"
+        },
+        "body": {
+          "title": "Body",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceQuote"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "heading": {
+          "title": "Heading",
+          "type": "string"
+        },
+        "mermaid_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Mermaid Ids",
+          "type": "array"
+        },
+        "object_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Object Ids",
+          "type": "array"
+        },
+        "open_issue_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Open Issue Ids",
+          "type": "array"
+        },
+        "order": {
+          "minimum": 0,
+          "title": "Order",
+          "type": "integer"
+        },
+        "provenance": {
+          "items": {
+            "$ref": "#/$defs/Provenance"
+          },
+          "title": "Provenance",
+          "type": "array"
+        },
+        "section_id": {
+          "pattern": "^(SEC|PROV-SEC)-[A-Z0-9-]+$",
+          "title": "Section Id",
+          "type": "string"
+        },
+        "source_span_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Span Ids",
+          "type": "array"
+        },
+        "table_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Table Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "section_id",
+        "heading",
+        "order",
+        "anchor",
+        "body"
+      ],
+      "title": "EnhancedSection",
+      "type": "object"
+    },
     "EntityType": {
       "enum": [
         "DocumentIdentity",
@@ -2663,122 +2757,6 @@
       "title": "Figure",
       "type": "object"
     },
-    "Finding": {
-      "additionalProperties": false,
-      "properties": {
-        "blocking": {
-          "default": false,
-          "title": "Blocking",
-          "type": "boolean"
-        },
-        "category": {
-          "title": "Category",
-          "type": "string"
-        },
-        "evidence": {
-          "items": {
-            "$ref": "#/$defs/EvidenceQuote"
-          },
-          "title": "Evidence",
-          "type": "array"
-        },
-        "finding_id": {
-          "title": "Finding Id",
-          "type": "string"
-        },
-        "finding_type": {
-          "$ref": "#/$defs/FindingType"
-        },
-        "impact": {
-          "title": "Impact",
-          "type": "string"
-        },
-        "proposed_disposition": {
-          "title": "Proposed Disposition",
-          "type": "string"
-        },
-        "requirement_id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Requirement Id"
-        },
-        "requires_human_answer": {
-          "title": "Requires Human Answer",
-          "type": "boolean"
-        },
-        "severity": {
-          "$ref": "#/$defs/FindingSeverity"
-        },
-        "target_object_id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Target Object Id"
-        },
-        "target_template_section": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Target Template Section"
-        }
-      },
-      "required": [
-        "finding_id",
-        "category",
-        "severity",
-        "finding_type",
-        "impact",
-        "proposed_disposition",
-        "requires_human_answer"
-      ],
-      "title": "Finding",
-      "type": "object"
-    },
-    "FindingSeverity": {
-      "enum": [
-        "blocker",
-        "high",
-        "medium",
-        "low",
-        "informational"
-      ],
-      "title": "FindingSeverity",
-      "type": "string"
-    },
-    "FindingType": {
-      "enum": [
-        "missing",
-        "ambiguous",
-        "conflicting",
-        "duplicate",
-        "vague",
-        "unsupported",
-        "noncompliant",
-        "extraction_risk",
-        "improvement"
-      ],
-      "title": "FindingType",
-      "type": "string"
-    },
     "Formula": {
       "additionalProperties": false,
       "properties": {
@@ -3330,6 +3308,135 @@
         "provenance"
       ],
       "title": "Limitation",
+      "type": "object"
+    },
+    "MermaidDiagram": {
+      "additionalProperties": false,
+      "properties": {
+        "caption": {
+          "title": "Caption",
+          "type": "string"
+        },
+        "diagram_id": {
+          "title": "Diagram Id",
+          "type": "string"
+        },
+        "diagram_type": {
+          "enum": [
+            "process",
+            "decision",
+            "dependency",
+            "lineage"
+          ],
+          "title": "Diagram Type",
+          "type": "string"
+        },
+        "edges": {
+          "items": {
+            "$ref": "#/$defs/MermaidEdge"
+          },
+          "title": "Edges",
+          "type": "array"
+        },
+        "nodes": {
+          "items": {
+            "$ref": "#/$defs/MermaidNode"
+          },
+          "title": "Nodes",
+          "type": "array"
+        },
+        "source_object_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Object Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "diagram_id",
+        "diagram_type",
+        "caption"
+      ],
+      "title": "MermaidDiagram",
+      "type": "object"
+    },
+    "MermaidEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "edge_id": {
+          "title": "Edge Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "relationship_type": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RelationshipType"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "source_node_id": {
+          "title": "Source Node Id",
+          "type": "string"
+        },
+        "target_node_id": {
+          "title": "Target Node Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "edge_id",
+        "source_node_id",
+        "target_node_id"
+      ],
+      "title": "MermaidEdge",
+      "type": "object"
+    },
+    "MermaidNode": {
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "node_id": {
+          "title": "Node Id",
+          "type": "string"
+        },
+        "semantic_id": {
+          "title": "Semantic Id",
+          "type": "string"
+        },
+        "source_span_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Span Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "node_id",
+        "semantic_id",
+        "label"
+      ],
+      "title": "MermaidNode",
       "type": "object"
     },
     "Methodology": {
@@ -3886,6 +3993,96 @@
         "provenance"
       ],
       "title": "Model",
+      "type": "object"
+    },
+    "OpenIssue": {
+      "additionalProperties": false,
+      "description": "An unsupported, unknown, or TBD item that is visible but not an asserted fact.",
+      "properties": {
+        "authoritative": {
+          "default": false,
+          "title": "Authoritative",
+          "type": "boolean"
+        },
+        "category": {
+          "enum": [
+            "unsupported",
+            "unknown",
+            "tbd",
+            "ambiguous",
+            "conflicting"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceQuote"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "issue_id": {
+          "title": "Issue Id",
+          "type": "string"
+        },
+        "source_span_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Span Ids",
+          "type": "array"
+        },
+        "statement": {
+          "title": "Statement",
+          "type": "string"
+        },
+        "status": {
+          "default": "open",
+          "enum": [
+            "open",
+            "waived",
+            "resolved"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "target_object_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Object Id"
+        },
+        "target_section_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Section Id"
+        }
+      },
+      "required": [
+        "issue_id",
+        "category",
+        "statement"
+      ],
+      "title": "OpenIssue",
       "type": "object"
     },
     "Organization": {
@@ -5598,6 +5795,43 @@
       "title": "ReviewStatus",
       "type": "string"
     },
+    "RevisionCounters": {
+      "additionalProperties": false,
+      "description": "Persisted, fail-closed revision budget for the M6/M7 workflow boundary.",
+      "properties": {
+        "audit_revision": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Audit Revision",
+          "type": "integer"
+        },
+        "max_audit_revisions": {
+          "default": 1,
+          "minimum": 0,
+          "title": "Max Audit Revisions",
+          "type": "integer"
+        },
+        "max_rewrite_revisions": {
+          "default": 2,
+          "minimum": 0,
+          "title": "Max Rewrite Revisions",
+          "type": "integer"
+        },
+        "rewrite_revision": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Rewrite Revision",
+          "type": "integer"
+        },
+        "schema_version": {
+          "default": "m6.revision-counters.v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "title": "RevisionCounters",
+      "type": "object"
+    },
     "Risk": {
       "additionalProperties": false,
       "properties": {
@@ -6729,6 +6963,140 @@
       "title": "Statement",
       "type": "object"
     },
+    "StructuredTable": {
+      "additionalProperties": false,
+      "properties": {
+        "columns": {
+          "items": {
+            "$ref": "#/$defs/TableColumn"
+          },
+          "minItems": 1,
+          "title": "Columns",
+          "type": "array"
+        },
+        "provenance": {
+          "items": {
+            "$ref": "#/$defs/Provenance"
+          },
+          "title": "Provenance",
+          "type": "array"
+        },
+        "purpose": {
+          "title": "Purpose",
+          "type": "string"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/StructuredTableRow"
+          },
+          "minItems": 1,
+          "title": "Rows",
+          "type": "array"
+        },
+        "section_id": {
+          "pattern": "^(SEC|PROV-SEC)-[A-Z0-9-]+$",
+          "title": "Section Id",
+          "type": "string"
+        },
+        "source_span_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Span Ids",
+          "type": "array"
+        },
+        "table_id": {
+          "pattern": "^(TBL|PROV-TBL)-[A-Z0-9-]+$",
+          "title": "Table Id",
+          "type": "string"
+        },
+        "table_kind": {
+          "enum": [
+            "steps",
+            "rules",
+            "controls",
+            "risks",
+            "evidence",
+            "assumptions",
+            "limitations",
+            "exceptions",
+            "dependencies",
+            "calculators",
+            "inputs_outputs",
+            "versions",
+            "roles",
+            "metrics",
+            "custom"
+          ],
+          "title": "Table Kind",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "table_id",
+        "table_kind",
+        "title",
+        "purpose",
+        "section_id",
+        "columns",
+        "rows"
+      ],
+      "title": "StructuredTable",
+      "type": "object"
+    },
+    "StructuredTableRow": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceQuote"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "object_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Object Ids",
+          "type": "array"
+        },
+        "open_issue_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Open Issue Ids",
+          "type": "array"
+        },
+        "row_id": {
+          "title": "Row Id",
+          "type": "string"
+        },
+        "source_span_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Span Ids",
+          "type": "array"
+        },
+        "values": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Values",
+          "type": "object"
+        }
+      },
+      "required": [
+        "row_id"
+      ],
+      "title": "StructuredTableRow",
+      "type": "object"
+    },
     "System": {
       "additionalProperties": false,
       "properties": {
@@ -6985,6 +7353,30 @@
         "provenance"
       ],
       "title": "Table",
+      "type": "object"
+    },
+    "TableColumn": {
+      "additionalProperties": false,
+      "properties": {
+        "column_id": {
+          "title": "Column Id",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "required": {
+          "default": true,
+          "title": "Required",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "column_id",
+        "label"
+      ],
+      "title": "TableColumn",
       "type": "object"
     },
     "TemporalValidity": {
@@ -7267,7 +7659,7 @@
     }
   },
   "additionalProperties": false,
-  "description": "Versioned canonical object graph emitted beside enhanced Markdown.",
+  "description": "Validated M6 intermediate representation shared by all output producers.",
   "properties": {
     "document": {
       "$ref": "#/$defs/DocumentIdentity"
@@ -7278,18 +7670,15 @@
       "type": "string"
     },
     "ledger_id": {
-      "anyOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "title": "Ledger Id"
+      "title": "Ledger Id",
+      "type": "string"
     },
     "markdown_artifact": {
+      "default": "output/enhanced.md",
+      "title": "Markdown Artifact",
+      "type": "string"
+    },
+    "markdown_digest": {
       "anyOf": [
         {
           "type": "string"
@@ -7299,12 +7688,11 @@
         }
       ],
       "default": null,
-      "title": "Markdown Artifact"
+      "title": "Markdown Digest"
     },
     "mermaid": {
       "items": {
-        "additionalProperties": true,
-        "type": "object"
+        "$ref": "#/$defs/MermaidDiagram"
       },
       "title": "Mermaid",
       "type": "array"
@@ -7502,14 +7890,9 @@
       "title": "Objects",
       "type": "array"
     },
-    "ontology_version": {
-      "default": "0.1.0",
-      "title": "Ontology Version",
-      "type": "string"
-    },
     "open_issues": {
       "items": {
-        "$ref": "#/$defs/Finding"
+        "$ref": "#/$defs/OpenIssue"
       },
       "title": "Open Issues",
       "type": "array"
@@ -7522,28 +7905,12 @@
       "type": "array"
     },
     "reference_pack_id": {
-      "anyOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "title": "Reference Pack Id"
+      "title": "Reference Pack Id",
+      "type": "string"
     },
     "reference_pack_version": {
-      "anyOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "title": "Reference Pack Version"
+      "title": "Reference Pack Version",
+      "type": "string"
     },
     "relationships": {
       "items": {
@@ -7553,27 +7920,29 @@
       "type": "array"
     },
     "revision_counters": {
-      "additionalProperties": true,
-      "title": "Revision Counters",
-      "type": "object"
+      "$ref": "#/$defs/RevisionCounters"
     },
     "schema_version": {
-      "default": "0.1.0",
+      "default": "m6.enhanced-document.v1",
       "title": "Schema Version",
       "type": "string"
     },
     "sections": {
       "items": {
-        "additionalProperties": true,
-        "type": "object"
+        "$ref": "#/$defs/EnhancedSection"
       },
+      "minItems": 1,
       "title": "Sections",
       "type": "array"
     },
+    "semantic_artifact": {
+      "default": "output/enhanced.semantic.yaml",
+      "title": "Semantic Artifact",
+      "type": "string"
+    },
     "tables": {
       "items": {
-        "additionalProperties": true,
-        "type": "object"
+        "$ref": "#/$defs/StructuredTable"
       },
       "title": "Tables",
       "type": "array"
@@ -7599,8 +7968,12 @@
     "document",
     "version",
     "template_id",
-    "template_version"
+    "template_version",
+    "reference_pack_id",
+    "reference_pack_version",
+    "ledger_id",
+    "sections"
   ],
-  "title": "SemanticDocument",
+  "title": "EnhancedDocumentModel",
   "type": "object"
 }

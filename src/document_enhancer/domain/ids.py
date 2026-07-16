@@ -10,7 +10,7 @@ from collections.abc import Iterable
 from document_enhancer.domain.enums import EntityType
 
 IDENTIFIER_RE = re.compile(r"^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+$")
-SPAN_ID_RE = re.compile(r"^SPAN-[A-Z0-9]{8,64}$")
+SPAN_ID_RE = re.compile(r"^SPAN-[A-Z0-9]{8,64}$", re.IGNORECASE)
 SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 
 ENTITY_PREFIXES: dict[EntityType, str] = {
@@ -110,7 +110,7 @@ def validate_entity_id(value: str, entity_type: EntityType | None = None) -> str
 def validate_span_id(value: str) -> str:
     if not isinstance(value, str) or not SPAN_ID_RE.fullmatch(value):
         raise ValueError("span_id must match SPAN-<uppercase stable token>")
-    return value
+    return value.upper()
 
 
 def validate_sha256(value: str) -> str:

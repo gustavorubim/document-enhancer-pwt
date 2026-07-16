@@ -24,6 +24,12 @@ WorkflowStage = Literal[
     "gate1",
     "checklist",
     "gate2",
+    "content_ledger",
+    "rewrite_inputs",
+    "rewrite_model",
+    "render",
+    "semantic",
+    "mermaid_validate",
     "complete",
 ]
 
@@ -40,6 +46,12 @@ WORKFLOW_STAGES: tuple[str, ...] = (
     "gate1",
     "checklist",
     "gate2",
+    "content_ledger",
+    "rewrite_inputs",
+    "rewrite_model",
+    "render",
+    "semantic",
+    "mermaid_validate",
     "complete",
 )
 
@@ -56,7 +68,13 @@ WORKFLOW_DEPENDENCIES: dict[str, tuple[str, ...]] = {
     "gate1": ("question_synthesis",),
     "checklist": ("gate1", "question_synthesis"),
     "gate2": ("checklist",),
-    "complete": ("gate2",),
+    "content_ledger": ("gate2",),
+    "rewrite_inputs": ("content_ledger",),
+    "rewrite_model": ("rewrite_inputs",),
+    "render": ("rewrite_model",),
+    "semantic": ("render",),
+    "mermaid_validate": ("semantic",),
+    "complete": ("mermaid_validate",),
 }
 
 _FIELD_STAGE_IMPACT: dict[str, tuple[str, ...]] = {
@@ -94,6 +112,24 @@ _FIELD_STAGE_IMPACT: dict[str, tuple[str, ...]] = {
         "complete",
     ),
     "checklist": ("gate2", "complete"),
+    "ledger": (
+        "content_ledger",
+        "rewrite_inputs",
+        "rewrite_model",
+        "render",
+        "semantic",
+        "mermaid_validate",
+        "complete",
+    ),
+    "rewrite": (
+        "rewrite_inputs",
+        "rewrite_model",
+        "render",
+        "semantic",
+        "mermaid_validate",
+        "complete",
+    ),
+    "semantic_model": ("rewrite_model", "render", "semantic", "mermaid_validate", "complete"),
 }
 
 
@@ -166,6 +202,25 @@ class WorkflowCache:
         after = self.keys(updated)
         changed = [stage for stage in WORKFLOW_STAGES if before[stage] != after[stage]]
         expected = set(self.impact(changed_input))
+        # Preserve the M5 proof shape for callers that provide the frozen pre-M6 input map.  The
+        # live workflow includes the M6 ledger/rewrite/semantic keys and therefore invalidates
+        # the complete governed suffix; old callers intentionally know nothing about that suffix.
+        if changed_input in {"answer", "answers", "steering", "waiver", "waivers"} and not {
+            "ledger",
+            "rewrite",
+            "semantic_model",
+        } & set(inputs):
+            m6_suffix = {
+                "content_ledger",
+                "rewrite_inputs",
+                "rewrite_model",
+                "render",
+                "semantic",
+                "mermaid_validate",
+            }
+            changed = [stage for stage in changed if stage not in m6_suffix]
+            expected -= m6_suffix
+            after = {**after, **{stage: before[stage] for stage in m6_suffix}}
         return CacheInvalidationProof(
             changed_input=changed_input,
             changed_stages=changed,
@@ -231,6 +286,38 @@ def stage_inputs_for(stage: str, values: Mapping[str, object]) -> dict[str, obje
             **common,
             "checklist": values.get("checklist", ""),
             "waivers": values.get("waivers", ""),
+        }
+    if stage == "content_ledger":
+        return {
+            **common,
+            "structure": values.get("structure", ""),
+            "checklist": values.get("checklist", ""),
+        }
+    if stage == "rewrite_inputs":
+        return {
+            **common,
+            "ledger": values.get("ledger", ""),
+            "answers": values.get("answers", ""),
+            "steering": values.get("steering", ""),
+            "checklist": values.get("checklist", ""),
+            "reference": values.get("reference", ""),
+        }
+    if stage == "rewrite_model":
+        return {
+            **common,
+            "rewrite": values.get("rewrite", ""),
+            "ledger": values.get("ledger", ""),
+            "answers": values.get("answers", ""),
+            "steering": values.get("steering", ""),
+            "checklist": values.get("checklist", ""),
+            "schema": values.get("schema", ""),
+        }
+    if stage in {"render", "semantic", "mermaid_validate", "complete"}:
+        return {
+            **common,
+            "semantic_model": values.get("semantic_model", ""),
+            "template": values.get("template", ""),
+            "schema": values.get("schema", ""),
         }
     return {**common, "checklist": values.get("checklist", "")}
 

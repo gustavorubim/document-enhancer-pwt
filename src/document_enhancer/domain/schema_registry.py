@@ -35,6 +35,7 @@ from document_enhancer.domain.run import (
 )
 from document_enhancer.domain.semantic import SemanticDocument
 from document_enhancer.domain.source import RawDocument
+from document_enhancer.rewrite.models import EnhancedDocumentModel
 
 SCHEMA_MODELS: Mapping[str, type[BaseModel]] = {
     "analysis.schema.json": AnalysisReport,
@@ -53,6 +54,7 @@ SCHEMA_MODELS: Mapping[str, type[BaseModel]] = {
     "relationship.schema.json": Relationship,
     "run-manifest.schema.json": RunManifest,
     "semantic-document.schema.json": SemanticDocument,
+    "enhanced-document.schema.json": EnhancedDocumentModel,
     "source-document.schema.json": RawDocument,
     "steering.schema.json": Steering,
     "structure-quality.schema.json": StructureQuality,

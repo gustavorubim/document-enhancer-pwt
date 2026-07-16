@@ -38,6 +38,11 @@ class SemanticDocument(StrictModel):
     reference_pack_id: StrictStr | None = None
     reference_pack_version: StrictStr | None = None
     markdown_artifact: StrictStr | None = None
+    ledger_id: StrictStr | None = None
+    sections: list[dict[str, object]] = Field(default_factory=list)
+    tables: list[dict[str, object]] = Field(default_factory=list)
+    mermaid: list[dict[str, object]] = Field(default_factory=list)
+    revision_counters: dict[str, object] = Field(default_factory=dict)
     generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     validation_passed: StrictBool = True
 

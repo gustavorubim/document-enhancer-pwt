@@ -69,6 +69,15 @@ def next_action(state: Mapping[str, object]) -> str:
         return "Edit clarification/answers.yaml, steering.yaml, and waivers.yaml, then run docenhance resume."
     if stage == "gate2":
         return "Review clarification/rewrite-checklist.yaml, record approval or waivers, then run docenhance resume."
+    if stage in {
+        "content_ledger",
+        "rewrite_inputs",
+        "rewrite_model",
+        "render",
+        "semantic",
+        "mermaid_validate",
+    }:
+        return f"Run the {stage} stage or resume the persisted task."
     if stage in {"succeeded", "complete"} or state.get("status") == "succeeded":
         return "No action required; the run is complete."
     return f"Run the {stage} stage or resume the persisted task."

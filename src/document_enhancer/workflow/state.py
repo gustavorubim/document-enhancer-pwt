@@ -34,6 +34,12 @@ class WorkflowState(TypedDict, total=False):
     waivers: object
     checklist: object
     validation_report: object
+    content_ledger: object
+    rewrite_inputs: object
+    enhanced_model: object
+    semantic_document: object
+    mermaid_validation: object
+    revision_counters: object
     errors: list[str]
     stop_after: str | None
     gate2_enabled: bool

@@ -22,12 +22,18 @@ from .nodes import (
     analysis_node,
     checklist_node,
     complete_node,
+    content_ledger_node,
     gate1_node,
     gate2_node,
+    mermaid_validate_node,
     normalize_node,
     question_synthesis_node,
     raw_ingest_node,
+    render_node,
+    rewrite_inputs_node,
+    rewrite_model_node,
     selected_view_node,
+    semantic_node,
     structure_quality_node,
     structure_recovery_node,
     structure_scan_node,
@@ -65,7 +71,7 @@ def _gate1_route(state: WorkflowState) -> str:
 
 
 def _gate2_route(state: WorkflowState) -> str:
-    return "complete"
+    return "content_ledger"
 
 
 def _node_call(
@@ -96,6 +102,12 @@ def build_graph(services: WorkflowServices):
     builder.add_node("gate1", _node_call(gate1_node, services))
     builder.add_node("checklist", _node_call(checklist_node, services))
     builder.add_node("gate2", _node_call(gate2_node, services))
+    builder.add_node("content_ledger", _node_call(content_ledger_node, services))
+    builder.add_node("rewrite_inputs", _node_call(rewrite_inputs_node, services))
+    builder.add_node("rewrite_model", _node_call(rewrite_model_node, services))
+    builder.add_node("render", _node_call(render_node, services))
+    builder.add_node("semantic", _node_call(semantic_node, services))
+    builder.add_node("mermaid_validate", _node_call(mermaid_validate_node, services))
     builder.add_node("complete", _node_call(complete_node, services))
 
     builder.add_conditional_edges(
@@ -114,6 +126,12 @@ def build_graph(services: WorkflowServices):
             "gate1": "gate1",
             "checklist": "checklist",
             "gate2": "gate2",
+            "content_ledger": "content_ledger",
+            "rewrite_inputs": "rewrite_inputs",
+            "rewrite_model": "rewrite_model",
+            "render": "render",
+            "semantic": "semantic",
+            "mermaid_validate": "mermaid_validate",
             "complete": "complete",
         },
     )
@@ -134,7 +152,13 @@ def build_graph(services: WorkflowServices):
         "gate1", _gate1_route, {"gate1": "gate1", "checklist": "checklist"}
     )
     builder.add_edge("checklist", "gate2")
-    builder.add_conditional_edges("gate2", _gate2_route, {"complete": "complete"})
+    builder.add_conditional_edges("gate2", _gate2_route, {"content_ledger": "content_ledger"})
+    builder.add_edge("content_ledger", "rewrite_inputs")
+    builder.add_edge("rewrite_inputs", "rewrite_model")
+    builder.add_edge("rewrite_model", "render")
+    builder.add_edge("render", "semantic")
+    builder.add_edge("semantic", "mermaid_validate")
+    builder.add_edge("mermaid_validate", "complete")
     builder.add_edge("complete", END)
     return builder.compile(checkpointer=InMemorySaver())
 
