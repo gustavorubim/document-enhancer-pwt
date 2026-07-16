@@ -1,0 +1,87 @@
+{
+  "dataset_id": "cross-document-knowledge-network-v1",
+  "note": "Expected evidence and graph paths are contracts; answers and retrieval ranks are not passing gold before M7R.",
+  "questions": [
+    {
+      "acceptable_graph_paths": [
+        [
+          "PROC-MODEL-CHANGE-001",
+          "APPROVED_BY",
+          "APPROVAL-MRC-001"
+        ],
+        [
+          "PROC-MODEL-CHANGE-001",
+          "PRODUCES_EVIDENCE",
+          "EVID-MCG-VALIDATION-001"
+        ]
+      ],
+      "answerability": "answerable",
+      "contract_status": "pending_m7r",
+      "expected_chunk_ids": [
+        "pending:chunk-model-change-approval",
+        "pending:chunk-model-change-evidence"
+      ],
+      "forbidden_claims": [
+        "The committee approves every change regardless of impact."
+      ],
+      "question": "Which committee approves a high-impact model change, and what evidence is stored?",
+      "question_id": "RAG-Q-001",
+      "required_citations": [
+        "SPN-MCG-006",
+        "SPN-MCG-008"
+      ],
+      "required_facts": [
+        "FACT-MCG-003",
+        "FACT-MCG-004"
+      ]
+    },
+    {
+      "acceptable_graph_paths": [
+        [
+          "PROC-MODEL-CHANGE-001",
+          "DEPENDS_ON",
+          "DEP-MCG-LOSS-METH-001"
+        ]
+      ],
+      "answerability": "answerable_after_version_resolution",
+      "contract_status": "pending_m7r",
+      "expected_chunk_ids": [
+        "pending:chunk-model-change-intake",
+        "pending:chunk-loss-method"
+      ],
+      "forbidden_claims": [
+        "The loss methodology version is already resolved."
+      ],
+      "question": "What is the relationship between the model-change process and the monthly loss methodology?",
+      "question_id": "RAG-Q-002",
+      "required_citations": [
+        "SPN-MCG-002",
+        "SPN-FORECAST-006"
+      ],
+      "required_facts": [
+        "FACT-MCG-001",
+        "FACT-FORECAST-002"
+      ]
+    },
+    {
+      "acceptable_graph_paths": [],
+      "answerability": "unanswerable",
+      "contract_status": "pending_m7r",
+      "expected_abstention": "The source says quarterly but does not define a calendar trigger or deadline.",
+      "expected_chunk_ids": [
+        "pending:chunk-access-trigger"
+      ],
+      "forbidden_claims": [
+        "The review starts on the first business day of each quarter."
+      ],
+      "question": "What is the current review trigger for the access process?",
+      "question_id": "RAG-Q-003",
+      "required_citations": [
+        "SPN-ACCESS-002"
+      ],
+      "required_facts": []
+    }
+  ],
+  "schema_version": "0.1",
+  "status": "pending_m7r"
+}

@@ -1,0 +1,77 @@
+schema_version: "0.1"
+registry_id: "document-enhancer-public-sources"
+registry_version: "1.0.0"
+purpose: "Fetch-on-demand references for extraction and generalization tests; never synthetic gold."
+default_mode: "dry_run"
+allowlisted_hosts:
+  - cisa.gov
+  - www.cisa.gov
+  - www.epa.gov
+  - www.nasa.gov
+  - www.nist.gov
+  - nvlpubs.nist.gov
+sources:
+  - source_id: PUBLIC-CISA-INCIDENT-PLAYBOOKS
+    url: https://www.cisa.gov/sites/default/files/2023-01/federal_government_cybersecurity_incident_and_vulnerability_response_playbooks_508c.pdf
+    publisher: Cybersecurity and Infrastructure Security Agency
+    title: Federal Government Cybersecurity Incident and Vulnerability Response Playbooks
+    version_or_date: "2021-08"
+    retrieved_at: null
+    expected_media_types: [application/pdf]
+    max_bytes: 25000000
+    sha256: null
+    license:
+      terms: "U.S. government publication; confirm current CISA terms before redistribution."
+      review_status: "fetch_only_reviewed"
+      redistribution: "do_not_commit_without_separate_review"
+    provenance: "Official CISA publication listed in plan.md Section 19.2."
+    usefulness: "Process/playbook structure, response stages, roles, and escalation language."
+    destination: cisa/federal-incident-playbooks.pdf
+  - source_id: PUBLIC-EPA-SOP-GUIDANCE
+    url: https://www.epa.gov/sites/default/files/2015-06/documents/guidance-preparing-sops.pdf
+    publisher: U.S. Environmental Protection Agency
+    title: Guidance for Preparing Standard Operating Procedures
+    version_or_date: "2007-08"
+    retrieved_at: null
+    expected_media_types: [application/pdf]
+    max_bytes: 15000000
+    sha256: null
+    license:
+      terms: "U.S. government publication; confirm EPA reuse terms before redistribution."
+      review_status: "fetch_only_reviewed"
+      redistribution: "do_not_commit_without_separate_review"
+    provenance: "Official EPA QA/G-6 reference listed in plan.md Section 19.2."
+    usefulness: "SOP organization, approvals, revision history, and execution detail comparison."
+    destination: epa/qa-g6-sop-guidance.pdf
+  - source_id: PUBLIC-NASA-SE-HANDBOOK
+    url: https://www.nasa.gov/wp-content/uploads/2018/06/nasa_systems_engineering_handbook_0.pdf
+    publisher: National Aeronautics and Space Administration
+    title: NASA Systems Engineering Handbook
+    version_or_date: "2016-12"
+    retrieved_at: null
+    expected_media_types: [application/pdf]
+    max_bytes: 40000000
+    sha256: null
+    license:
+      terms: "U.S. government publication; confirm NASA reuse terms before redistribution."
+      review_status: "fetch_only_reviewed"
+      redistribution: "do_not_commit_without_separate_review"
+    provenance: "Official NASA handbook listed in plan.md Section 19.2."
+    usefulness: "Large methodology/process hierarchy and lifecycle terminology."
+    destination: nasa/systems-engineering-handbook.pdf
+  - source_id: PUBLIC-NIST-CSF-2
+    url: https://nvlpubs.nist.gov/nistpubs/CSWP/NIST.CSWP.29.pdf
+    publisher: National Institute of Standards and Technology
+    title: Cybersecurity Framework 2.0
+    version_or_date: "2024-02"
+    retrieved_at: null
+    expected_media_types: [application/pdf]
+    max_bytes: 20000000
+    sha256: null
+    license:
+      terms: "U.S. government publication; confirm NIST terms and any incorporated material before redistribution."
+      review_status: "fetch_only_reviewed"
+      redistribution: "do_not_commit_without_separate_review"
+    provenance: "Official NIST CSF 2.0 reference listed in plan.md Section 19.2."
+    usefulness: "Standards taxonomy, identifiers, cross-references, and normative language."
+    destination: nist/cybersecurity-framework-2.pdf

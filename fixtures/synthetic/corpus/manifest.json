@@ -1,0 +1,168 @@
+{
+  "cross_document_questions": "cross_document_questions.json",
+  "families": [
+    {
+      "document_id": "DOC-MONTHLY-LOSS-FORECAST-001",
+      "document_type": "methodology",
+      "family_id": "monthly_loss_forecasting_methodology",
+      "gold": "monthly_loss_forecasting_methodology/gold.json",
+      "variants": [
+        {
+          "expected_mode": "parser",
+          "sha256": "39057e390220399b8713f388ab1a8cfd200c6856a0c08024dd8451d137e5219b",
+          "source": "monthly_loss_forecasting_methodology/clean.md",
+          "variant": "clean"
+        },
+        {
+          "expected_mode": "llm_recovery",
+          "sha256": "f082357f63d4814b91c5ebedbe1da5eb483d64d3ae0d1cc0435db201e4d2fcfa",
+          "source": "monthly_loss_forecasting_methodology/mild.md",
+          "variant": "mild"
+        },
+        {
+          "expected_mode": "llm_recovery",
+          "sha256": "edacbea70ff27408afd92e253a03b702f331b6dbf65bf655ec3d856e7dc2a1da",
+          "source": "monthly_loss_forecasting_methodology/medium.md",
+          "variant": "medium"
+        },
+        {
+          "expected_mode": "llm_recovery",
+          "sha256": "72e637761f8d4ae7e9a02e79e8ce9281462c187f1d94100e49d3a542ef3e1398",
+          "source": "monthly_loss_forecasting_methodology/severe.md",
+          "variant": "severe"
+        }
+      ]
+    },
+    {
+      "document_id": "DOC-QUARTERLY-ACCESS-REVIEW-001",
+      "document_type": "process",
+      "family_id": "quarterly_user_access_review_process",
+      "gold": "quarterly_user_access_review_process/gold.json",
+      "variants": [
+        {
+          "expected_mode": "parser",
+          "sha256": "b9827fe65c9647f32f874a6d6b6d512d3aaa93746cc404ffdc4a1bfbd27db395",
+          "source": "quarterly_user_access_review_process/clean.md",
+          "variant": "clean"
+        },
+        {
+          "expected_mode": "llm_recovery",
+          "sha256": "79c4b1016ade2f90df84c6b556fc276b9842bb2cf4ea8790d8adc967718cdd89",
+          "source": "quarterly_user_access_review_process/mild.md",
+          "variant": "mild"
+        },
+        {
+          "expected_mode": "llm_recovery",
+          "sha256": "818903b9bbd26d4e86f447b2af28967ef1319dbf9c2b560bc348f2f6cb33d8fe",
+          "source": "quarterly_user_access_review_process/medium.md",
+          "variant": "medium"
+        },
+        {
+          "expected_mode": "llm_recovery",
+          "sha256": "bacab529fc6f97ddb1714009c2b3b65e2d89b1a85c037d82147ee3717dd095f6",
+          "source": "quarterly_user_access_review_process/severe.md",
+          "variant": "severe"
+        }
+      ]
+    },
+    {
+      "document_id": "DOC-INCIDENT-ESCALATION-001",
+      "document_type": "desktop_procedure",
+      "family_id": "incident_escalation_desktop_procedure",
+      "gold": "incident_escalation_desktop_procedure/gold.json",
+      "variants": [
+        {
+          "expected_mode": "parser",
+          "sha256": "f20457577d4b565f2a8a6e2f66ceb9f1fbe63f12fa4557dd54a8a5408d449c41",
+          "source": "incident_escalation_desktop_procedure/clean.md",
+          "variant": "clean"
+        },
+        {
+          "expected_mode": "llm_recovery",
+          "sha256": "5b5ff6ac94da50bb815fd6143e1fe3a38a35c3dba876e64bdd7caf7bb263d090",
+          "source": "incident_escalation_desktop_procedure/mild.md",
+          "variant": "mild"
+        },
+        {
+          "expected_mode": "llm_recovery",
+          "sha256": "adb6d83ec0b38d2184587b130b7a029f8e260c77ce2a5bbef061c2b087667b75",
+          "source": "incident_escalation_desktop_procedure/medium.md",
+          "variant": "medium"
+        },
+        {
+          "expected_mode": "llm_recovery",
+          "sha256": "4a1e4a425fc7899624a94816e098b97edc262bc5cbff8d512f526551aed4225a",
+          "source": "incident_escalation_desktop_procedure/severe.md",
+          "variant": "severe"
+        }
+      ]
+    },
+    {
+      "document_id": "DOC-THIRD-PARTY-RISK-STANDARD-001",
+      "document_type": "standard",
+      "family_id": "third_party_risk_standard",
+      "gold": "third_party_risk_standard/gold.json",
+      "variants": [
+        {
+          "expected_mode": "parser",
+          "sha256": "b872941eacffefb12d6cf3d104b43c73aeebd9b1b594c95b438d2471886f1ed5",
+          "source": "third_party_risk_standard/clean.md",
+          "variant": "clean"
+        },
+        {
+          "expected_mode": "llm_recovery",
+          "sha256": "c290465b9f6a36f9e8c791d4bfc1d048c796b6a1001163824e9fab5c7094592b",
+          "source": "third_party_risk_standard/mild.md",
+          "variant": "mild"
+        },
+        {
+          "expected_mode": "llm_recovery",
+          "sha256": "88ecc612331571757f7174255208cd91c3360acf17b76150c074e186fe65787b",
+          "source": "third_party_risk_standard/medium.md",
+          "variant": "medium"
+        },
+        {
+          "expected_mode": "llm_recovery",
+          "sha256": "41e9fa1f71a79dc9636a2c46b72bb910930b56c6a3d6a0b72eefb2d45024e89f",
+          "source": "third_party_risk_standard/severe.md",
+          "variant": "severe"
+        }
+      ]
+    },
+    {
+      "document_id": "DOC-MODEL-CHANGE-GOVERNANCE-001",
+      "document_type": "process",
+      "family_id": "model_change_governance_process",
+      "gold": "model_change_governance_process/gold.json",
+      "variants": [
+        {
+          "expected_mode": "parser",
+          "sha256": "4ba79ff365417fe2583a7708b55d2aa4600935a3c91bb80870feaf3484c6009c",
+          "source": "model_change_governance_process/clean.md",
+          "variant": "clean"
+        },
+        {
+          "expected_mode": "llm_recovery",
+          "sha256": "a143c96741b5cc4519a13b96a967ce95bb32e5c5a216c5745ffc0b6b28b752e5",
+          "source": "model_change_governance_process/mild.md",
+          "variant": "mild"
+        },
+        {
+          "expected_mode": "llm_recovery",
+          "sha256": "7b9537a935e77a6ddc19cc63d5cfdad842c277b2e141f7981849b2a5a9ae7e2e",
+          "source": "model_change_governance_process/medium.md",
+          "variant": "medium"
+        },
+        {
+          "expected_mode": "llm_recovery",
+          "sha256": "5d51b04cb48c9dd12091b9c3b0efc4132f8b246cbdf5317d238c59af07420080",
+          "source": "model_change_governance_process/severe.md",
+          "variant": "severe"
+        }
+      ]
+    }
+  ],
+  "generated_file_count": 27,
+  "generator_version": "0.1.0",
+  "schema_version": "0.1"
+}
