@@ -228,6 +228,14 @@ def _as_normalized(value: object) -> NormalizedDocument:
     )
 
 
+def _as_structure_result(value: object) -> StructureRecoveryResult:
+    return (
+        value
+        if isinstance(value, StructureRecoveryResult)
+        else StructureRecoveryResult.model_validate(value)
+    )
+
+
 def _as_questions(value: object) -> QuestionsArtifact:
     return (
         value if isinstance(value, QuestionsArtifact) else QuestionsArtifact.model_validate(value)
@@ -530,9 +538,10 @@ def analysis_node(state: WorkflowState, services: WorkflowServices) -> WorkflowS
             blocking_count=0,
         )
     else:
-        structure_result = cast(Any, state.get("structure_result"))
-        if structure_result is None or not hasattr(structure_result, "authoritative_raw"):
+        structure_value = state.get("structure_result")
+        if structure_value is None:
             raise ValidationError("M4 analysis requires the validated M3 authoritative source port")
+        structure_result = _as_structure_result(structure_value)
         analysis_document = DomainNormalizedDocument(
             raw=structure_result.authoritative_raw,
             structural_view=structure_result.authoritative_view,

@@ -7,6 +7,7 @@ import pytest
 
 from document_enhancer.analysis.errors import AnalysisIncompleteError
 from document_enhancer.analysis.models import AnalysisStageRecord
+from document_enhancer.domain.analysis import FindingSet
 from document_enhancer.domain.enums import DocumentType
 from document_enhancer.workflow import DocumentWorkflow, WorkflowServices
 from document_enhancer.workflow.cache import WORKFLOW_STAGES, WorkflowCache
@@ -118,6 +119,16 @@ def test_workflow_checkpoints_failed_analysis_before_question_and_downstream_gat
     assert stage is not None
     assert stage.status == "failed"
     assert stage.payload["unresolved_stages"] == ["macro_reviewer"]
+
+    services.analysis_runner = lambda request: FindingSet(
+        document_id=request.document_id,
+        source_digest=request.source_digest,
+        findings=[],
+        blocking_count=0,
+    )
+    resumed = DocumentWorkflow(services).resume()
+    assert resumed.status == "succeeded"
+    assert resumed.current_stage == "complete"
 
 
 @pytest.mark.parametrize("changed_input", ["template", "reference_file", "prompt", "schema"])
