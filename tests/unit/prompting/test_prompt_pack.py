@@ -49,7 +49,7 @@ def _values(spec, *, document_type: str = "process") -> dict[str, object]:
 
 def test_pack_is_versioned_and_all_required_references_resolve(prompt_pack) -> None:
     assert prompt_pack.pack_id == "gemini_core"
-    assert prompt_pack.version == "1.0.6"
+    assert prompt_pack.version == "1.1.0"
     assert len(prompt_pack.manifest.prompts) == 20
     assert len(prompt_pack.pack_sha256) == 64
     assert set(prompt_pack.manifest.required_references) == {
@@ -100,17 +100,81 @@ def test_prompt_budgets_fit_their_exact_bounded_routes(prompt_pack) -> None:
         assert spec.output_budget <= route.max_output_tokens
 
 
-def test_large_persisted_schemas_are_not_duplicated_into_prompt_text(
+def test_representative_prompts_fit_declared_stage_budgets_without_schema_duplication(
     prompt_pack, reference_pack
 ) -> None:
-    composer = PromptPackComposer(prompt_pack, reference_pack=reference_pack)
-    for prompt_id in ("analysis.macro", "rewrite.revision"):
-        spec = prompt_pack.prompt(prompt_id)
-        composed = composer.compose_with_metadata(prompt_id, _values(spec))
-        assert len(composed.text) < 50_000
-        assert '"$defs"' not in composed.text
-        assert '"properties"' not in composed.text
-        assert f"Output schema name: {spec.output_schema}" in composed.text
+    for document_type in ("process", "methodology", "standard", "desktop_procedure"):
+        composer = PromptPackComposer(prompt_pack, reference_pack=reference_pack)
+        source = (REFERENCE_ROOT / "templates" / document_type / "example.md").read_text(
+            encoding="utf-8"
+        )
+        representative_analysis = json.dumps(
+            {
+                "baseline_questions": [
+                    {
+                        "question_id": f"Q-{index:03d}",
+                        "source_finding_ids": [f"F-{index:03d}"],
+                        "question": "Supply the governed owner and evidence reference.",
+                    }
+                    for index in range(12)
+                ],
+                "findings": [
+                    {
+                        "finding_id": f"F-{index:03d}",
+                        "impact": "The document cannot establish accountable execution.",
+                    }
+                    for index in range(12)
+                ],
+            },
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+        reviewer = json.dumps(
+            {"answers": [], "steering": None, "waivers": []},
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+        for prompt_id in (
+            "analysis.macro",
+            "analysis.sections",
+            "analysis.process-methodology-discovery",
+            "analysis.rag-readiness",
+            "analysis.synthesize-findings",
+            "clarification.questions",
+            "clarification.rewrite-checklist",
+            "rewrite.section",
+            "rewrite.semantic-objects",
+            "rewrite.revision",
+            "audit.content-fidelity",
+            "audit.remediation-routing",
+        ):
+            spec = prompt_pack.prompt(prompt_id)
+            values = _values(spec, document_type=document_type)
+            for variable in spec.variables:
+                if variable.name == "source_text":
+                    values[variable.name] = source
+                elif variable.name == "analysis_results":
+                    values[variable.name] = representative_analysis
+                elif variable.name == "reviewer_inputs":
+                    values[variable.name] = reviewer
+                elif variable.name in {"approved_ledger", "enhanced_document"}:
+                    values[variable.name] = source
+                elif variable.name == "audit_findings":
+                    values[variable.name] = representative_analysis
+            composed = composer.compose_with_metadata(prompt_id, values)
+            # Three characters per token is a conservative offline approximation for the
+            # Markdown/YAML/JSON mix. The manifest and gateway separately enforce exact route
+            # input-plus-output caps; this assertion catches reference-pack/context regressions.
+            conservative_tokens = (len(composed.text) + 2) // 3
+            assert conservative_tokens <= spec.token_budget, (
+                document_type,
+                prompt_id,
+                conservative_tokens,
+                spec.token_budget,
+            )
+            assert '"$defs"' not in composed.text
+            assert '"properties"' not in composed.text
+            assert f"Output schema name: {spec.output_schema}" in composed.text
 
 
 def test_structure_compositions_are_source_first_and_bounded(prompt_pack, reference_pack) -> None:
@@ -198,11 +262,16 @@ def test_analysis_and_rewrite_scopes_include_rubric_and_template_metadata(
     prompt_pack, reference_pack
 ) -> None:
     composer = PromptPackComposer(prompt_pack, reference_pack=reference_pack)
-    for prompt_id in ("analysis.macro", "rewrite.section"):
-        spec = prompt_pack.prompt(prompt_id)
-        composed = composer.compose_with_metadata(prompt_id, _values(spec))
-        assert "[REFERENCE logical_name=common_rubric" in composed.text
-        assert "[REFERENCE logical_name=template" in composed.text
+    macro = composer.compose_with_metadata(
+        "analysis.macro", _values(prompt_pack.prompt("analysis.macro"))
+    )
+    rewrite = composer.compose_with_metadata(
+        "rewrite.section", _values(prompt_pack.prompt("rewrite.section"))
+    )
+    assert "[REFERENCE logical_name=common_rubric" in macro.text
+    assert "[REFERENCE logical_name=template" in macro.text
+    assert "[REFERENCE logical_name=template_requirements" in rewrite.text
+    assert "[REFERENCE logical_name=style_guide" in rewrite.text
 
 
 def test_source_injection_stays_after_the_governed_instruction_boundary(
@@ -267,7 +336,7 @@ def test_snapshot_contains_digests_but_not_raw_source_or_credentials(
 def test_prompt_service_metadata_does_not_require_composing(prompt_pack) -> None:
     listed = list_prompts(prompt_pack)
     assert len(listed) == 20
-    assert listed[0]["pack_version"] == "1.0.6"
+    assert listed[0]["pack_version"] == "1.1.0"
     shown = cast(dict[str, object], show_prompt(prompt_pack, "rag.grounded-answer"))
     assert shown["output_schema"] == "rag-answer.schema.json"
     assert shown["reference_scope"] == ["glossary"]

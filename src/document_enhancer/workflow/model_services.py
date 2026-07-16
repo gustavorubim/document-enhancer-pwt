@@ -9,11 +9,13 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Any
+from hashlib import sha256
+from typing import Any, cast
 
 from pydantic import BaseModel
 
 from document_enhancer.audit.content import ContentAuditRequest
+from document_enhancer.domain.analysis import AnalysisReport, Finding, FindingSet
 from document_enhancer.domain.audit import Audit, IndependentAuditResult
 from document_enhancer.domain.enums import DocumentType
 from document_enhancer.domain.questions import (
@@ -114,6 +116,141 @@ def _json(value: object) -> str:
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=True, default=str)
 
 
+def _json_digest(value: object) -> str:
+    return sha256(_json(value).encode("utf-8")).hexdigest()
+
+
+def _analysis_findings(value: object) -> tuple[Finding, ...]:
+    """Resolve only the promoted findings needed by the clarification boundary."""
+
+    if isinstance(value, FindingSet):
+        return tuple(value.findings)
+    if isinstance(value, AnalysisReport):
+        return tuple(finding for analysis in value.analyses for finding in analysis.findings)
+    if isinstance(value, dict):
+        mapping = cast(dict[str, object], value)
+        for key in ("finding_set", "synthesis", "report"):
+            if key in mapping:
+                findings = _analysis_findings(mapping[key])
+                if findings:
+                    return findings
+        raw_findings = mapping.get("findings")
+        if isinstance(raw_findings, list):
+            return tuple(Finding.model_validate(item) for item in raw_findings)
+        return ()
+    synthesis = getattr(value, "synthesis", None)
+    if synthesis is not None:
+        findings = _analysis_findings(synthesis)
+        if findings:
+            return findings
+    finding_set = getattr(value, "finding_set", None)
+    if finding_set is not None:
+        return _analysis_findings(finding_set)
+    return ()
+
+
+def _question_input(baseline: QuestionsArtifact, analysis_result: object) -> dict[str, object]:
+    """Build the compact deterministic question seed instead of serializing the full fan-out."""
+
+    finding_ids = sorted(
+        {
+            finding_id
+            for question in baseline.questions
+            for finding_id in question.source_finding_ids
+        }
+    )
+    findings_by_id = {
+        finding.finding_id: finding for finding in _analysis_findings(analysis_result)
+    }
+    finding_fields = {
+        "finding_id",
+        "category",
+        "severity",
+        "finding_type",
+        "target_template_section",
+        "target_object_id",
+        "requirement_id",
+        "impact",
+        "proposed_disposition",
+        "requires_human_answer",
+        "blocking",
+    }
+    return {
+        "baseline_questions": baseline.model_dump(
+            mode="json",
+            exclude={"generated_at", "digest"},
+            exclude_none=True,
+        ),
+        # Evidence is already present on the deterministic baseline question. Repeating it on
+        # each finding consumes budget without improving the model's decision boundary.
+        "findings": [
+            findings_by_id[finding_id].model_dump(
+                mode="json",
+                include=finding_fields,
+                exclude_none=True,
+            )
+            for finding_id in finding_ids
+            if finding_id in findings_by_id
+        ],
+    }
+
+
+def _checklist_input(baseline: RewriteChecklist, questions: QuestionsArtifact) -> dict[str, object]:
+    """Retain the governed checklist seed plus only question fields needed for reconciliation."""
+
+    return {
+        "baseline_checklist": baseline.model_dump(
+            mode="json",
+            exclude={"digest"},
+            exclude_none=True,
+        ),
+        "question_summaries": [
+            question.model_dump(
+                mode="json",
+                include={
+                    "question_id",
+                    "blocking",
+                    "question",
+                    "source_finding_ids",
+                    "target_section_id",
+                    "target_object_id",
+                    "depends_on_question_ids",
+                },
+                exclude_none=True,
+            )
+            for question in questions.questions
+        ],
+    }
+
+
+def _reviewer_input(
+    answers: AnswersArtifact,
+    steering: Steering | None,
+    waivers: WaiversArtifact,
+) -> dict[str, object]:
+    return {
+        "answers": answers.model_dump(
+            mode="json",
+            exclude={"generated_at", "digest"},
+            exclude_none=True,
+        ),
+        "steering": (
+            steering.model_dump(
+                mode="json",
+                exclude={"created_at"},
+                exclude_none=True,
+            )
+            if steering
+            else None
+        ),
+        "waivers": waivers.model_dump(
+            mode="json",
+            exclude={"generated_at", "digest"},
+            exclude_none=True,
+        ),
+    }
+
+
 def _invoke(
     composer: PromptPackComposer,
     gateway: GeminiModelGateway,
@@ -167,6 +304,7 @@ class GeminiQuestionGenerator:
         normalized: NormalizedDocument,
         document_type: DocumentType,
     ) -> QuestionsArtifact:
+        question_input = _question_input(baseline, analysis_result)
         artifact = _invoke(
             self.composer,
             self.gateway,
@@ -180,16 +318,17 @@ class GeminiQuestionGenerator:
                     "document_id": baseline.document_id,
                     "source_digest": normalized.raw.source_digest,
                 },
-                "analysis_results": _json(analysis_result),
-                "source_text": normalized.normalized_markdown,
+                "analysis_results": _json(question_input),
                 "reviewer_inputs": "",
             },
             stage="clarification_questions",
-            input_digests=(normalized.raw.source_digest,),
+            input_digests=(normalized.raw.source_digest, _json_digest(question_input)),
         )
         if artifact.document_id != baseline.document_id:
             raise ValidationError("question generator returned a different document identity")
-        known_spans = {block.span_id for block in normalized.raw.blocks}
+        # The strict domain evidence contract canonicalizes span identifiers to uppercase while
+        # deterministic ingestion retains its lowercase content-addressed representation.
+        known_spans = {block.span_id.upper() for block in normalized.raw.blocks}
         for question in artifact.questions:
             if any(item.span_id not in known_spans for item in question.evidence):
                 raise ValidationError("question generator cited an unknown source span")
@@ -226,11 +365,8 @@ class GeminiChecklistGenerator:
         waivers: WaiversArtifact,
         document_type: DocumentType,
     ) -> RewriteChecklist:
-        reviewer = {
-            "answers": answers.model_dump(mode="json"),
-            "steering": steering.model_dump(mode="json") if steering else None,
-            "waivers": waivers.model_dump(mode="json"),
-        }
+        checklist_input = _checklist_input(baseline, questions)
+        reviewer = _reviewer_input(answers, steering, waivers)
         artifact = _invoke(
             self.composer,
             self.gateway,
@@ -241,10 +377,11 @@ class GeminiChecklistGenerator:
             variables={
                 "document_type": document_type.value,
                 "document_metadata": {"document_id": questions.document_id},
-                "analysis_results": _json(questions),
+                "analysis_results": _json(checklist_input),
                 "reviewer_inputs": _json(reviewer),
             },
             stage="rewrite_checklist",
+            input_digests=(_json_digest(checklist_input), _json_digest(reviewer)),
         )
         if artifact.document_id != baseline.document_id:
             raise ValidationError("checklist generator returned a different document identity")
