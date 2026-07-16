@@ -1562,34 +1562,34 @@ Acceptance: every enhanced section and semantic object traces to approved eviden
 
 ### M7 — Audit, diff, graph export, embeddings, and SQLite RAG package
 
-- [ ] M7.1 Implement deterministic schema, template, ontology, reference, provenance, unresolved-item, and ledger checks.
-- [ ] M7.2 Implement document-type lint suites for steps, methods, rules, controls, risks, tables, calculators, exceptions, and dependencies.
-- [ ] M7.3 Implement independent content auditor and evidence-linked audit findings.
-- [ ] M7.4 Implement bounded routing for auto-revisable failures versus human-required failures.
-- [ ] M7.5 Implement textual diff, semantic diff, and source-to-target mapping.
-- [ ] M7.6 Implement deterministic semantic chunking and stable chunk IDs.
-- [ ] M7.7 Implement nodes/edges JSONL export with graph layers and authority.
-- [ ] M7.8 Implement export bundle manifest, digests, counts, and validation.
-- [ ] M7.9 Implement final audit report with clear pass/fail and waivers.
-- [ ] M7.10 Define versioned SQLite migrations for documents, versions, sections, chunks, provenance, graph nodes/edges/aliases, embeddings, FTS5, and build metadata.
-- [ ] M7.11 Implement transactional ingestion from enhanced Markdown, semantic sidecar, chunks, nodes, and edges with stable IDs and foreign keys.
-- [ ] M7.12 Implement `gemini-embedding-2` document embedding at default 768 dimensions with deterministic retrieval-document formatting and exact profile metadata.
-- [ ] M7.13 Implement embedding batching, cache/resume, retry classification, rate limiting, input-limit rejection/splitting, and failed-build recovery.
-- [ ] M7.14 Implement float32 vector serialization/validation and one-embedding-per-approved-chunk enforcement.
-- [ ] M7.15 Implement and synchronize the FTS5 chunk index for lexical/hybrid retrieval.
-- [ ] M7.16 Implement database/JSONL reconciliation, `integrity_check`, `foreign_key_check`, migration verification, row/digest checks, and atomic promotion.
-- [ ] M7.17 Implement the package-only `rag build`, `rag verify`, and `rag inspect` CLI commands and manifest rendering; retrieval and answer generation are added by M7.20–M7.25.
-- [ ] M7.18 Add prior-schema migration, idempotent rebuild, partial embedding failure, profile-change re-embedding, and known-vector smoke tests.
-- [ ] M7.19 Implement atomic, idempotent cumulative catalog ingestion with historical document versions, current-version selection, graph identity-conflict handling, WAL/busy policy, and catalog generations.
-- [ ] M7.20 Implement a LangChain `VectorStore` adapter over pinned SQLiteVec and the validated exact-scan fallback, returning stable LangChain `Document` metadata and scores.
-- [ ] M7.21 Implement vector, FTS5 lexical, and graph-expansion `BaseRetriever` components plus deterministic RRF hybrid fusion, filters, deduplication, and source diversity.
-- [ ] M7.22 Implement the controlled LangGraph RAG flow for history-aware query, bounded retrieval retry, relevance/sufficiency, context assembly, grounded generation, and citation audit.
-- [ ] M7.23 Implement stable citation handles, context-budget enforcement, structured `RagAnswer`, claim/citation validation, insufficiency behavior, and one bounded grounding repair.
-- [ ] M7.24 Implement Rich `rag search`, `rag ask`, `rag chat`, `rag sources`, `rag graph`, and `rag stats` experiences with live stage progress, validated Markdown, panels/tables, slash commands, non-TTY behavior, `NO_COLOR`, `--explain`, and stable `--json` output.
-- [ ] M7.25 Implement in-memory chat history plus explicit SQLite session persistence without hidden reasoning, including catalog-generation pinning and refresh.
-- [ ] M7.26 Add retriever, hybrid ranking, graph-hop, metadata-filter, multi-turn, citation, abstention, prompt-injection, and CLI snapshot tests.
+- [x] M7.1 Implement deterministic schema, template, ontology, reference, provenance, unresolved-item, and ledger checks.
+- [x] M7.2 Implement document-type lint suites for steps, methods, rules, controls, risks, tables, calculators, exceptions, and dependencies.
+- [x] M7.3 Implement independent content auditor and evidence-linked audit findings.
+- [x] M7.4 Implement bounded routing for auto-revisable failures versus human-required failures.
+- [x] M7.5 Implement textual diff, semantic diff, and source-to-target mapping.
+- [x] M7.6 Implement deterministic semantic chunking and stable chunk IDs.
+- [x] M7.7 Implement nodes/edges JSONL export with graph layers and authority.
+- [x] M7.8 Implement export bundle manifest, digests, counts, and validation.
+- [x] M7.9 Implement final audit report with clear pass/fail and waivers.
+- [x] M7.10 Define versioned SQLite migrations for documents, versions, sections, chunks, provenance, graph nodes/edges/aliases, embeddings, FTS5, and build metadata.
+- [x] M7.11 Implement transactional ingestion from enhanced Markdown, semantic sidecar, chunks, nodes, and edges with stable IDs and foreign keys.
+- [x] M7.12 Implement `gemini-embedding-2` document embedding at default 768 dimensions with deterministic retrieval-document formatting and exact profile metadata.
+- [x] M7.13 Implement embedding batching, cache/resume, retry classification, rate limiting, input-limit rejection/splitting, and failed-build recovery.
+- [x] M7.14 Implement float32 vector serialization/validation and one-embedding-per-approved-chunk enforcement.
+- [x] M7.15 Implement and synchronize the FTS5 chunk index for lexical/hybrid retrieval.
+- [x] M7.16 Implement database/JSONL reconciliation, `integrity_check`, `foreign_key_check`, migration verification, row/digest checks, and atomic promotion.
+- [x] M7.17 Implement the package-only `rag build`, `rag verify`, and `rag inspect` CLI commands and manifest rendering; retrieval and answer generation are added by M7.20–M7.25.
+- [x] M7.18 Add prior-schema migration, idempotent rebuild, partial embedding failure, profile-change re-embedding, and known-vector smoke tests.
+- [x] M7.19 Implement atomic, idempotent cumulative catalog ingestion with historical document versions, current-version selection, graph identity-conflict handling, WAL/busy policy, and catalog generations.
+- [x] M7.20 Implement a LangChain `VectorStore` adapter over pinned SQLiteVec and the validated exact-scan fallback, returning stable LangChain `Document` metadata and scores.
+- [x] M7.21 Implement vector, FTS5 lexical, and graph-expansion `BaseRetriever` components plus deterministic RRF hybrid fusion, filters, deduplication, and source diversity.
+- [x] M7.22 Implement the controlled LangGraph RAG flow for history-aware query, bounded retrieval retry, relevance/sufficiency, context assembly, grounded generation, and citation audit.
+- [x] M7.23 Implement stable citation handles, context-budget enforcement, structured `RagAnswer`, claim/citation validation, insufficiency behavior, and one bounded grounding repair.
+- [x] M7.24 Implement Rich `rag search`, `rag ask`, `rag chat`, `rag sources`, `rag graph`, and `rag stats` experiences with live stage progress, validated Markdown, panels/tables, slash commands, non-TTY behavior, `NO_COLOR`, `--explain`, and stable `--json` output.
+- [x] M7.25 Implement in-memory chat history plus explicit SQLite session persistence without hidden reasoning, including catalog-generation pinning and refresh.
+- [x] M7.26 Add retriever, hybrid ranking, graph-hop, metadata-filter, multi-turn, citation, abstention, prompt-injection, and CLI snapshot tests.
 
-Acceptance: deliberate omissions, invented facts, dangling edges, invalid Mermaid references, missing units, orphan controls, and unresolved blockers fail the appropriate gate; a passing fixture produces reconciled exports and a promoted cumulative SQLite catalog with complete sections, graph, provenance, FTS/vector indexes, and valid Gemini embeddings. The Rich CLI retrieves across documents, answers with validated citations, and abstains when evidence is insufficient. No incomplete database or failed grounding result is presented as successful.
+Acceptance: deliberate omissions, invented facts, dangling edges, invalid Mermaid references, missing units, orphan controls, and unresolved blockers fail the appropriate gate; a passing fixture produces reconciled exports and a promoted cumulative SQLite catalog with complete sections, graph, provenance, FTS/vector indexes, and valid Gemini embeddings. The Rich CLI retrieves across documents, answers with validated citations, and abstains when evidence is insufficient. No incomplete database or failed grounding result is presented as successful. **Verified 2026-07-16 on merged code commit `ec278eb`: 258 passed, 2 opt-in tests deselected; frozen sync, import smoke, Ruff format/check, ty, schemas, reference/prompt packs, fixture corpus, build, and diff checks passed.**
 
 ### M8 — Fixtures, evaluation, security, documentation, and release
 
