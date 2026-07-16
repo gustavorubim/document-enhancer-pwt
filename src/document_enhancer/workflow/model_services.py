@@ -8,12 +8,14 @@ before they can be promoted.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from dataclasses import dataclass
 from hashlib import sha256
 from typing import Any, cast
 
 from pydantic import BaseModel
 
+from document_enhancer.audit import AuditRevisionPatchSet, apply_audit_revision_patches
 from document_enhancer.audit.content import ContentAuditRequest
 from document_enhancer.domain.analysis import AnalysisReport, Finding, FindingSet
 from document_enhancer.domain.audit import Audit, IndependentAuditResult
@@ -104,10 +106,10 @@ class _GeminiIndependentAuditResult(IndependentAuditResult):
         return _provider_schema(IndependentAuditResult.model_json_schema(*args, **kwargs))
 
 
-class _GeminiEnhancedDocumentModel(EnhancedDocumentModel):
+class _GeminiAuditRevisionPatchSet(AuditRevisionPatchSet):
     @classmethod
     def model_json_schema(cls, *args: Any, **kwargs: Any) -> dict[str, Any]:
-        return _provider_schema(EnhancedDocumentModel.model_json_schema(*args, **kwargs))
+        return _provider_schema(AuditRevisionPatchSet.model_json_schema(*args, **kwargs))
 
 
 def _json(value: object) -> str:
@@ -262,6 +264,8 @@ def _invoke(
     variables: dict[str, object],
     stage: str,
     input_digests: tuple[str, ...] = (),
+    promote: Callable[[Any], Any] | None = None,
+    result_schema: type[Any] | None = None,
 ) -> Any:
     spec = composer.pack.prompt(prompt_id)
     if spec.model_route != route:
@@ -286,6 +290,8 @@ def _invoke(
         input_digests=input_digests,
         input_token_budget=composed.input_token_budget,
         output_token_budget=composed.output_token_budget,
+        promote=promote,
+        result_schema=result_schema,
     ).artifact
 
 
@@ -556,8 +562,8 @@ class GeminiAuditRevisionRunner:
             self.gateway,
             prompt_id=self.prompt_id,
             route=ROUTE_PRO_PREVIEW,
-            output_schema="enhanced-document.schema.json",
-            schema=_GeminiEnhancedDocumentModel,
+            output_schema="audit-revision-patch.schema.json",
+            schema=_GeminiAuditRevisionPatchSet,
             variables={
                 "document_type": self.document_type.value,
                 "document_metadata": {"document_id": model.document.id},
@@ -566,30 +572,11 @@ class GeminiAuditRevisionRunner:
                 "reviewer_inputs": "",
             },
             stage="bounded_revision",
+            input_digests=(_json_digest(model), _json_digest(audit)),
+            promote=lambda value: apply_audit_revision_patches(model, audit, value),
+            result_schema=EnhancedDocumentModel,
         )
-        immutable_before = (
-            model.document.id,
-            model.version.id,
-            model.document.source_digest,
-            model.ledger_id,
-            model.reference_pack_id,
-            model.reference_pack_version,
-            model.template_id,
-            model.template_version,
-        )
-        immutable_after = (
-            revised.document.id,
-            revised.version.id,
-            revised.document.source_digest,
-            revised.ledger_id,
-            revised.reference_pack_id,
-            revised.reference_pack_version,
-            revised.template_id,
-            revised.template_version,
-        )
-        if immutable_after != immutable_before:
-            raise ValidationError("audit revision changed immutable governed identity")
-        return revised
+        return EnhancedDocumentModel.model_validate(revised)
 
 
 __all__ = [

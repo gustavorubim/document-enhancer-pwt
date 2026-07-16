@@ -6,6 +6,7 @@ from collections.abc import Mapping
 
 from pydantic import BaseModel
 
+from document_enhancer.audit.revision import AuditRevisionPatchSet
 from document_enhancer.clarification.models import ReviewerValidationReport
 from document_enhancer.domain.analysis import (
     AnalysisReport,
@@ -45,6 +46,7 @@ SCHEMA_MODELS: Mapping[str, type[BaseModel]] = {
     "analysis.schema.json": AnalysisReport,
     "answers.schema.json": AnswersArtifact,
     "audit.schema.json": Audit,
+    "audit-revision-patch.schema.json": AuditRevisionPatchSet,
     "content-ledger.schema.json": ContentLedger,
     "chunk.schema.json": ExportChunk,
     "catalog-ingestion.schema.json": CatalogIngestionReceipt,

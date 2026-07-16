@@ -64,7 +64,7 @@ EXPECTED_SCHEMAS: dict[str, str] = {
     "clarification.rewrite-checklist": "rewrite-checklist.schema.json",
     "rewrite.section": "section-rewrite.schema.json",
     "rewrite.semantic-objects": "semantic-document.schema.json",
-    "rewrite.revision": "enhanced-document.schema.json",
+    "rewrite.revision": "audit-revision-patch.schema.json",
     "audit.content-fidelity": "independent-audit.schema.json",
     "audit.remediation-routing": "audit.schema.json",
     "rag.history-aware-query": "rag-query.schema.json",

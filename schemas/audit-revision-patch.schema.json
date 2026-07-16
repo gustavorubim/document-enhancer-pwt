@@ -1,0 +1,88 @@
+{
+  "$defs": {
+    "AuditIssueResolutionPatch": {
+      "additionalProperties": false,
+      "description": "Request to resolve one existing issue through a cited section revision.",
+      "properties": {
+        "audit_finding_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Audit Finding Ids",
+          "type": "array"
+        },
+        "issue_id": {
+          "title": "Issue Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "issue_id",
+        "audit_finding_ids"
+      ],
+      "title": "AuditIssueResolutionPatch",
+      "type": "object"
+    },
+    "AuditSectionRevisionPatch": {
+      "additionalProperties": false,
+      "description": "One provider-proposed prose change to an existing enhanced section.",
+      "properties": {
+        "audit_finding_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Audit Finding Ids",
+          "type": "array"
+        },
+        "evidence_span_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Evidence Span Ids",
+          "type": "array"
+        },
+        "revised_body": {
+          "maxLength": 60000,
+          "title": "Revised Body",
+          "type": "string"
+        },
+        "section_id": {
+          "pattern": "^(SEC|PROV-SEC)-[A-Z0-9-]+$",
+          "title": "Section Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "section_id",
+        "revised_body",
+        "evidence_span_ids",
+        "audit_finding_ids"
+      ],
+      "title": "AuditSectionRevisionPatch",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Provider-facing audit revision DTO without canonical document ownership.",
+  "properties": {
+    "issue_resolutions": {
+      "items": {
+        "$ref": "#/$defs/AuditIssueResolutionPatch"
+      },
+      "title": "Issue Resolutions",
+      "type": "array"
+    },
+    "section_patches": {
+      "items": {
+        "$ref": "#/$defs/AuditSectionRevisionPatch"
+      },
+      "title": "Section Patches",
+      "type": "array"
+    }
+  },
+  "title": "AuditRevisionPatchSet",
+  "type": "object"
+}
