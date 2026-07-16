@@ -244,16 +244,29 @@ def load_external_env(path: Path) -> None:
         "GOOGLE_CLOUD_LOCATION",
         "GOOGLE_GENAI_USE_VERTEXAI",
     }
+    local_alias = "gemini_api"
+    values: dict[str, str] = {}
     for raw_line in path.read_text(encoding="utf-8").splitlines():
         line = raw_line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
         name, value = line.split("=", 1)
         name = name.strip()
-        if name not in approved or name in os.environ:
+        if name not in approved and name != local_alias:
             continue
         value = value.strip().strip("\"'")
-        os.environ[name] = value
+        values[name] = value
+
+    for name in approved:
+        if name in values and name not in os.environ:
+            os.environ[name] = values[name]
+
+    if (
+        local_alias in values
+        and "GOOGLE_API_KEY" not in os.environ
+        and "GEMINI_API_KEY" not in os.environ
+    ):
+        os.environ["GEMINI_API_KEY"] = values[local_alias]
 
 
 def run_live_spikes(schema: type[Any]) -> dict[str, dict[str, str]]:
