@@ -37,6 +37,22 @@
           "default": null,
           "title": "Section Id"
         },
+        "segments": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/BlockSegment"
+              },
+              "minItems": 2,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Segments"
+        },
         "source_text_digest": {
           "title": "Source Text Digest",
           "type": "string"
@@ -53,6 +69,81 @@
         "confidence"
       ],
       "title": "BlockDisposition",
+      "type": "object"
+    },
+    "BlockSegment": {
+      "additionalProperties": false,
+      "description": "A deterministic Python-character slice of one immutable source block.",
+      "properties": {
+        "char_end": {
+          "minimum": 0,
+          "title": "Char End",
+          "type": "integer"
+        },
+        "char_start": {
+          "minimum": 0,
+          "title": "Char Start",
+          "type": "integer"
+        },
+        "confidence": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "disposition": {
+          "$ref": "#/$defs/StructureDisposition"
+        },
+        "offset_unit": {
+          "const": "python_characters",
+          "default": "python_characters",
+          "title": "Offset Unit",
+          "type": "string"
+        },
+        "rationale": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rationale"
+        },
+        "section_id": {
+          "anyOf": [
+            {
+              "pattern": "^(SEC|PROV-SEC)-[A-Z0-9-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Section Id"
+        },
+        "segment_id": {
+          "pattern": "^SEG-[A-F0-9]{16}$",
+          "title": "Segment Id",
+          "type": "string"
+        },
+        "slice_sha256": {
+          "title": "Slice Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "segment_id",
+        "char_start",
+        "char_end",
+        "disposition",
+        "confidence",
+        "slice_sha256"
+      ],
+      "title": "BlockSegment",
       "type": "object"
     },
     "BoundaryAlternative": {
