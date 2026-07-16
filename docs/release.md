@@ -18,7 +18,24 @@ completion. The temporary clone, install root, and UV cache are deleted on exit.
 
 Successful stdout is one JSON object containing `clean_clone_gate=passed`,
 `isolated_wheel=passed`, the tested commit and wheel SHA-256, plus zero provider/public calls. Save
-that object with the release record. A live report is separate and opt-in:
+that object with the release record.
+
+The repository-level four-document governed proof is separate from gold replay. It invokes the
+actual CLI for the checked-in complete process, methodology, standard, and desktop-procedure
+examples with `enterprise_core` selected, crosses Gate 1, pauses for Gate 2 approval, resumes
+through strict audit and package/catalog promotion, then runs offline `rag search` and `rag ask`:
+
+```bash
+uv run python scripts/run_governed_dod_proof.py \
+  --output .document-enhancer/governed-dod --force
+```
+
+The resulting `governed-dod-result.json` records each run ID, audit status, package row counts,
+catalog generation, search count, answer status/citation count, and zero provider calls/public
+downloads. An altered or incomplete source does not qualify for this exact-digest governed-example
+path and remains fail-closed at strict audit.
+
+A live report is separate and opt-in:
 
 ```bash
 DOCENHANCE_RUN_LIVE=1 uv run python scripts/run_live_evaluations.py \

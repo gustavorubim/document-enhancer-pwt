@@ -83,15 +83,16 @@ def _payload(model: EnhancedDocumentModel) -> dict[str, Any]:
         sections[section.anchor] = section.body
         sections[section.section_id] = section.body
     tables = {table.table_kind: _table_rows(table) for table in model.tables}
+    attributes = document.attributes
     return {
         "document": {
             "id": document.id,
             "title": document.name,
             "version": version.version,
             "status": version.status.value,
-            "owner": "TBD",
-            "effective_date": "TBD",
-            "next_review_date": "TBD",
+            "owner": attributes.get("owner", "TBD"),
+            "effective_date": attributes.get("effective_date", "TBD"),
+            "next_review_date": attributes.get("next_review_date", "TBD"),
         },
         "sections": sections,
         "tables": tables,

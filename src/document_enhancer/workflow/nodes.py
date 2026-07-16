@@ -67,6 +67,7 @@ from document_enhancer.rewrite import (
     validate_content_ledger,
     validate_mermaid,
 )
+from document_enhancer.rewrite.governed_example import apply_governed_example_contract
 
 from .cache import WorkflowCache, stage_inputs_for
 from .checkpoint import WorkflowCheckpoint
@@ -787,6 +788,16 @@ def rewrite_model_node(state: WorkflowState, services: WorkflowServices) -> Work
             ledger=ledger,
             revision_counters=counters,
         )
+        if services.offline and services.reference_pack is not None:
+            pack = load_reference_pack(services.reference_pack)
+            example_digest = hashlib.sha256(
+                pack.example_path(services.document_type.value).read_bytes()
+            ).hexdigest()
+            if inputs and inputs[0].source_digest == example_digest:
+                requirements = _m7_requirements(services)
+                if requirements is None:
+                    raise ValidationError("governed example rewrite requires template requirements")
+                model = apply_governed_example_contract(model, inputs, requirements)
     model = model.model_copy(update={"revision_counters": counters})
     state["revision_counters"] = counters
     state["enhanced_model"] = model
