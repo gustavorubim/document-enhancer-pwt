@@ -8,6 +8,7 @@ from typing import cast
 from document_enhancer.contracts import Validator
 from document_enhancer.domain.audit import AuditEvidence, DeterministicCheck
 from document_enhancer.domain.enums import DocumentType, EntityType, LedgerDisposition
+from document_enhancer.domain.ids import IDENTIFIER_RE
 from document_enhancer.domain.questions import ContentLedger, WaiversArtifact
 from document_enhancer.domain.semantic import SemanticDocument
 from document_enhancer.ingest.models import RawDocument
@@ -233,11 +234,17 @@ def _lint_errors(
         if table.table_id in waivers:
             continue
         column_ids = {column.column_id for column in table.columns}
-        if (
+        named_stable_column = (
             "id" not in column_ids
             and "version" not in column_ids
             and not any(column.endswith("_id") for column in column_ids)
-        ):
+        )
+        complete_rows = [row for row in table.rows if not row.open_issue_ids]
+        stable_row_values = bool(complete_rows) and all(
+            any(IDENTIFIER_RE.fullmatch(value) for value in row.values.values())
+            for row in complete_rows
+        )
+        if named_stable_column and not stable_row_values:
             errors.append(f"{table.table_id} has no stable ID column")
         for row in table.rows:
             if row.open_issue_ids:
