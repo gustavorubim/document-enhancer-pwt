@@ -11,7 +11,13 @@ from document_enhancer.analysis.errors import (
     AnalysisBudgetError,
     AnalysisPromptContractError,
 )
-from document_enhancer.analysis.gemini_adapter import GeminiAnalysisReport
+from document_enhancer.analysis.gemini_adapter import (
+    GeminiDiscoveryAnalysisReport,
+    GeminiMacroAnalysisReport,
+    GeminiRagReadinessAnalysisReport,
+    GeminiSectionAnalysisReport,
+    GeminiSynthesisAnalysisReport,
+)
 from document_enhancer.analysis.macro import MacroReviewer
 from document_enhancer.analysis.models import AnalysisRequest, AnalysisRunResult
 from document_enhancer.analysis.orchestrator import AnalysisOrchestrator
@@ -81,6 +87,32 @@ def test_fan_out_fan_in_is_bounded_ordered_injection_safe_and_schema_valid(
         assert "Ignore all prior instructions" in untrusted
         assert "END UNTRUSTED SOURCE" in untrusted
 
+    schemas_by_stage = {str(call["stage"]): call["schema"] for call in model.calls}
+    assert set(schemas_by_stage) == {
+        "macro_reviewer",
+        "section_mapper",
+        "process_methodology_discoverer",
+        "rag_readiness_reviewer",
+        "finding_synthesizer",
+    }
+    expected_types = {
+        "macro_reviewer": "macro",
+        "section_mapper": "sections",
+        "process_methodology_discoverer": "discovery",
+        "rag_readiness_reviewer": "rag_readiness",
+        "finding_synthesizer": "synthesis",
+    }
+    for stage, analysis_type in expected_types.items():
+        analyses = schemas_by_stage[stage]["properties"]["analyses"]
+        assert "anyOf" not in analyses["items"]
+        assert analyses["items"]["properties"]["analysis_type"]["enum"] == [analysis_type]
+    discovery_objects = schemas_by_stage["process_methodology_discoverer"]["properties"][
+        "analyses"
+    ]["items"]["properties"]["objects"]["items"]
+    assert "anyOf" not in discovery_objects
+    assert len(discovery_objects["properties"]["entity_type"]["enum"]) == 45
+    assert "entity_type" in discovery_objects["required"]
+
 
 def test_invalid_structured_output_fails_closed_without_partial_artifact(
     composer: PromptPackComposer,
@@ -130,8 +162,20 @@ def test_prompt_route_mismatch_fails_before_provider_call(
     assert model.calls == []
 
 
-def test_analysis_schema_adapter_keeps_full_pydantic_validation() -> None:
-    schema = gemini_schema(GeminiAnalysisReport)
+@pytest.mark.parametrize(
+    ("adapter", "analysis_type"),
+    (
+        (GeminiMacroAnalysisReport, "macro"),
+        (GeminiSectionAnalysisReport, "sections"),
+        (GeminiDiscoveryAnalysisReport, "discovery"),
+        (GeminiRagReadinessAnalysisReport, "rag_readiness"),
+        (GeminiSynthesisAnalysisReport, "synthesis"),
+    ),
+)
+def test_analysis_schema_adapters_are_stage_only_and_keep_full_pydantic_validation(
+    adapter: type[AnalysisReport], analysis_type: str
+) -> None:
+    schema = gemini_schema(adapter)
 
     assert schema["type"] == "object"
     assert set(schema["properties"]) == {
@@ -140,6 +184,9 @@ def test_analysis_schema_adapter_keeps_full_pydantic_validation() -> None:
         "analyses",
         "generated_at",
     }
+    analyses = schema["properties"]["analyses"]
+    assert "anyOf" not in analyses["items"]
+    assert analyses["items"]["properties"]["analysis_type"]["enum"] == [analysis_type]
 
     unsupported = {
         "const",
@@ -171,7 +218,7 @@ def test_analysis_schema_adapter_keeps_full_pydantic_validation() -> None:
     assert_supported(schema)
     with pytest.raises(StructuredOutputError, match="Pydantic validation"):
         validate_artifact(
-            GeminiAnalysisReport,
+            adapter,
             {
                 "document_id": "invalid-lowercase-id",
                 "source_digest": "not-a-digest",

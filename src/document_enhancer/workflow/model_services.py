@@ -147,6 +147,8 @@ def _invoke(
         prompt_version=composed.pack_version,
         prompt_digest=composed.digest,
         input_digests=input_digests,
+        input_token_budget=composed.input_token_budget,
+        output_token_budget=composed.output_token_budget,
     ).artifact
 
 

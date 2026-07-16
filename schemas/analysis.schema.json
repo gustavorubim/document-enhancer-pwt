@@ -7624,6 +7624,87 @@
       "title": "Statement",
       "type": "object"
     },
+    "SynthesisAnalysis": {
+      "additionalProperties": false,
+      "description": "Dedicated model contribution from the governed finding-synthesis stage.",
+      "properties": {
+        "analysis_id": {
+          "title": "Analysis Id",
+          "type": "string"
+        },
+        "analysis_type": {
+          "const": "synthesis",
+          "default": "synthesis",
+          "title": "Analysis Type",
+          "type": "string"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "document_id": {
+          "pattern": "^DOC-[A-Z0-9-]+$",
+          "title": "Document Id",
+          "type": "string"
+        },
+        "findings": {
+          "items": {
+            "$ref": "#/$defs/Finding"
+          },
+          "title": "Findings",
+          "type": "array"
+        },
+        "model_route": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model Route"
+        },
+        "prompt_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Prompt Id"
+        },
+        "source_digest": {
+          "title": "Source Digest",
+          "type": "string"
+        },
+        "version_id": {
+          "anyOf": [
+            {
+              "pattern": "^(DOCV|VER)-[A-Z0-9-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Version Id"
+        }
+      },
+      "required": [
+        "analysis_id",
+        "document_id",
+        "source_digest"
+      ],
+      "title": "SynthesisAnalysis",
+      "type": "object"
+    },
     "System": {
       "additionalProperties": false,
       "properties": {
@@ -8177,6 +8258,9 @@
           },
           {
             "$ref": "#/$defs/RagReadinessAnalysis"
+          },
+          {
+            "$ref": "#/$defs/SynthesisAnalysis"
           }
         ]
       },

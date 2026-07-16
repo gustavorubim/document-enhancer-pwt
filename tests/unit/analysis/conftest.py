@@ -293,7 +293,7 @@ def recorded_responses() -> dict[str, list[object]]:
     synthesis_finding["finding_id"] = "FND-SCOPE-SYNTH"
     synthesis = {
         **_analysis_base("AN-SYNTHESIS-001"),
-        "analysis_type": "macro",
+        "analysis_type": "synthesis",
         "findings": [synthesis_finding],
     }
     return {

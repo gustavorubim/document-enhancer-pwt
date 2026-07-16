@@ -546,10 +546,22 @@ class RagReadinessAnalysis(AnalysisBase):
     candidate_objects: list[StrictStr] = Field(default_factory=list)
 
 
+class SynthesisAnalysis(AnalysisBase):
+    """Dedicated model contribution from the governed finding-synthesis stage."""
+
+    analysis_type: Literal["synthesis"] = "synthesis"
+
+
 class AnalysisReport(StrictModel):
     document_id: StrictStr = Field(pattern=r"^DOC-[A-Z0-9-]+$")
     source_digest: StrictStr
-    analyses: list[MacroAnalysis | SectionAnalysis | DiscoveryAnalysis | RagReadinessAnalysis]
+    analyses: list[
+        MacroAnalysis
+        | SectionAnalysis
+        | DiscoveryAnalysis
+        | RagReadinessAnalysis
+        | SynthesisAnalysis
+    ]
     generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     @model_validator(mode="after")
@@ -598,5 +610,6 @@ __all__ = [
     "StructureRecoveryProposal",
     "StructureScan",
     "StructureValidation",
+    "SynthesisAnalysis",
     "SourceBlockSegment",
 ]
