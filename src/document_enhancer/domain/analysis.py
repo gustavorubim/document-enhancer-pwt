@@ -416,7 +416,7 @@ class RubricScore(StrictModel):
     dimension: StrictStr
     score: StrictInt = Field(ge=0, le=4)
     weight: StrictFloat = Field(gt=0.0, le=100.0)
-    evidence: list[EvidenceQuote] = Field(default_factory=list)
+    evidence: list[EvidenceQuote] = Field(min_length=1)
     explanation: StrictStr
 
 

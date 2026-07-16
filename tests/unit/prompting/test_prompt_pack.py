@@ -49,7 +49,7 @@ def _values(spec, *, document_type: str = "process") -> dict[str, object]:
 
 def test_pack_is_versioned_and_all_required_references_resolve(prompt_pack) -> None:
     assert prompt_pack.pack_id == "gemini_core"
-    assert prompt_pack.version == "1.0.5"
+    assert prompt_pack.version == "1.0.6"
     assert len(prompt_pack.manifest.prompts) == 20
     assert len(prompt_pack.pack_sha256) == 64
     assert set(prompt_pack.manifest.required_references) == {
@@ -267,7 +267,7 @@ def test_snapshot_contains_digests_but_not_raw_source_or_credentials(
 def test_prompt_service_metadata_does_not_require_composing(prompt_pack) -> None:
     listed = list_prompts(prompt_pack)
     assert len(listed) == 20
-    assert listed[0]["pack_version"] == "1.0.5"
+    assert listed[0]["pack_version"] == "1.0.6"
     shown = cast(dict[str, object], show_prompt(prompt_pack, "rag.grounded-answer"))
     assert shown["output_schema"] == "rag-answer.schema.json"
     assert shown["reference_scope"] == ["glossary"]

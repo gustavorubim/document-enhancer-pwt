@@ -67,12 +67,15 @@ def _provider_schema(value: Any) -> Any:
     return cleaned
 
 
-def _collapse_discovery_object_union(schema: dict[str, Any]) -> dict[str, Any]:
-    """Merge the ontology discriminator union into one bounded provider object.
+def _compact_discovery_object_union(schema: dict[str, Any]) -> dict[str, Any]:
+    """Project the ontology union to fields that every safely promotable variant shares.
 
-    The persisted ``DiscoveryAnalysis`` still validates each returned object against its exact
-    discriminated subtype. The native provider schema carries the union of relevant fields once,
-    avoiding dozens of repeated copies of the common entity/provenance graph.
+    Repeating every semantic subtype exceeds Gemini's native-schema limit. Merging every
+    subtype-specific field is also unsafe: the resulting object is both large and permits
+    combinations that no persisted subtype accepts. The provider therefore receives only the
+    common entity fields and discriminator values for variants that add no required fields.
+    ``DiscoveryAnalysis`` remains the promotion boundary and restores subtype defaults while
+    rejecting any response that does not satisfy the complete persisted contract.
     """
 
     definitions = schema.get("$defs")
@@ -83,7 +86,7 @@ def _collapse_discovery_object_union(schema: dict[str, Any]) -> dict[str, Any]:
         return schema
     try:
         items = discovery["properties"]["objects"]["items"]
-        variants = items["oneOf"]
+        variants = items.get("oneOf") or items["anyOf"]
     except (KeyError, TypeError):  # pragma: no cover - Pydantic contract invariant
         return schema
     if not isinstance(variants, list) or not variants:
@@ -99,32 +102,47 @@ def _collapse_discovery_object_union(schema: dict[str, Any]) -> dict[str, Any]:
             return schema
         variant_schemas.append(resolved)
 
-    property_options: dict[str, dict[str, dict[str, Any]]] = {}
-    required = set(variant_schemas[0].get("required", []))
-    entity_types: set[str] = set()
-    for variant in variant_schemas:
-        required &= set(variant.get("required", []))
-        properties = variant.get("properties", {})
-        if not isinstance(properties, dict):
-            return schema
-        for name, value in properties.items():
-            if not isinstance(value, dict):
-                continue
-            if name == "entity_type":
-                literal = value.get("const")
-                if isinstance(literal, str):
-                    entity_types.add(literal)
-                continue
-            canonical = json.dumps(value, sort_keys=True, separators=(",", ":"))
-            property_options.setdefault(name, {})[canonical] = value
+    required_sets = [set(variant.get("required", [])) for variant in variant_schemas]
+    common_required = set.intersection(*required_sets)
+    safe_variants = [
+        variant
+        for variant, required in zip(variant_schemas, required_sets, strict=True)
+        if not (required - common_required)
+    ]
+    if not safe_variants:  # pragma: no cover - ontology contract invariant
+        return schema
 
-    merged_properties: dict[str, Any] = {
-        "entity_type": {"type": "string", "enum": sorted(entity_types)}
-    }
-    required.add("entity_type")
-    for name, options in sorted(property_options.items()):
-        values = list(options.values())
-        merged_properties[name] = values[0] if len(values) == 1 else {"anyOf": values}
+    property_sets: list[set[str]] = []
+    for variant in safe_variants:
+        properties = variant.get("properties")
+        if not isinstance(properties, dict):  # pragma: no cover - Pydantic contract invariant
+            return schema
+        property_names = {name for name in properties if isinstance(name, str)}
+        if len(property_names) != len(properties):  # pragma: no cover - JSON Schema invariant
+            return schema
+        property_sets.append(property_names)
+    common_property_names = set.intersection(*property_sets)
+
+    merged_properties: dict[str, Any] = {}
+    entity_types: set[str] = set()
+    for name in sorted(common_property_names):
+        schemas = [variant["properties"][name] for variant in safe_variants]
+        if name == "entity_type":
+            for value in schemas:
+                literal = value.get("const") if isinstance(value, dict) else None
+                if not isinstance(literal, str):
+                    return schema  # pragma: no cover - Pydantic contract invariant
+                entity_types.add(literal)
+            merged_properties[name] = {"type": "string", "enum": sorted(entity_types)}
+            continue
+        canonical = {json.dumps(value, sort_keys=True, separators=(",", ":")) for value in schemas}
+        if len(canonical) != 1:  # pragma: no cover - common entity field contract invariant
+            continue
+        merged_properties[name] = schemas[0]
+
+    if "entity_type" not in merged_properties:  # pragma: no cover - ontology contract invariant
+        return schema
+    required = common_required | {"entity_type"}
     discovery["properties"]["objects"]["items"] = {
         "type": "object",
         "properties": merged_properties,
@@ -156,7 +174,7 @@ class GeminiDiscoveryAnalysisReport(_GeminiStageReport):
     @classmethod
     def model_json_schema(cls, *args: Any, **kwargs: Any) -> dict[str, Any]:
         raw = super(_GeminiStageReport, cls).model_json_schema(*args, **kwargs)
-        return _provider_schema(_collapse_discovery_object_union(raw))
+        return _provider_schema(_compact_discovery_object_union(raw))
 
 
 class GeminiRagReadinessAnalysisReport(_GeminiStageReport):

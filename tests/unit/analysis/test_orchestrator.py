@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Callable, Mapping
 from dataclasses import replace
 from pathlib import Path
@@ -21,7 +22,13 @@ from document_enhancer.analysis.gemini_adapter import (
 from document_enhancer.analysis.macro import MacroReviewer
 from document_enhancer.analysis.models import AnalysisRequest, AnalysisRunResult
 from document_enhancer.analysis.orchestrator import AnalysisOrchestrator
-from document_enhancer.domain.analysis import AnalysisReport, FindingSet
+from document_enhancer.domain.analysis import (
+    AnalysisReport,
+    DiscoveryAnalysis,
+    FindingSet,
+    RubricScore,
+)
+from document_enhancer.domain.ontology import Statement
 from document_enhancer.errors import ProviderError
 from document_enhancer.llm.models import GeminiModelGateway
 from document_enhancer.llm.profiles import ROUTE_FLASH
@@ -110,7 +117,7 @@ def test_fan_out_fan_in_is_bounded_ordered_injection_safe_and_schema_valid(
         "analyses"
     ]["items"]["properties"]["objects"]["items"]
     assert "anyOf" not in discovery_objects
-    assert len(discovery_objects["properties"]["entity_type"]["enum"]) == 45
+    assert len(discovery_objects["properties"]["entity_type"]["enum"]) == 42
     assert "entity_type" in discovery_objects["required"]
 
 
@@ -240,3 +247,90 @@ def test_section_provider_schema_constrains_disposition_to_canonical_values() ->
         "uncertain",
         "blocking",
     ]
+
+
+def test_discovery_provider_schema_is_compact_and_only_exposes_safe_common_fields() -> None:
+    schema = gemini_schema(GeminiDiscoveryAnalysisReport)
+    encoded = json.dumps(schema, sort_keys=True, separators=(",", ":")).encode()
+    objects = schema["properties"]["analyses"]["items"]["properties"]["objects"]["items"]
+
+    assert len(encoded) < 16_000
+    assert set(objects["properties"]) == {
+        "aliases",
+        "attributes",
+        "authority",
+        "entity_type",
+        "id",
+        "layer",
+        "name",
+        "provenance",
+        "provisional",
+        "review_status",
+        "valid_from",
+        "valid_to",
+        "validity",
+    }
+    entity_types = set(objects["properties"]["entity_type"]["enum"])
+    assert len(entity_types) == 42
+    assert {"DocumentIdentity", "DocumentVersion", "Section"}.isdisjoint(entity_types)
+    assert {"Statement", "Process", "Control"} <= entity_types
+    assert set(objects["required"]) == {"id", "entity_type", "name", "provenance"}
+    assert "action" not in objects["properties"]
+    assert "document_type" not in objects["properties"]
+
+
+def test_compact_discovery_response_promotes_through_full_persisted_contract() -> None:
+    payload = {
+        "document_id": "DOC-COMPACT-LIVE",
+        "source_digest": "a" * 64,
+        "analyses": [
+            {
+                "analysis_id": "AN-DISCOVERY-COMPACT",
+                "analysis_type": "discovery",
+                "document_id": "DOC-COMPACT-LIVE",
+                "source_digest": "a" * 64,
+                "objects": [
+                    {
+                        "id": "STMT-COMPACT-001",
+                        "entity_type": "Statement",
+                        "name": "Compact provider object",
+                        "provenance": {
+                            "document_id": "DOC-COMPACT-LIVE",
+                            "source_span_id": "SPAN-COMPACT00000001",
+                            "origin": "source",
+                            "authority": "explicit",
+                            "layer": "extracted",
+                            "extraction_method": "analysis.process-methodology-discovery",
+                        },
+                    }
+                ],
+            }
+        ],
+    }
+
+    provider = validate_artifact(GeminiDiscoveryAnalysisReport, payload)
+    persisted = AnalysisReport.model_validate(provider.model_dump(mode="python"))
+
+    persisted_discovery = persisted.analyses[0]
+    assert isinstance(persisted_discovery, DiscoveryAnalysis)
+    assert isinstance(persisted_discovery.objects[0], Statement)
+    assert persisted_discovery.objects[0].aliases == []
+
+
+def test_rubric_score_requires_at_least_one_authoritative_evidence_item() -> None:
+    with pytest.raises(ValueError, match="at least 1 item"):
+        RubricScore.model_validate(
+            {
+                "dimension": "purpose_scope",
+                "score": 2,
+                "weight": 10.0,
+                "evidence": [],
+                "explanation": "The source is incomplete.",
+            }
+        )
+
+    schema = gemini_schema(GeminiMacroAnalysisReport)
+    evidence = schema["properties"]["analyses"]["items"]["properties"]["rubric_scores"]["items"][
+        "properties"
+    ]["evidence"]
+    assert evidence["minItems"] == 1

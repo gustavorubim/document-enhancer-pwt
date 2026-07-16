@@ -6538,6 +6538,7 @@
           "items": {
             "$ref": "#/$defs/EvidenceQuote"
           },
+          "minItems": 1,
           "title": "Evidence",
           "type": "array"
         },
@@ -6562,6 +6563,7 @@
         "dimension",
         "score",
         "weight",
+        "evidence",
         "explanation"
       ],
       "title": "RubricScore",
