@@ -22,6 +22,18 @@ The prompt pack, not Python, owns prompt text, shared references, output schemas
 selection. Source content is placed in the prompt pack's untrusted-data boundary. Tools are not
 available to any structure route.
 
+## Cross-lane integration dependency
+
+The WT3 implementation is offline-green and remains fail-closed when the live gateway cannot
+produce a native structured result. The first credential-backed smoke exposed a WT11 prompt-pack
+scope issue: all nine reference files were injected into the structure prompts, and composing the
+empty-source structure prompt was 48,806 characters. The resulting `BudgetExceededError` is a
+prompt-scope integration finding, not a structure-routing or validation failure in this lane.
+WT11 is correcting this with explicit per-prompt reference scopes and empty reference scopes for
+the structure routes. After that shared correction is merged, rerun the opt-in scan and recovery
+smoke on the combined baseline. WT3 deliberately does not duplicate prompt text or modify shared
+prompt/gateway files.
+
 ## Windows, validation, and promotion
 
 Windows are contiguous raw blocks with deterministic character limits and stable overlap. Every
