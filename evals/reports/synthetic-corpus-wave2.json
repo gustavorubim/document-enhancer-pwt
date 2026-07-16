@@ -1,0 +1,846 @@
+{
+  "dataset_id": "synthetic-corpus-v1",
+  "generator_version": "0.1.0",
+  "metric_status_summary": {
+    "pending": [
+      "ontology_graph_completeness",
+      "question_quality",
+      "ledger_rewrite_fidelity",
+      "sqlite_embedding_completeness",
+      "retrieval_ranking",
+      "groundedness",
+      "citations",
+      "abstention",
+      "cost",
+      "latency"
+    ],
+    "supported_now": [
+      "structure_coverage_order",
+      "boundary_accuracy"
+    ]
+  },
+  "reports": [
+    {
+      "document_id": "DOC-MONTHLY-LOSS-FORECAST-001",
+      "fixture_id": "monthly_loss_forecasting_methodology",
+      "metrics": [
+        {
+          "denominator": null,
+          "dependencies": [
+            "M3B"
+          ],
+          "details": {
+            "reason": "No selected structural-view artifact was supplied."
+          },
+          "metric_id": "structure_coverage_order",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "M3B"
+          ],
+          "details": {
+            "reason": "No selected section-boundary artifact was supplied."
+          },
+          "metric_id": "boundary_accuracy",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "M6"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'semantic_objects, semantic_edges' are not available in the WT0 baseline."
+          },
+          "metric_id": "ontology_graph_completeness",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "M4B"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'questions' are not available in the WT0 baseline."
+          },
+          "metric_id": "question_quality",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "M6"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'content_dispositions' are not available in the WT0 baseline."
+          },
+          "metric_id": "ledger_rewrite_fidelity",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "M7R"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'sqlite_rows' are not available in the WT0 baseline."
+          },
+          "metric_id": "sqlite_embedding_completeness",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "M7R"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'retrieval_hits' are not available in the WT0 baseline."
+          },
+          "metric_id": "retrieval_ranking",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "M7R"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'answer_claims' are not available in the WT0 baseline."
+          },
+          "metric_id": "groundedness",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "M7R"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'citations' are not available in the WT0 baseline."
+          },
+          "metric_id": "citations",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "M7R"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'abstention' are not available in the WT0 baseline."
+          },
+          "metric_id": "abstention",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "live_model"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'cost' are not available in the WT0 baseline."
+          },
+          "metric_id": "cost",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "live_model"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'latency' are not available in the WT0 baseline."
+          },
+          "metric_id": "latency",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        }
+      ],
+      "schema_version": "0.1",
+      "status": "pending_dependencies"
+    },
+    {
+      "document_id": "DOC-QUARTERLY-ACCESS-REVIEW-001",
+      "fixture_id": "quarterly_user_access_review_process",
+      "metrics": [
+        {
+          "denominator": null,
+          "dependencies": [
+            "M3B"
+          ],
+          "details": {
+            "reason": "No selected structural-view artifact was supplied."
+          },
+          "metric_id": "structure_coverage_order",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "M3B"
+          ],
+          "details": {
+            "reason": "No selected section-boundary artifact was supplied."
+          },
+          "metric_id": "boundary_accuracy",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "M6"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'semantic_objects, semantic_edges' are not available in the WT0 baseline."
+          },
+          "metric_id": "ontology_graph_completeness",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "M4B"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'questions' are not available in the WT0 baseline."
+          },
+          "metric_id": "question_quality",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "M6"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'content_dispositions' are not available in the WT0 baseline."
+          },
+          "metric_id": "ledger_rewrite_fidelity",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "M7R"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'sqlite_rows' are not available in the WT0 baseline."
+          },
+          "metric_id": "sqlite_embedding_completeness",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "M7R"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'retrieval_hits' are not available in the WT0 baseline."
+          },
+          "metric_id": "retrieval_ranking",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "M7R"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'answer_claims' are not available in the WT0 baseline."
+          },
+          "metric_id": "groundedness",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "M7R"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'citations' are not available in the WT0 baseline."
+          },
+          "metric_id": "citations",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "M7R"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'abstention' are not available in the WT0 baseline."
+          },
+          "metric_id": "abstention",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "live_model"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'cost' are not available in the WT0 baseline."
+          },
+          "metric_id": "cost",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "live_model"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'latency' are not available in the WT0 baseline."
+          },
+          "metric_id": "latency",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        }
+      ],
+      "schema_version": "0.1",
+      "status": "pending_dependencies"
+    },
+    {
+      "document_id": "DOC-INCIDENT-ESCALATION-001",
+      "fixture_id": "incident_escalation_desktop_procedure",
+      "metrics": [
+        {
+          "denominator": null,
+          "dependencies": [
+            "M3B"
+          ],
+          "details": {
+            "reason": "No selected structural-view artifact was supplied."
+          },
+          "metric_id": "structure_coverage_order",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "M3B"
+          ],
+          "details": {
+            "reason": "No selected section-boundary artifact was supplied."
+          },
+          "metric_id": "boundary_accuracy",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "M6"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'semantic_objects, semantic_edges' are not available in the WT0 baseline."
+          },
+          "metric_id": "ontology_graph_completeness",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "M4B"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'questions' are not available in the WT0 baseline."
+          },
+          "metric_id": "question_quality",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "M6"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'content_dispositions' are not available in the WT0 baseline."
+          },
+          "metric_id": "ledger_rewrite_fidelity",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "M7R"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'sqlite_rows' are not available in the WT0 baseline."
+          },
+          "metric_id": "sqlite_embedding_completeness",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "M7R"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'retrieval_hits' are not available in the WT0 baseline."
+          },
+          "metric_id": "retrieval_ranking",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "M7R"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'answer_claims' are not available in the WT0 baseline."
+          },
+          "metric_id": "groundedness",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "M7R"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'citations' are not available in the WT0 baseline."
+          },
+          "metric_id": "citations",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "M7R"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'abstention' are not available in the WT0 baseline."
+          },
+          "metric_id": "abstention",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "live_model"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'cost' are not available in the WT0 baseline."
+          },
+          "metric_id": "cost",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "live_model"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'latency' are not available in the WT0 baseline."
+          },
+          "metric_id": "latency",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        }
+      ],
+      "schema_version": "0.1",
+      "status": "pending_dependencies"
+    },
+    {
+      "document_id": "DOC-THIRD-PARTY-RISK-STANDARD-001",
+      "fixture_id": "third_party_risk_standard",
+      "metrics": [
+        {
+          "denominator": null,
+          "dependencies": [
+            "M3B"
+          ],
+          "details": {
+            "reason": "No selected structural-view artifact was supplied."
+          },
+          "metric_id": "structure_coverage_order",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "M3B"
+          ],
+          "details": {
+            "reason": "No selected section-boundary artifact was supplied."
+          },
+          "metric_id": "boundary_accuracy",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "M6"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'semantic_objects, semantic_edges' are not available in the WT0 baseline."
+          },
+          "metric_id": "ontology_graph_completeness",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "M4B"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'questions' are not available in the WT0 baseline."
+          },
+          "metric_id": "question_quality",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "M6"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'content_dispositions' are not available in the WT0 baseline."
+          },
+          "metric_id": "ledger_rewrite_fidelity",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "M7R"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'sqlite_rows' are not available in the WT0 baseline."
+          },
+          "metric_id": "sqlite_embedding_completeness",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "M7R"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'retrieval_hits' are not available in the WT0 baseline."
+          },
+          "metric_id": "retrieval_ranking",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "M7R"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'answer_claims' are not available in the WT0 baseline."
+          },
+          "metric_id": "groundedness",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "M7R"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'citations' are not available in the WT0 baseline."
+          },
+          "metric_id": "citations",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "M7R"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'abstention' are not available in the WT0 baseline."
+          },
+          "metric_id": "abstention",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "live_model"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'cost' are not available in the WT0 baseline."
+          },
+          "metric_id": "cost",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "live_model"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'latency' are not available in the WT0 baseline."
+          },
+          "metric_id": "latency",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        }
+      ],
+      "schema_version": "0.1",
+      "status": "pending_dependencies"
+    },
+    {
+      "document_id": "DOC-MODEL-CHANGE-GOVERNANCE-001",
+      "fixture_id": "model_change_governance_process",
+      "metrics": [
+        {
+          "denominator": null,
+          "dependencies": [
+            "M3B"
+          ],
+          "details": {
+            "reason": "No selected structural-view artifact was supplied."
+          },
+          "metric_id": "structure_coverage_order",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "M3B"
+          ],
+          "details": {
+            "reason": "No selected section-boundary artifact was supplied."
+          },
+          "metric_id": "boundary_accuracy",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "M6"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'semantic_objects, semantic_edges' are not available in the WT0 baseline."
+          },
+          "metric_id": "ontology_graph_completeness",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "M4B"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'questions' are not available in the WT0 baseline."
+          },
+          "metric_id": "question_quality",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "M6"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'content_dispositions' are not available in the WT0 baseline."
+          },
+          "metric_id": "ledger_rewrite_fidelity",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "M7R"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'sqlite_rows' are not available in the WT0 baseline."
+          },
+          "metric_id": "sqlite_embedding_completeness",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "M7R"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'retrieval_hits' are not available in the WT0 baseline."
+          },
+          "metric_id": "retrieval_ranking",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "M7R"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'answer_claims' are not available in the WT0 baseline."
+          },
+          "metric_id": "groundedness",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "M7R"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'citations' are not available in the WT0 baseline."
+          },
+          "metric_id": "citations",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "M7R"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'abstention' are not available in the WT0 baseline."
+          },
+          "metric_id": "abstention",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "live_model"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'cost' are not available in the WT0 baseline."
+          },
+          "metric_id": "cost",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        },
+        {
+          "denominator": null,
+          "dependencies": [
+            "live_model"
+          ],
+          "details": {
+            "reason": "Dependency-gated artifact(s) 'latency' are not available in the WT0 baseline."
+          },
+          "metric_id": "latency",
+          "numerator": null,
+          "score": null,
+          "status": "not_evaluated"
+        }
+      ],
+      "schema_version": "0.1",
+      "status": "pending_dependencies"
+    }
+  ],
+  "schema_version": "0.1",
+  "status": "pending_dependencies"
+}
