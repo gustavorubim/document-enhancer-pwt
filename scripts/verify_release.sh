@@ -41,20 +41,26 @@ cp "$clone/fixtures/synthetic/corpus/monthly_loss_forecasting_methodology/clean.
 (
   cd "$install_root"
   export UV_CACHE_DIR="$uv_cache"
+  export UV_NO_PROGRESS=1
   uv run --isolated --with "$wheel" docenhance version >version.txt
   uv run --isolated --with "$wheel" docenhance --help >help.txt
+  uv run --isolated --with "$wheel" docenhance prompts validate --json >prompts.json
+  set +e
   uv run --isolated --with "$wheel" docenhance run source.md \
     --document-type methodology \
     --run-dir "$install_root/runs" \
-    --no-gate2 \
-    --no-catalog-ingest \
+    --until questions \
     --json >run.json
-  uv run --isolated --with "$wheel" docenhance audit \
+  run_exit="$?"
+  set -e
+  test "$run_exit" -eq 10
+  uv run --isolated --with "$wheel" docenhance status \
     "$(python -c 'import json; print(json.load(open("run.json"))["run_id"])')" \
     --run-dir "$install_root/runs" \
-    --json >audit.json
-  grep -q '"status": "succeeded"' run.json
-  grep -q '"status": "pass"' audit.json
+    --json >status.json
+  grep -q '"ok": true' prompts.json
+  grep -q '"status": "waiting"' run.json
+  grep -q '"status": "waiting"' status.json
 )
 
 tested_commit="$(git -C "$clone" rev-parse HEAD)"

@@ -12,8 +12,9 @@ The script creates a temporary clone with `git clone --no-local`, checks out the
 detached mode, confirms the clone is clean, runs frozen sync, Ruff format/lint, ty, all non-live and
 non-public tests, schema/reference/prompt/fixture/evaluation checks, and builds the distributions.
 It then changes to a separate directory, installs only the wheel through `uv --isolated`, runs the
-CLI, completes an offline enhancement, and verifies its audit. The temporary clone, install root,
-and UV cache are deleted on exit.
+CLI, validates the bundled prompt/reference packs, and starts a governed workflow through the
+expected human-review pause (exit 10). The separate M8 offline demo proves full audit/export/RAG
+completion. The temporary clone, install root, and UV cache are deleted on exit.
 
 Successful stdout is one JSON object containing `clean_clone_gate=passed`,
 `isolated_wheel=passed`, the tested commit and wheel SHA-256, plus zero provider/public calls. Save

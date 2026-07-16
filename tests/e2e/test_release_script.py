@@ -15,3 +15,5 @@ def test_release_script_is_syntactically_valid_and_isolates_clone_and_install() 
     assert "git clone --quiet --no-local" in text
     assert "uv run --isolated --with" in text
     assert "not live_model and not public_download" in text
+    assert "--until questions" in text
+    assert 'test "$run_exit" -eq 10' in text
