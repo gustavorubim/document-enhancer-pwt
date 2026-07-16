@@ -7110,17 +7110,14 @@
           "title": "Source Span Ids",
           "type": "array"
         },
-        "target_section_id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Target Section Id"
+        "target_section_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Target Section Ids",
+          "type": "array",
+          "uniqueItems": true
         }
       },
       "required": [

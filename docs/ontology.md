@@ -64,6 +64,25 @@ different syntactically valid ID. Changing the offsets or digest changes the
 expected ID and invalidates the proposal. Unsplit dispositions remain valid
 without a `segments` field.
 
+### Section mapping targets
+
+`SectionMapping` preserves source-span order while mapping each source block to
+one or more ordered target sections, or to no target when its explicit
+`disposition` explains why it is unmapped. The canonical persisted field is
+`target_section_ids`; it is always a list, including an empty list for an
+explicit no-target disposition. Its order is meaningful when one source block
+contributes to multiple target sections, and its values must be nonblank and
+unique.
+
+For input compatibility, older artifacts may provide singular
+`target_section_id`; validation normalizes a string to a one-item list and
+`null` to an empty list. Canonical JSON/YAML always emits the plural field. If
+singular and plural fields are supplied together, they must describe the same
+canonical values, treating `null` and `[]` as equivalent, or validation fails
+closed. Multi-target consumers must read `target_section_ids`; the singular
+accessor returns a value only for exactly one target and returns `null` for
+zero or multiple targets so mappings cannot be silently truncated.
+
 ## Adding an ontology extension
 
 Extensions are reviewed changes, not per-run invention. To add a new entity or

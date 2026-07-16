@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Literal
 
@@ -446,9 +447,51 @@ class MacroAnalysis(AnalysisBase):
 
 class SectionMapping(StrictModel):
     source_span_ids: list[StrictStr]
-    target_section_id: StrictStr | None = None
+    target_section_ids: list[StrictStr] = Field(
+        default_factory=list,
+        json_schema_extra={"default": [], "uniqueItems": True},
+    )
     disposition: StrictStr
     rationale: StrictStr | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_legacy_target_section_id(cls, data: object) -> object:
+        if not isinstance(data, Mapping):
+            return data
+        values = dict(data)
+        singular_present = "target_section_id" in values
+        plural_present = "target_section_ids" in values
+        if singular_present and plural_present:
+            singular = values["target_section_id"]
+            plural = values["target_section_ids"]
+            canonical_singular = [] if singular is None else [singular]
+            canonical_plural = [] if plural is None else plural
+            equivalent = (
+                isinstance(canonical_plural, (list, tuple))
+                and list(canonical_plural) == canonical_singular
+            )
+            if not equivalent:
+                raise ValueError(
+                    "target_section_id and target_section_ids provide conflicting values"
+                )
+            values["target_section_ids"] = list(canonical_plural)
+            values.pop("target_section_id")
+        elif singular_present:
+            singular = values.pop("target_section_id")
+            values["target_section_ids"] = [] if singular is None else [singular]
+        elif values.get("target_section_ids") is None:
+            values["target_section_ids"] = []
+        return values
+
+    @field_validator("target_section_ids")
+    @classmethod
+    def validate_target_section_ids(cls, values: list[StrictStr]) -> list[StrictStr]:
+        for value in values:
+            non_empty(value, field_name="target section id")
+        if len(set(values)) != len(values):
+            raise ValueError("target_section_ids must contain unique IDs")
+        return values
 
     @field_validator("source_span_ids")
     @classmethod
@@ -456,6 +499,12 @@ class SectionMapping(StrictModel):
         for value in values:
             validate_span_id(value)
         return values
+
+    @property
+    def target_section_id(self) -> StrictStr | None:
+        """Return the sole target for legacy singular consumers."""
+
+        return self.target_section_ids[0] if len(self.target_section_ids) == 1 else None
 
 
 class SectionAnalysis(AnalysisBase):
