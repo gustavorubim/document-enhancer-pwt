@@ -20,7 +20,8 @@ cannot be overwritten with different bytes. A local SQLite checkpoint records
 stage cache keys and artifact digests. Reconciliation marks checkpoints stale
 when a manifest artifact is missing or has changed.
 
-The M3A implementation reserves `source/structure-scan.json` and
-`source/recovered-outline.json` with an explicit `deferred` status. M3.11–M3.13
-remain dependency-gated on WT4's Gemini gateway and WT11's prompt pack; no model
-result is manufactured by the deterministic lane.
+M3B consumes WT4's fakeable Gemini gateway and WT11's versioned prompt pack through
+`StructureRecoveryService`; the full routing, window, validation, and artifact contract is in
+[`structure-recovery.md`](structure-recovery.md). Existing deferred M3A reservations are replaced
+only by the explicit atomic revision path after a real structured result passes validation. `off`
+and `parser` modes retain the deferred/no-model semantics and never manufacture a model result.

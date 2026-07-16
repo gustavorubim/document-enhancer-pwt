@@ -1,0 +1,13 @@
+{
+  "duplicate": "duplicate span IDs in dispositions",
+  "gap": "coverage/order mismatch",
+  "reordering": "coverage/order mismatch",
+  "text_mutation": "source text digest mismatch",
+  "bad_hierarchy": "illegal crossing section boundaries",
+  "bad_nesting": "invalid section nesting level",
+  "ambiguity_loss": "boundary alternatives are retained as model evidence",
+  "oversized_window": "raw block exceeds the configured window budget",
+  "prompt_injection": "source is data-only and no tools are available",
+  "cache_invalidation": "source and outline digests are cache dependencies",
+  "interrupted_persistence": "prior canonical bytes survive failed promotion"
+}
