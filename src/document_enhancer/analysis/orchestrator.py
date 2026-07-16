@@ -73,31 +73,6 @@ def _safe_failure_record(
     )
 
 
-def _quarantine_record(
-    request: AnalysisRequest,
-    branch: AnalysisBranchResult,
-) -> AnalysisStageRecord:
-    return AnalysisStageRecord(
-        document_id=request.document_id,
-        source_digest=request.source_digest,
-        stage=branch.specialist,
-        status="quarantined",
-        branch=branch,
-        error_type="CandidateQuarantine",
-        error_message="The branch contains non-promoted candidates that require resolution.",
-        retry_action=(
-            f"Review the {branch.specialist} quarantine findings and retry that analysis stage."
-        ),
-    )
-
-
-def _has_blocking_quarantine(branch: AnalysisBranchResult) -> bool:
-    return any(
-        finding.category == "candidate_quarantine" and finding.blocking
-        for finding in branch.analysis.findings
-    )
-
-
 def _validate_branch_identity(
     stage: AnalysisStageName,
     branch: object,
@@ -241,20 +216,19 @@ class AnalysisOrchestrator:
                     branch, candidate_disposition = _resolve_branch_value(stage, future.result())
                     if candidate_disposition is not None:
                         disposition_map = cast(SourceDispositionMap, candidate_disposition)
-                    if _has_blocking_quarantine(branch):
-                        outcome = _quarantine_record(request, branch)
-                    else:
-                        outcome = AnalysisStageRecord(
-                            document_id=request.document_id,
-                            source_digest=request.source_digest,
-                            stage=stage,
-                            status="succeeded",
-                            branch=branch,
-                            disposition_map=cast(
-                                SourceDispositionMap | None, candidate_disposition
-                            ),
-                        )
-                        branches_by_stage[stage] = branch
+                    # Item-level discovery quarantines are valid, visible branch findings. They
+                    # must reach Gate 1 as blocking questions; only a stage that fails to produce
+                    # a strict branch artifact prevents fan-in. Downstream promotion remains
+                    # closed until those questions are answered or explicitly waived.
+                    outcome = AnalysisStageRecord(
+                        document_id=request.document_id,
+                        source_digest=request.source_digest,
+                        stage=stage,
+                        status="succeeded",
+                        branch=branch,
+                        disposition_map=cast(SourceDispositionMap | None, candidate_disposition),
+                    )
+                    branches_by_stage[stage] = branch
                 except Exception as exc:  # every sibling still resolves before fail-closed fan-in
                     outcome = _safe_failure_record(request, stage, exc)
                 records_by_stage[stage] = outcome

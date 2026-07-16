@@ -748,6 +748,7 @@ class GeminiModelGateway:
                 )
                 usage = callback.usage or UsageMetadata.from_response(response)
                 provider_artifact = validate_artifact(schema, _extract_parsed(response))
+                provider_artifact_payload = artifact_json(schema, provider_artifact)
                 if promote is None:
                     promoted: object = provider_artifact
                 else:
@@ -764,7 +765,7 @@ class GeminiModelGateway:
                 self._enforce_budget(
                     effective,
                     usage,
-                    artifact_payload,
+                    provider_artifact_payload,
                     token_budget=token_budget,
                     output_budget=output_budget,
                 )

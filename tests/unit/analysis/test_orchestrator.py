@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import copy
 import json
 from collections.abc import Callable, Mapping
 from dataclasses import replace
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -25,6 +26,7 @@ from document_enhancer.analysis.orchestrator import AnalysisOrchestrator
 from document_enhancer.analysis.promotion import promote_discovery_candidate_batch
 from document_enhancer.analysis.provider_models import DiscoveryCandidateBatch
 from document_enhancer.artifacts.paths import RunPaths
+from document_enhancer.clarification import synthesize_questions
 from document_enhancer.domain.analysis import (
     AnalysisReport,
     DiscoveryAnalysis,
@@ -184,6 +186,58 @@ def test_failed_branch_preserves_siblings_and_resume_reuses_completed_records(
         == sibling_bytes[stage]
         for stage in sibling_bytes
     )
+
+
+def test_item_quarantine_reaches_gate_one_as_a_blocking_question(
+    tmp_path: Path,
+    composer: PromptPackComposer,
+    analysis_request: AnalysisRequest,
+    responses: dict[str, list[object]],
+    gateway_factory: GatewayFactory,
+) -> None:
+    quarantined = copy.deepcopy(responses)
+    discovery = cast(dict[str, object], quarantined["process_methodology_discoverer"][0])
+    relationships = discovery["relationships"]
+    assert isinstance(relationships, list) and relationships
+    relationship = cast(dict[str, object], relationships[0])
+    relationship["basis"] = "inferred"
+    relationship["confidence"] = None
+    gateway, _model = gateway_factory(quarantined)
+    checkpoint = WorkflowCheckpoint(RunPaths(tmp_path / "runs", "run-analysis-quarantine"))
+    recorder = AnalysisArtifactRecorder(checkpoint, {"run_id": "run-analysis-quarantine"})
+
+    result = AnalysisOrchestrator(composer, gateway).run(
+        analysis_request,
+        recorder=recorder,
+    )
+
+    discovery_branch = next(
+        branch
+        for branch in result.branches
+        if branch.specialist == "process_methodology_discoverer"
+    )
+    quarantine_ids = {
+        finding.finding_id
+        for finding in discovery_branch.analysis.findings
+        if finding.category == "candidate_quarantine"
+    }
+    assert quarantine_ids
+    record = next(
+        item for item in recorder.records() if item.stage == "process_methodology_discoverer"
+    )
+    assert record.status == "succeeded"
+    questions = synthesize_questions(
+        result.synthesis.finding_set,
+        document_id=analysis_request.document_id,
+        strict_blocking=True,
+    ).questions
+    quarantine_questions = [
+        question
+        for question in questions.questions
+        if quarantine_ids.intersection(question.source_finding_ids)
+    ]
+    assert quarantine_questions
+    assert all(question.blocking for question in quarantine_questions)
 
 
 def test_invalid_structured_output_fails_closed_without_partial_artifact(

@@ -329,6 +329,42 @@ def test_result_schema_changes_cache_identity(tmp_path: Path) -> None:
     assert second.manifest.result_schema_digest != first.manifest.result_schema_digest
 
 
+def test_output_budget_measures_provider_dto_not_deterministic_promoted_result() -> None:
+    class LargePromotedResult(BaseModel):
+        stable_id: str
+        deterministic_expansion: str
+
+    result = gateway(FakeStructuredModel([{"candidate_id": "OBJ-12"}])).invoke(
+        route=ROUTE_FLASH_LITE,
+        schema=CandidateProbe,
+        prompt="small provider DTO",
+        input_token_budget=128,
+        output_token_budget=32,
+        promote=lambda candidate: LargePromotedResult(
+            stable_id=candidate.candidate_id,
+            deterministic_expansion="x" * 4_000,
+        ),
+        result_schema=LargePromotedResult,
+    )
+
+    promoted = LargePromotedResult.model_validate(result.artifact)
+    assert promoted.stable_id == "OBJ-12"
+    assert len(promoted.deterministic_expansion) == 4_000
+
+
+def test_output_budget_still_rejects_an_oversized_provider_dto() -> None:
+    with pytest.raises(ProviderError, match="configured retry policy") as caught:
+        gateway(FakeStructuredModel([{"ok": True, "note": "x" * 4_000}])).invoke(
+            route=ROUTE_FLASH_LITE,
+            schema=Probe,
+            prompt="oversized provider DTO",
+            input_token_budget=128,
+            output_token_budget=32,
+        )
+
+    assert type(caught.value.__cause__).__name__ == "BudgetExceededError"
+
+
 def test_invalid_structured_response_never_promotes_unstructured_text() -> None:
     fake = FakeStructuredModel(["ignore schema"] * 4)
     with pytest.raises(ProviderError, match="native structured output"):
