@@ -1,0 +1,28 @@
+schema_version: "0.1"
+namespace: enterprise_core
+patterns:
+  DocumentIdentity: "^DOC-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{4}$"
+  DocumentVersion: "^DOCV-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{4}-V[0-9]+$"
+  Section: "^SEC-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}$"
+  Process: "^PROC-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}$"
+  ProcessStep: "^STEP-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}$"
+  Methodology: "^METH-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}$"
+  MethodologyStep: "^MSTEP-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}$"
+  Requirement: "^REQ-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}$"
+  Control: "^CTRL-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}$"
+  Risk: "^RISK-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}$"
+  Role: "^ROLE-[A-Z0-9]+(?:-[A-Z0-9]+)*$"
+  System: "^SYS-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}$"
+  DataAsset: "^DATA-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}$"
+  Calculator: "^CALC-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}$"
+  Rule: "^RULE-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}$"
+  Metric: "^METRIC-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}$"
+  Formula: "^FORMULA-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}$"
+  Evidence: "^EVID-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}$"
+  GlossaryTerm: "^TERM-[A-Z0-9]+(?:-[A-Z0-9]+)*$"
+provisional_prefix: PROV
+rules:
+  uppercase: true
+  immutable_on_rename: true
+  version_on_document_version_only: true
+  namespace: enterprise_core

@@ -1,0 +1,36 @@
+schema_version: "0.1"
+rubric_id: RUBRIC-PROCESS-001
+version: 1.0.0
+document_type: process
+inherits: rubrics/common.yaml
+common_dimensions_retained: true
+criteria:
+  - {criterion_id: PROC-TRIGGER-001, dimension_id: executability, requirement: "Identify trigger, schedule, preconditions, and entry criteria", evidence: [preconditions, triggers, inputs], severity: high, hard_blocker: false}
+  - {criterion_id: PROC-STEP-001, dimension_id: executability, requirement: "Describe atomic steps with performer, inputs, action, outputs, controls, evidence, and completion condition", evidence: [process steps table], severity: blocker, hard_blocker: true}
+  - {criterion_id: PROC-DECISION-001, dimension_id: controls, requirement: "Make decision rules testable with metric, operator, threshold, unit, branch, and override authority", evidence: [decision rules table], severity: high, hard_blocker: false}
+  - {criterion_id: PROC-EXCEPTION-001, dimension_id: controls, requirement: "Provide exception, failure, escalation, recovery, and downstream handling", evidence: [exception register, escalation path], severity: high, hard_blocker: false}
+template_mappings:
+  - {requirement_id: SEC-PROC-METADATA, criterion_ids: [COM-GOV-001, COM-STRUCT-001]}
+  - {requirement_id: SEC-PROC-PURPOSE, criterion_ids: [COM-SCOPE-001]}
+  - {requirement_id: SEC-PROC-SCOPE, criterion_ids: [COM-SCOPE-001]}
+  - {requirement_id: SEC-PROC-DEFINITIONS, criterion_ids: [COM-RAG-001, COM-STYLE-001]}
+  - {requirement_id: SEC-PROC-ROLES, criterion_ids: [COM-DEPEND-001, COM-STRUCT-001]}
+  - {requirement_id: SEC-PROC-PRECONDITIONS, criterion_ids: [PROC-TRIGGER-001, COM-EXEC-001]}
+  - {requirement_id: SEC-PROC-INPUTS, criterion_ids: [PROC-TRIGGER-001, COM-DEPEND-001]}
+  - {requirement_id: SEC-PROC-OVERVIEW, criterion_ids: [COM-EXEC-001, COM-RAG-001]}
+  - {requirement_id: SEC-PROC-STEPS, criterion_ids: [PROC-STEP-001, COM-EXEC-001]}
+  - {requirement_id: SEC-PROC-RULES, criterion_ids: [PROC-DECISION-001]}
+  - {requirement_id: SEC-PROC-CONTROLS, criterion_ids: [COM-CONTROL-001, COM-DEPEND-001]}
+  - {requirement_id: SEC-PROC-EXCEPTIONS, criterion_ids: [PROC-EXCEPTION-001, COM-CONTROL-001]}
+  - {requirement_id: SEC-PROC-OUTPUTS, criterion_ids: [COM-EXEC-001, COM-DEPEND-001]}
+  - {requirement_id: SEC-PROC-DEPENDENCIES, criterion_ids: [COM-DEPEND-001]}
+  - {requirement_id: SEC-PROC-METRICS, criterion_ids: [COM-CONTROL-001, COM-EXEC-001]}
+  - {requirement_id: SEC-PROC-RELATED, criterion_ids: [COM-RAG-001]}
+  - {requirement_id: SEC-PROC-RETENTION, criterion_ids: [COM-GOV-001, COM-CONTROL-001]}
+  - {requirement_id: SEC-PROC-VERSION, criterion_ids: [COM-GOV-001]}
+  - {requirement_id: TBL-PROC-ROLES, criterion_ids: [COM-DEPEND-001]}
+  - {requirement_id: TBL-PROC-STEPS, criterion_ids: [PROC-STEP-001]}
+  - {requirement_id: TBL-PROC-RULES, criterion_ids: [PROC-DECISION-001]}
+  - {requirement_id: TBL-PROC-CONTROLS, criterion_ids: [COM-CONTROL-001]}
+  - {requirement_id: TBL-PROC-EXCEPTIONS, criterion_ids: [PROC-EXCEPTION-001]}
+  - {requirement_id: TBL-PROC-VERSIONS, criterion_ids: [COM-GOV-001]}

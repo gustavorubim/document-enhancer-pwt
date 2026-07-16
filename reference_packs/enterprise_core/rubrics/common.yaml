@@ -1,0 +1,40 @@
+schema_version: "0.1"
+rubric_id: RUBRIC-COMMON-001
+version: 1.0.0
+title: Common enterprise document quality rubric
+scale:
+  - {score: 0, label: absent, meaning: Required information is missing or unusable}
+  - {score: 1, label: weak, meaning: Information is implied, materially ambiguous, or not executable}
+  - {score: 2, label: partial, meaning: Core content exists but important gaps remain}
+  - {score: 3, label: complete, meaning: Requirement is clear, supported, and operationally usable}
+  - {score: 4, label: exemplary, meaning: Complete plus unusually strong traceability, precision, usability, and retrieval readiness}
+dimensions:
+  - {dimension_id: purpose_scope, title: "Purpose, scope, applicability, and audience", weight: 10, evidence_requirement: "Explicit boundaries, inclusions, exclusions, and intended users"}
+  - {dimension_id: governance, title: "Governance and document lifecycle", weight: 10, evidence_requirement: "Owner, approvers, version, status, effective and review dates, related authority"}
+  - {dimension_id: structure, title: "Required structure and section completeness", weight: 10, evidence_requirement: "Template sections and table requirements are covered"}
+  - {dimension_id: executability, title: "Process or methodology executability", weight: 20, evidence_requirement: "Atomic actions or methods, triggers, inputs, transformations, outputs, and conditions"}
+  - {dimension_id: dependencies, title: "Roles, decisions, dependencies, systems, and calculators", weight: 10, evidence_requirement: "Accountable actors, rules, prerequisites, tools, data, and offline artifacts"}
+  - {dimension_id: controls, title: "Controls, risks, evidence, exceptions, and escalation", weight: 15, evidence_requirement: "IDs, relationships, frequency, authority, evidence, and failure response"}
+  - {dimension_id: rag, title: "Semantic and RAG readiness", weight: 15, evidence_requirement: "Canonical terms, IDs, provenance, self-contained tables, Mermaid, and clean chunks"}
+  - {dimension_id: style, title: "Clarity, consistency, accessibility, and style", weight: 10, evidence_requirement: "Defined acronyms, precise language, usable headings, tables, and captions"}
+criteria:
+  - {criterion_id: COM-SCOPE-001, dimension_id: purpose_scope, requirement: "State purpose, scope, audience, applicability, and exclusions", evidence: [purpose section, scope section, metadata], severity: high, hard_blocker: false}
+  - {criterion_id: COM-GOV-001, dimension_id: governance, requirement: "Identify identity, version, owner, approver, status, effective date, and review date", evidence: [metadata, approvals, version history], severity: blocker, hard_blocker: true}
+  - {criterion_id: COM-STRUCT-001, dimension_id: structure, requirement: "Cover every required template section and table", evidence: [requirements.yaml mapping, rendered headings, table IDs], severity: high, hard_blocker: false}
+  - {criterion_id: COM-EXEC-001, dimension_id: executability, requirement: "Make work executable with inputs, actions or methods, outputs, and completion conditions", evidence: [steps table, method table, procedure actions], severity: high, hard_blocker: false}
+  - {criterion_id: COM-DEPEND-001, dimension_id: dependencies, requirement: "Name roles, systems, data, calculators, decisions, and dependencies", evidence: [roles table, dependency table, system references], severity: high, hard_blocker: false}
+  - {criterion_id: COM-CONTROL-001, dimension_id: controls, requirement: "Link risks, controls, evidence, exceptions, and escalation", evidence: [controls table, risks table, exception register], severity: blocker, hard_blocker: true}
+  - {criterion_id: COM-RAG-001, dimension_id: rag, requirement: "Use stable IDs, canonical terms, provenance, self-contained tables, and accessible diagrams", evidence: [ontology IDs, glossary, source ledger, Mermaid], severity: high, hard_blocker: false}
+  - {criterion_id: COM-STYLE-001, dimension_id: style, requirement: "Use precise language, defined acronyms, accessible headings, and sentence-case tables", evidence: [style lint, headings, captions], severity: medium, hard_blocker: false}
+hard_blockers:
+  - {blocker_id: HB-UNSUPPORTED-001, rule: Unsupported factual additions, evidence: source-to-target ledger, waiver_allowed: false}
+  - {blocker_id: HB-OMISSION-001, rule: Materially weakened or omitted governed requirements, evidence: requirement coverage, waiver_allowed: false}
+  - {blocker_id: HB-CONFLICT-001, rule: Unresolved critical contradictions, evidence: conflict report, waiver_allowed: true}
+  - {blocker_id: HB-GOV-001, rule: Missing mandatory approval or governance data, evidence: metadata and approvals, waiver_allowed: true}
+  - {blocker_id: HB-QUESTION-001, rule: Blocking question without an approved waiver, evidence: questions and waivers, waiver_allowed: true}
+  - {blocker_id: HB-REFERENCE-001, rule: Invalid semantic reference or dangling authoritative edge, evidence: sidecar validation, waiver_allowed: false}
+  - {blocker_id: HB-PROVENANCE-001, rule: Missing provenance for an authoritative claim, evidence: provenance ledger, waiver_allowed: false}
+waiver_semantics:
+  required_fields: [waiver_id, blocker_id, reason, approver, approved_at, expiry_or_review_date, downstream_impact]
+  score_rule: A waiver can explain an accepted gap but cannot increase the underlying criterion score or hide it.
+  expiry_rule: Expired waivers reactivate the blocker.

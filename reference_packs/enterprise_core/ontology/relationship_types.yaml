@@ -1,0 +1,53 @@
+schema_version: "0.1"
+namespace: enterprise_core
+relationship_types:
+  - {relationship_id: HAS_VERSION, source_types: [DocumentIdentity], target_types: [DocumentVersion], layer: authoritative}
+  - {relationship_id: CURRENT_VERSION, source_types: [DocumentIdentity], target_types: [DocumentVersion], layer: authoritative}
+  - {relationship_id: SUPERSEDES, source_types: [DocumentVersion, Policy, Standard], target_types: [DocumentVersion, Policy, Standard], layer: governed}
+  - {relationship_id: HAS_SECTION, source_types: [DocumentVersion], target_types: [Section], layer: authoritative}
+  - {relationship_id: CONTAINS_STATEMENT, source_types: [Section], target_types: [Statement], layer: authoritative}
+  - {relationship_id: CONTAINS_TABLE, source_types: [Section], target_types: [Table], layer: authoritative}
+  - {relationship_id: CONTAINS_FIGURE, source_types: [Section], target_types: [Figure], layer: authoritative}
+  - {relationship_id: DEFINES, source_types: [DocumentVersion, Section, GlossaryTerm], target_types: [GlossaryTerm, Requirement, Rule], layer: governed}
+  - {relationship_id: REFERENCES, source_types: [DocumentVersion, Section, Statement], target_types: [DocumentVersion, Policy, Standard, Requirement, GlossaryTerm], layer: governed}
+  - {relationship_id: GOVERNED_BY, source_types: [DocumentVersion, Process, Methodology, Standard], target_types: [Policy, Standard, Regulation], layer: governed}
+  - {relationship_id: IMPLEMENTS, source_types: [Process, Methodology, Standard], target_types: [Requirement, Standard, Policy], layer: governed}
+  - {relationship_id: HAS_STEP, source_types: [Process, Methodology], target_types: [ProcessStep, MethodologyStep], layer: authoritative}
+  - {relationship_id: PRECEDES, source_types: [ProcessStep, MethodologyStep, Activity], target_types: [ProcessStep, MethodologyStep, Activity], layer: authoritative}
+  - {relationship_id: NEXT_ON_TRUE, source_types: [Decision, Rule], target_types: [ProcessStep, MethodologyStep, Activity], layer: authoritative}
+  - {relationship_id: NEXT_ON_FALSE, source_types: [Decision, Rule], target_types: [ProcessStep, MethodologyStep, Activity], layer: authoritative}
+  - {relationship_id: TRIGGERED_BY, source_types: [Process, Activity, ProcessStep], target_types: [Trigger], layer: extracted}
+  - {relationship_id: PERFORMED_BY, source_types: [ProcessStep, MethodologyStep, Activity], target_types: [Role, Organization], layer: authoritative}
+  - {relationship_id: ACCOUNTABLE_TO, source_types: [ProcessStep, MethodologyStep, Control], target_types: [Role, Organization], layer: authoritative}
+  - {relationship_id: APPROVED_BY, source_types: [DocumentVersion, Exception, Decision], target_types: [Role, Organization, Approval], layer: governed}
+  - {relationship_id: ESCALATES_TO, source_types: [ProcessStep, MethodologyStep, Exception, Risk], target_types: [Role, Organization, EscalationPath], layer: extracted}
+  - {relationship_id: CONSUMES, source_types: [ProcessStep, MethodologyStep], target_types: [Input, DataAsset, DataElement], layer: extracted}
+  - {relationship_id: PRODUCES, source_types: [ProcessStep, MethodologyStep], target_types: [Output, Evidence, Record, DataAsset], layer: extracted}
+  - {relationship_id: USES_SYSTEM, source_types: [ProcessStep, MethodologyStep, Control], target_types: [System], layer: extracted}
+  - {relationship_id: USES_DATA, source_types: [ProcessStep, MethodologyStep, Rule], target_types: [DataAsset, DataElement], layer: extracted}
+  - {relationship_id: USES_CALCULATOR, source_types: [ProcessStep, MethodologyStep], target_types: [Calculator], layer: extracted}
+  - {relationship_id: DEPENDS_ON, source_types: [Process, Methodology, ProcessStep, MethodologyStep, Control], target_types: [Dependency, System, DataAsset, Role], layer: extracted}
+  - {relationship_id: REQUIRES, source_types: [ProcessStep, MethodologyStep, Control, Requirement], target_types: [Input, Precondition, Requirement, Dependency], layer: governed}
+  - {relationship_id: HAS_PRECONDITION, source_types: [ProcessStep, MethodologyStep], target_types: [Precondition, Assumption], layer: authoritative}
+  - {relationship_id: HAS_COMPLETION_CONDITION, source_types: [ProcessStep, MethodologyStep, Process], target_types: [CompletionCondition], layer: authoritative}
+  - {relationship_id: EVALUATES, source_types: [Decision, Rule], target_types: [Metric, DataElement, Threshold], layer: authoritative}
+  - {relationship_id: HAS_THRESHOLD, source_types: [Rule, Metric], target_types: [Threshold], layer: authoritative}
+  - {relationship_id: TRIGGERS, source_types: [Rule, Threshold, Metric], target_types: [Decision, ProcessStep, EscalationPath], layer: extracted}
+  - {relationship_id: MITIGATES, source_types: [Control], target_types: [Risk], layer: governed}
+  - {relationship_id: ADDRESSES_RISK, source_types: [ProcessStep, MethodologyStep, Requirement], target_types: [Risk], layer: extracted}
+  - {relationship_id: EXECUTES_CONTROL, source_types: [ProcessStep, MethodologyStep], target_types: [Control], layer: extracted}
+  - {relationship_id: PRODUCES_EVIDENCE, source_types: [ProcessStep, MethodologyStep, Control, Decision], target_types: [Evidence], layer: authoritative}
+  - {relationship_id: VALIDATED_BY, source_types: [Methodology, MethodologyStep, Calculator, Model], target_types: [Control, Test, Role], layer: governed}
+  - {relationship_id: TESTED_BY, source_types: [Requirement, Control, Methodology, Model], target_types: [Evidence, Test, Role], layer: governed}
+  - {relationship_id: MONITORED_BY, source_types: [Process, Methodology, Control, ServiceLevel], target_types: [Metric, Role, System], layer: extracted}
+  - {relationship_id: HAS_ASSUMPTION, source_types: [Process, Methodology, MethodologyStep, Model], target_types: [Assumption], layer: authoritative}
+  - {relationship_id: HAS_LIMITATION, source_types: [Methodology, Model, Process], target_types: [Limitation], layer: authoritative}
+  - {relationship_id: HAS_EXCEPTION, source_types: [Process, Methodology, Requirement, Rule], target_types: [Exception], layer: authoritative}
+  - {relationship_id: OVERRIDES, source_types: [Exception, Policy, Standard], target_types: [Requirement, Rule, Standard, Policy], layer: governed}
+  - {relationship_id: HAS_PARAMETER, source_types: [Model, Methodology, Formula], target_types: [Parameter], layer: extracted}
+  - {relationship_id: USES_MODEL, source_types: [Methodology, MethodologyStep, ProcessStep], target_types: [Model], layer: extracted}
+  - {relationship_id: USES_FORMULA, source_types: [Methodology, MethodologyStep, Calculator, Rule], target_types: [Formula], layer: authoritative}
+  - {relationship_id: DEFINED_BY, source_types: [GlossaryTerm, Requirement, Metric], target_types: [Policy, Standard, GlossaryTerm], layer: governed}
+  - {relationship_id: HAS_ALIAS, source_types: [GlossaryTerm, DocumentIdentity, Process, Methodology, System], target_types: [GlossaryTerm, Statement], layer: governed}
+  - {relationship_id: RELATED_TO_DOCUMENT, source_types: [Process, Methodology, Policy, Standard, Control, Risk], target_types: [DocumentIdentity, DocumentVersion], layer: governed}
+  - {relationship_id: CHUNK_SIMILAR_TO, source_types: [Section, Statement, Table], target_types: [Section, Statement, Table], layer: retrieval}

@@ -1,0 +1,12 @@
+schema_version: "0.1"
+terms:
+  - {term_id: TERM-APPROVAL, term: approval, definition: Recorded authorization by the role named in the governing requirement, aliases: [sign-off]}
+  - {term_id: TERM-CONTROL, term: control, definition: A repeatable action designed to reduce a stated risk and produce evidence}
+  - {term_id: TERM-EVIDENCE, term: evidence, definition: Retained information that demonstrates a step, control, decision, or approval occurred}
+  - {term_id: TERM-EXCEPTION, term: exception, definition: An authorized and time-bounded deviation from a requirement or normal path}
+  - {term_id: TERM-INPUT, term: input, definition: Named information or artifact required before a step or method can execute}
+  - {term_id: TERM-OWNER, term: owner, definition: Role accountable for the quality, lifecycle, and approval of a governed object}
+  - {term_id: TERM-THRESHOLD, term: threshold, definition: A value or range that changes a rule outcome and includes a unit and period}
+  - {term_id: TERM-TRIGGER, term: trigger, definition: Event or schedule that starts a process, method, or procedure}
+  - {term_id: TERM-CALCULATOR, term: calculator, definition: Spreadsheet, script, worksheet, service, or manual artifact used to calculate a result}
+  - {term_id: TERM-TBD, term: TBD, definition: Visible marker for information that is not available and must not be treated as a fact}
