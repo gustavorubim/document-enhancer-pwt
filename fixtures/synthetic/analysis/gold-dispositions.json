@@ -1,0 +1,16 @@
+{
+  "document_id": "DOC-LOSS-FORECAST",
+  "ordered_span_ids": [
+    "SPAN-ANALYSIS00000001",
+    "SPAN-ANALYSIS00000002",
+    "SPAN-ANALYSIS00000003",
+    "SPAN-ANALYSIS00000004",
+    "SPAN-ANALYSIS00000005",
+    "SPAN-ANALYSIS00000006",
+    "SPAN-ANALYSIS00000007",
+    "SPAN-ANALYSIS00000008"
+  ],
+  "non_substantive_span_id": "SPAN-ANALYSIS00000008",
+  "non_substantive_disposition": "omitted",
+  "reason": "Repeated page furniture is accounted for explicitly and is not target content."
+}
