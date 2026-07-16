@@ -1,8 +1,10 @@
 """Domain contracts for ontology, provenance, and machine artifacts."""
 
+from document_enhancer.domain.analysis import BlockSegment
 from document_enhancer.domain.enums import *  # noqa: F403
 from document_enhancer.domain.ids import (
     allocate_provisional_id,
+    allocate_segment_id,
     allocate_span_id,
     ensure_unique_ids,
     validate_entity_id,
@@ -23,6 +25,7 @@ from document_enhancer.domain.semantic import SemanticDocument
 
 __all__ = [
     "ALLOWED_RELATIONSHIPS",
+    "BlockSegment",
     "Entity",
     "EntityRegistry",
     "Provenance",
@@ -32,6 +35,7 @@ __all__ = [
     "SourceLocation",
     "TemporalValidity",
     "allocate_provisional_id",
+    "allocate_segment_id",
     "allocate_span_id",
     "ensure_unique_ids",
     "is_relationship_allowed",

@@ -1,6 +1,7 @@
 import pytest
 
 from document_enhancer import __version__
+from document_enhancer.domain import BlockSegment, allocate_segment_id
 from document_enhancer.prompting.loader import bundled_prompt_pack_path
 from document_enhancer.references.loader import bundled_reference_pack_path
 
@@ -8,6 +9,12 @@ from document_enhancer.references.loader import bundled_reference_pack_path
 @pytest.mark.e2e
 def test_package_surface_is_versioned() -> None:
     assert __version__ == "0.1.0"
+
+
+@pytest.mark.e2e
+def test_split_segment_contract_is_public() -> None:
+    assert BlockSegment.__name__ == "BlockSegment"
+    assert allocate_segment_id("SPAN-ABCDEFGH", 0, 1, "a" * 64).startswith("SEG-")
 
 
 @pytest.mark.e2e
