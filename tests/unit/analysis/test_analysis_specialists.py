@@ -114,6 +114,57 @@ def test_section_disposition_map_fails_closed_on_coverage_defects(
         build_disposition_map(analysis_request, invalid)
 
 
+def test_section_disposition_map_preserves_multiple_split_targets(
+    analysis_request: AnalysisRequest,
+    responses: dict[str, list[object]],
+) -> None:
+    section = _analysis(responses["section_mapper"][0], SectionAnalysis)
+    values = section.model_dump(mode="python")
+    mappings = list(values["mappings"])
+    mappings[0] = {
+        **mappings[0],
+        "disposition": "split",
+        "target_section_ids": ["SEC-GOVERNANCE", "SEC-OVERVIEW"],
+    }
+    split = SectionAnalysis.model_validate({**values, "mappings": mappings})
+
+    disposition_map = build_disposition_map(analysis_request, split)
+
+    assert disposition_map.dispositions[0].target_section_ids == (
+        "SEC-GOVERNANCE",
+        "SEC-OVERVIEW",
+    )
+
+
+@pytest.mark.parametrize(
+    ("disposition", "targets"),
+    [
+        ("preserved", []),
+        ("moved", ["SEC-ONE", "SEC-TWO"]),
+        ("split", ["SEC-ONE"]),
+        ("omitted", ["SEC-ONE"]),
+    ],
+)
+def test_section_disposition_map_rejects_invalid_target_cardinality(
+    disposition: str,
+    targets: list[str],
+    analysis_request: AnalysisRequest,
+    responses: dict[str, list[object]],
+) -> None:
+    section = _analysis(responses["section_mapper"][0], SectionAnalysis)
+    values = section.model_dump(mode="python")
+    mappings = list(values["mappings"])
+    mappings[0] = {
+        **mappings[0],
+        "disposition": disposition,
+        "target_section_ids": targets,
+    }
+    invalid = SectionAnalysis.model_validate({**values, "mappings": mappings})
+
+    with pytest.raises(SourceSpanCoverageError):
+        build_disposition_map(analysis_request, invalid)
+
+
 def test_discovery_returns_typed_candidates_and_rejects_mermaid_semantics(
     composer: PromptPackComposer,
     analysis_request: AnalysisRequest,

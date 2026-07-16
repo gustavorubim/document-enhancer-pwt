@@ -153,6 +153,7 @@ def test_analysis_schema_adapter_keeps_full_pydantic_validation() -> None:
         "multipleOf",
         "oneOf",
         "pattern",
+        "uniqueItems",
     }
 
     def assert_supported(value: object) -> None:

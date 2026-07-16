@@ -38,11 +38,10 @@ _DISPOSITIONS = {
     "blocking": SpanDisposition.BLOCKING,
     "blocked": SpanDisposition.BLOCKING,
 }
-_TARGET_REQUIRED = {
+_SINGLE_TARGET = {
     SpanDisposition.PRESERVED,
     SpanDisposition.MOVED,
     SpanDisposition.MERGED,
-    SpanDisposition.SPLIT,
 }
 
 
@@ -77,12 +76,17 @@ def build_disposition_map(
             raise SourceSpanCoverageError(
                 "a split disposition must identify exactly one source span"
             )
-        if disposition in _TARGET_REQUIRED and not mapping.target_section_id:
+        targets = tuple(mapping.target_section_ids)
+        if disposition in _SINGLE_TARGET and len(targets) != 1:
             raise SourceSpanCoverageError(
-                f"{disposition.value} disposition requires a target section"
+                f"{disposition.value} disposition requires exactly one target section"
             )
-        if disposition is SpanDisposition.OMITTED and mapping.target_section_id is not None:
-            raise SourceSpanCoverageError("an omitted disposition must not name a target section")
+        if disposition is SpanDisposition.SPLIT and len(targets) < 2:
+            raise SourceSpanCoverageError(
+                "a split disposition requires at least two target sections"
+            )
+        if disposition is SpanDisposition.OMITTED and targets:
+            raise SourceSpanCoverageError("an omitted disposition must not name target sections")
         for span_id in mapping.source_span_ids:
             if span_id not in known:
                 raise SourceSpanCoverageError(f"section mapping references unknown span {span_id}")
@@ -90,7 +94,6 @@ def build_disposition_map(
                 raise SourceSpanCoverageError(f"section mapping duplicates source span {span_id}")
             seen.add(span_id)
             actual.append(span_id)
-            targets = (mapping.target_section_id,) if mapping.target_section_id else ()
             dispositions.append(
                 SourceSpanDisposition(
                     span_id=span_id,

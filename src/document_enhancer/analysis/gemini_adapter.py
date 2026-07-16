@@ -30,6 +30,7 @@ _UNSUPPORTED_VALIDATION_KEYS = {
     "minimum",
     "multipleOf",
     "pattern",
+    "uniqueItems",
 }
 
 

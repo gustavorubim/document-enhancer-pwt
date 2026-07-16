@@ -63,10 +63,10 @@ need one explicit disposition.
 
 The mapper requires the flattened mapping spans to equal the raw span sequence exactly. Missing,
 duplicate, unknown, or reordered spans fail. Each disposition needs a rationale. Preserved, moved,
-merged, and split content needs a target section; omitted content must not claim a target; uncertain
-or blocking content remains visible. The current shared `SectionMapping` contract has one target
-section field, so a split span is represented once with its primary target and explicit rationale.
-A future multi-target shared schema should add a target list without permitting duplicate coverage.
+merged content needs exactly one target section; split content needs at least two ordered target
+sections; omitted content must not claim a target; uncertain or blocking content remains visible.
+The shared `SectionMapping.target_section_ids` contract preserves every target for a split without
+duplicating the source-span disposition.
 
 ### Candidate graph
 
