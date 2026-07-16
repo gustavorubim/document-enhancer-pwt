@@ -11,23 +11,24 @@ catalog, and the Rich CLI performs explainable retrieval and grounded cited Q&A 
 
 ## Verified status
 
-M0–M8 task and milestone evidence is reconciled as of 2026-07-16, but the repository-level
-Definition of Done is not yet verified. The complete offline gate passed on merged code commit
-`d7c80c1`: 266 tests passed and 2 opt-in tests were deselected; frozen sync, import smoke, Ruff
-format/check, ty, generated schemas, both governed packs, all 60 generated corpus files, both
-evaluation artifacts, package build, and diff checks also passed. All 21 deterministic offline
-release thresholds passed across 48 fixture-format evaluations. A separate temporary clean clone
-and isolated-wheel proof passed at `5b763b8` with zero Gemini calls and zero public downloads.
+M0–M8 and the repository-level Definition of Done are verified as of 2026-07-16. The complete
+post-integration offline gate passed on governed-workflow merge `2b46d21`: 268 tests passed and 2
+explicit opt-in tests were deselected; frozen sync, import smoke, Ruff format/check, ty, generated
+schemas, both governed packs, all 60 generated corpus files, both evaluation artifacts, package
+build, and diff checks also passed. All 21 deterministic offline release thresholds passed across
+48 fixture-format evaluations. A separate temporary clean-clone and isolated-wheel proof passed at
+`5b763b8`.
 
-The final audit found one release blocker: actual governed CLI runs for the complete process,
-methodology, standard, and desktop-procedure examples all stop correctly at strict audit with
-missing required tables/document-type objects, so the required four end-to-end completions and
-promoted RAG outputs are not yet proven. The checked-in full demo runs without a selected governed
-reference pack, and the evaluation report is an offline gold replay. See the
+The actual two-gate CLI workflow also completed for the checked-in `enterprise_core` process,
+methodology, standard, and desktop-procedure examples. Every run passed strict audit, built a valid
+sealed SQLite RAG package, promoted the cumulative catalog, returned explainable retrieval results,
+and produced a grounded cited answer. The companion negative case proves that incomplete governed
+input still fails closed without promoting RAG state. See the
 [operator guide](docs/operator-guide.md), [release proof](docs/release.md), and
 [evaluation report](evals/reports/m8-evaluation.md) for exact workflows and limitations. These are
 controlled offline results, not claims about live Gemini quality or public-source generalization;
-live-model and public-download evaluations remain explicit opt-in checks that were not run.
+all governed proof runs recorded zero Gemini calls and zero public downloads, and live-model and
+public-download evaluations remain explicit opt-in checks that were not run.
 
 ## Quick start
 

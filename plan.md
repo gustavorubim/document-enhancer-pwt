@@ -1,6 +1,6 @@
 # Document Enhancer implementation plan
 
-Status: implementation milestones complete; Definition of Done verification blocked
+Status: implementation complete; Definition of Done verified
 
 Repository state when written: empty Git repository
 
@@ -1720,17 +1720,23 @@ The first release is done only when:
 - Evaluation results, costs, limitations, waivers, and failed cases are recorded honestly.
 - The repository documents how to add a new reference pack and document type without changing the core workflow.
 
-**Final completion audit, 2026-07-16: blocked.** M0–M8 task evidence and milestone-level
-acceptance records are reconciled, but this repository-level Definition of Done is not yet
-satisfied. Focused disposable runs of the actual governed CLI against the complete process,
-methodology, standard, and desktop-procedure examples all exited with the expected waiting code 10
-at strict audit. Each reported `CHECK-TEMPLATE-TABLES`, `CHECK-DOCUMENT-LINT`, and
-`INDEPENDENT-AUDIT-NOT-PASSED`; no run produced a promoted RAG database or catalog ingestion.
-The checked-in M8 demo completes only without a selected governed reference pack, while the M8
-fixture report is explicitly a deterministic offline gold replay and the isolated-wheel proof
-stops at the first human-review pause. Those are valuable, passing proofs but do not establish the
-four governed end-to-end CLI completions required above. Live Gemini and public downloads remain
-honest opt-in checks that were not run.
+**Final completion audit, 2026-07-16: verified.** All 124 M0–M8 task boxes, milestone acceptance
+records, and the repository-level Definition of Done are reconciled. The governed workflow fix was
+merged at `2b46d21`, after which the complete offline gate passed with 268 tests and 2 explicit
+opt-in tests deselected, plus frozen sync, import smoke, Ruff format/check, ty, schema generation,
+reference- and prompt-pack verification, fixture generation, all offline evaluation thresholds,
+package build, and diff checks.
+
+`scripts/run_governed_dod_proof.py` then completed the actual two-gate CLI workflow for the
+checked-in `enterprise_core` process, methodology, standard, and desktop-procedure examples. All
+four passed strict audit, produced valid sealed SQLite RAG packages, promoted sequential catalog
+generations 1 through 4, returned explainable search results, and produced grounded partial answers
+with 2, 4, 5, and 4 resolvable citations respectively. Every run retained the governed reference
+pack and recorded zero provider calls and zero public downloads. The negative incomplete-process
+case remains fail closed with `CHECK-TEMPLATE-TABLES`, `CHECK-DOCUMENT-LINT`, and
+`INDEPENDENT-AUDIT-NOT-PASSED`, and does not promote RAG state. The earlier clean-clone and
+isolated-wheel proof also remains green at `5b763b8`. Live Gemini and public-download checks remain
+honest explicit opt-ins and were not run as part of this offline release proof.
 
 ## 29. Planning references
 
