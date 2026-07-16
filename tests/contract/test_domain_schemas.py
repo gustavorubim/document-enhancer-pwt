@@ -44,6 +44,16 @@ def test_structure_recovery_schema_declares_typed_python_character_segments() ->
     assert segments_schema["minItems"] == 2
 
 
+def test_analysis_schema_declares_canonical_plural_section_targets() -> None:
+    schema = json.loads((ROOT / "schemas" / "analysis.schema.json").read_text(encoding="utf-8"))
+    mapping = schema["$defs"]["SectionMapping"]
+    assert "target_section_id" not in mapping["properties"]
+    targets = mapping["properties"]["target_section_ids"]
+    assert targets["items"] == {"type": "string"}
+    assert targets["uniqueItems"] is True
+    assert targets["default"] == []
+
+
 def test_valid_yaml_fixture_round_trips_and_negative_fixtures_fail() -> None:
     fixtures = ROOT / "tests" / "contract" / "fixtures"
     questions = model_from_yaml(
