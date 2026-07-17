@@ -59,25 +59,46 @@ audit/export, and optional retrieval. Run the commands from the repository root.
 ### 1. Install and check the local environment
 
 ```bash
-uv sync --frozen
+uv sync --frozen --no-editable
+export UV_NO_SYNC=1
 uv run docenhance version
 uv run docenhance doctor --json
 uv run docenhance prompts validate --json
 ```
 
+The non-editable install plus `UV_NO_SYNC=1` is the robust source-checkout setup on Python builds
+that skip hidden editable-install `.pth` files. It also prevents a later `uv run` from silently
+replacing the working install with the incompatible editable form. Unset `UV_NO_SYNC` when you
+intentionally want `uv run` to synchronize the environment again.
+
 The CLI accepts Markdown (`.md`), plain text (`.txt`), Word (`.docx`), and text-based PDF (`.pdf`)
 sources. Scanned or image-only PDFs require OCR before they can be used.
 
-### 2. Put the source document in the local inbox
+### 2. Use the checked-in showcase DOCX
 
-The CLI accepts a source from any readable path. The recommended repository-local convention is
-`.document-enhancer/inbox/`:
+The cookbook includes a seven-page fictional Word document designed to exercise the full product
+surface. It contains native headings, lists, captions, and tables; explicit roles, controls,
+decision rules, evidence, dependencies, and metrics; and four intentional conflicts that must be
+resolved by a person rather than silently guessed by the rewrite.
+
+Copy it to the recommended repository-local inbox and keep the original unchanged:
 
 ```bash
 mkdir -p .document-enhancer/inbox
-cp "/absolute/path/to/Current Methodology.docx" \
-  ".document-enhancer/inbox/current-methodology.docx"
+cp examples/cookbook/aurora_ai_complaint_triage_process.docx \
+  .document-enhancer/inbox/aurora-ai-complaint-triage.docx
+SHOWCASE_SOURCE=.document-enhancer/inbox/aurora-ai-complaint-triage.docx
 ```
+
+Open `examples/cookbook/aurora_ai_complaint_triage_process.docx` before the run if you want to
+compare the source with the final governed Markdown. The document is entirely fictional and
+contains no customer data. Rebuild the same DOCX from source at any time with:
+
+```bash
+uv run python scripts/generate_cookbook_example.py
+```
+
+The CLI also accepts a source from any other readable path.
 
 The entire `.document-enhancer/` directory is ignored by Git. This keeps confidential inputs,
 review artifacts, generated outputs, and the optional RAG catalog out of commits by default:
@@ -120,13 +141,13 @@ project/location settings described in the [operator guide](docs/operator-guide.
 
 ### 4. Start the run and save the run ID
 
-This live example always pauses at Gate 1 so the intermediate extraction and questions can be
-reviewed before rewriting:
+This live example uses the `process` template and always pauses at Gate 1 so the extracted Word
+structure, specialist findings, and clarification questions can be reviewed before rewriting:
 
 ```bash
 uv run docenhance run \
-  ".document-enhancer/inbox/current-methodology.docx" \
-  --document-type methodology \
+  "$SHOWCASE_SOURCE" \
+  --document-type process \
   --until questions \
   --json
 ```
@@ -135,12 +156,16 @@ For a network-free first pass, add `--execution-mode offline`:
 
 ```bash
 uv run docenhance run \
-  ".document-enhancer/inbox/current-methodology.docx" \
-  --document-type methodology \
+  "$SHOWCASE_SOURCE" \
+  --document-type process \
   --execution-mode offline \
   --until questions \
   --json
 ```
+
+Offline mode proves deterministic ingestion, checkpointing, gates, and artifact wiring. It may
+produce no clarification questions because it intentionally does not evaluate Gemini analysis
+quality; use the live mode to exercise conflict discovery and specialist reasoning on this source.
 
 The response contains a value such as `"run_id": "run-abc123..."`. Save it for later commands:
 
@@ -191,6 +216,21 @@ answers:
     responder: reviewer@example.com
     evidence_reference: answer://review/ANS-REVIEW-001
 ```
+
+For a live run of this fictional showcase, use the generated question text and IDs to map the
+following training decisions into `answers.yaml`. Question IDs are generated for each run, so copy
+them from `questions.yaml` rather than copying placeholder IDs literally:
+
+| Source conflict | Training decision | Suggested evidence reference |
+| --- | --- | --- |
+| P1 acknowledgement is stated as both 60 and 30 minutes | Require human acknowledgement within 30 minutes of receipt | `answer://cookbook/p1-sla` |
+| High-confidence routing is stated as both 0.80 and 0.85 | Use 0.85; values below 0.85 route to manual triage | `answer://cookbook/routing-confidence` |
+| Independent approval for actions affecting more than 25 complaints is missing | Require both the Complaint Operations Manager and Compliance duty officer | `answer://cookbook/batch-approval` |
+| Retention is stated as both five and seven years | Retain for seven years after case closure, subject to legal hold | `answer://cookbook/retention` |
+
+Use a fictional reviewer identity such as `cookbook-reviewer@example.invalid`. If the live analysis
+raises additional legitimate questions, answer them only when the source or a deliberate training
+decision supports the answer; otherwise leave them open or record an explicit waiver.
 
 An answered item requires a reviewer and an `answer://`, `reference://`, `source://`, or
 `steering://` evidence reference. Do not invent an answer merely to pass the gate. Leave it open,
@@ -283,14 +323,16 @@ Inspect the cumulative catalog, then query it using the mode that built it:
 uv run docenhance rag stats --json
 
 # Catalog built by a live run
-uv run docenhance rag search "Who approves the monthly limitation review?" --explain
-uv run docenhance rag ask "Who approves the monthly limitation review?" --explain
+uv run docenhance rag search \
+  "What happens when AI routing confidence is below 0.85?" --explain
+uv run docenhance rag ask \
+  "What is the required P1 acknowledgement time, and who monitors breaches?" --explain
 
 # Catalog built by an offline run
 uv run docenhance rag search \
-  "Who approves the monthly limitation review?" --offline --explain
+  "What happens when AI routing confidence is below 0.85?" --offline --explain
 uv run docenhance rag ask \
-  "Who approves the monthly limitation review?" --offline --explain
+  "What is the required P1 acknowledgement time, and who monitors breaches?" --offline --explain
 ```
 
 Use `--offline` with `rag search`, `rag ask`, or `rag chat` only when the catalog was built with the

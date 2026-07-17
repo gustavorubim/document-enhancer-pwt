@@ -25,6 +25,7 @@ class Probe(BaseModel):
 
 def test_exact_routes_and_stage_routing_are_stable() -> None:
     assert resolve_route(ROUTE_FLASH_LITE).model == ROUTE_FLASH_LITE
+    assert resolve_route(ROUTE_FLASH_LITE).token_budget == 40_000
     assert resolve_route("structure_recovery").route_id == ROUTE_FLASH_LITE
     assert resolve_route("analysis").route_id == ROUTE_FLASH
     assert resolve_route("rewrite").route_id == ROUTE_PRO_PREVIEW

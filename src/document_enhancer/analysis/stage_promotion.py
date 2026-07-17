@@ -38,7 +38,7 @@ from document_enhancer.domain.base import StrictModel, non_empty
 from document_enhancer.domain.enums import DocumentType, FindingSeverity, FindingType
 from document_enhancer.llm.profiles import ROUTE_FLASH
 
-from .common import canonical_json, validate_finding
+from .common import canonical_json, make_lint_finding, validate_finding
 from .models import AnalysisRequest
 
 _APPLICATION_ANALYSIS_FIELDS = {
@@ -255,6 +255,62 @@ def _finding_id(
     return base if occurrence == 1 else f"{base}-{occurrence}"
 
 
+def _promote_rag_candidate_chunks(
+    request: AnalysisRequest,
+    analysis: ProviderRagReadinessAnalysis,
+) -> tuple[list[ChunkCandidate], list[Finding]]:
+    """Promote only source-bound chunk suggestions and quarantine invalid items visibly."""
+
+    known_spans = set(request.authoritative_span_ids)
+    duplicate_keys = {
+        key
+        for key, count in Counter(chunk.chunk_key for chunk in analysis.candidate_chunks).items()
+        if count > 1
+    }
+    promoted: list[ChunkCandidate] = []
+    findings: list[Finding] = []
+    for ordinal, chunk in enumerate(analysis.candidate_chunks, start=1):
+        reasons: list[str] = []
+        if chunk.chunk_key in duplicate_keys:
+            reasons.append("duplicate_chunk_key")
+        if not chunk.source_span_ids:
+            reasons.append("missing_source_spans")
+        elif set(chunk.source_span_ids) - known_spans:
+            reasons.append("unknown_source_spans")
+        if not reasons:
+            promoted.append(chunk)
+            continue
+
+        evidence_spans = tuple(
+            span_id for span_id in chunk.source_span_ids if span_id in known_spans
+        )[:1]
+        if not evidence_spans:
+            evidence_spans = request.authoritative_span_ids[:1]
+        findings.append(
+            make_lint_finding(
+                request,
+                check_id="RAG-CANDIDATE-CHUNK-QUARANTINE",
+                category="candidate_chunk_quarantine",
+                severity=FindingSeverity.BLOCKER,
+                finding_type=FindingType.EXTRACTION_RISK,
+                span_ids=evidence_spans,
+                impact=(
+                    f"RAG candidate chunk {ordinal} was quarantined because its source binding "
+                    "did not resolve against the authoritative input."
+                ),
+                proposed_disposition=(
+                    "Review the source boundaries and reconstruct this candidate chunk from "
+                    "authoritative spans before RAG promotion."
+                ),
+                requirement_id=None if evidence_spans else "SYSTEM-RAG-CHUNK-PROMOTION",
+                requires_human_answer=True,
+                blocking=True,
+                details=(chunk.chunk_key, *reasons),
+            )
+        )
+    return promoted, findings
+
+
 def promote_stage_report(
     request: AnalysisRequest,
     provider_report: ProviderStageReport,
@@ -302,6 +358,12 @@ def promote_stage_report(
         findings.append(finding)
 
     analysis_values = provider_analysis.model_dump(mode="python")
+    if isinstance(provider_analysis, ProviderRagReadinessAnalysis):
+        promoted_chunks, quarantined_findings = _promote_rag_candidate_chunks(
+            request, provider_analysis
+        )
+        analysis_values["candidate_chunks"] = promoted_chunks
+        findings.extend(quarantined_findings)
     analysis_values.update(
         analysis_id=(
             f"ANA-{stage_token}-" + _token(request.document_id, request.source_digest, prompt_id)

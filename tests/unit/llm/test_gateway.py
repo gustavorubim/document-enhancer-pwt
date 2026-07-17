@@ -160,6 +160,18 @@ def test_prompt_scoped_usage_within_budget_is_accepted_and_overage_fails_closed(
     assert accepted.manifest.token_budget == 30_000
     assert accepted.manifest.output_budget == 8_000
 
+    showcase = gateway(UsageModel(41_006)).invoke(
+        route=ROUTE_FLASH,
+        schema=Probe,
+        prompt="showcase macro prompt",
+        input_token_budget=40_000,
+        output_token_budget=8_000,
+    )
+    assert showcase.artifact.ok is True
+    assert showcase.manifest.usage is not None
+    assert showcase.manifest.usage.input_tokens == 33_006
+    assert showcase.manifest.token_budget == 48_000
+
     with pytest.raises(ProviderError, match="configured retry policy"):
         gateway(UsageModel(30_001)).invoke(
             route=ROUTE_FLASH,

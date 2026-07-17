@@ -8,7 +8,6 @@ from typing import Literal
 
 from document_enhancer.domain.analysis import DiscoveryAnalysis, Finding, RagReadinessAnalysis
 from document_enhancer.domain.enums import FindingSeverity, FindingType, SourceBlockType
-from document_enhancer.domain.ids import ensure_unique_ids
 from document_enhancer.domain.ontology import Calculator, Control, Dependency
 from document_enhancer.llm.models import GeminiModelGateway
 from document_enhancer.llm.profiles import ROUTE_FLASH
@@ -458,18 +457,6 @@ class RagReadinessReviewer:
             prompt_id=self.prompt_id,
             model_route=ROUTE_FLASH,
         )
-        ensure_unique_ids(chunk.chunk_key for chunk in analysis.candidate_chunks)
-        known_spans = set(request.authoritative_span_ids)
-        for chunk in analysis.candidate_chunks:
-            if not chunk.source_span_ids:
-                raise EvidenceResolutionError(
-                    f"candidate chunk {chunk.chunk_key} has no source spans"
-                )
-            unknown = sorted(set(chunk.source_span_ids) - known_spans)
-            if unknown:
-                raise EvidenceResolutionError(
-                    f"candidate chunk {chunk.chunk_key} references unknown spans: {unknown}"
-                )
         return AnalysisBranchResult(
             specialist=self.name,
             analysis=analysis,

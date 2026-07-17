@@ -121,7 +121,7 @@ def test_question_generator_sends_baseline_and_referenced_findings_not_full_fano
     assert "FULL-SOURCE-MUST-NOT-REACH-QUESTION-CALL" not in prompt
     assert "FULL-ANALYSIS-FANOUT-MUST-NOT-REACH-QUESTION-CALL" not in prompt
     assert "[INPUT name=source_text" not in prompt
-    assert call["prompt_version"] == "1.1.1"
+    assert call["prompt_version"] == "1.1.4"
     input_digests = cast(tuple[str, ...], call["input_digests"])
     assert input_digests[0] == normalized.raw.source_digest
     assert len(input_digests) == 2
@@ -296,7 +296,7 @@ def test_checklist_generator_sends_governed_seed_summaries_and_compact_reviewer_
     assert "ANS-CONTEXT-001" in prompt
     assert "Keep the control wording concise." in prompt
     assert "REDUNDANT-QUESTION-EXAMPLE-MUST-NOT-BE-SENT" not in prompt
-    assert call["prompt_version"] == "1.1.1"
+    assert call["prompt_version"] == "1.1.4"
     input_digests = cast(tuple[str, ...], call["input_digests"])
     assert len(input_digests) == 2
     assert all(len(digest) == 64 for digest in input_digests)

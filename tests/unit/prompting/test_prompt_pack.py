@@ -49,7 +49,7 @@ def _values(spec, *, document_type: str = "process") -> dict[str, object]:
 
 def test_pack_is_versioned_and_all_required_references_resolve(prompt_pack) -> None:
     assert prompt_pack.pack_id == "gemini_core"
-    assert prompt_pack.version == "1.1.1"
+    assert prompt_pack.version == "1.1.4"
     assert len(prompt_pack.manifest.prompts) == 20
     assert len(prompt_pack.pack_sha256) == 64
     assert set(prompt_pack.manifest.required_references) == {
@@ -98,6 +98,61 @@ def test_prompt_budgets_fit_their_exact_bounded_routes(prompt_pack) -> None:
         assert spec.token_budget + spec.output_budget <= route.token_budget
         assert spec.output_budget <= route.output_budget
         assert spec.output_budget <= route.max_output_tokens
+
+    analysis_prompts = {
+        "analysis.macro",
+        "analysis.sections",
+        "analysis.process-methodology-discovery",
+        "analysis.rag-readiness",
+        "analysis.synthesize-findings",
+    }
+    assert {
+        spec.prompt_id: spec.token_budget
+        for spec in prompt_pack.manifest.prompts
+        if spec.prompt_id in analysis_prompts
+    } == {prompt_id: 40_000 for prompt_id in analysis_prompts}
+
+
+def test_synthesis_accepts_measured_showcase_fan_in(prompt_pack, reference_pack) -> None:
+    spec = prompt_pack.prompt("analysis.synthesize-findings")
+    analysis_results = next(item for item in spec.variables if item.name == "analysis_results")
+    assert analysis_results.max_size == 140_000
+
+    values = _values(spec)
+    values["analysis_results"] = "x" * 105_794
+    composed = PromptPackComposer(prompt_pack, reference_pack=reference_pack).compose_with_metadata(
+        spec.prompt_id, values
+    )
+
+    assert composed.input_token_budget == 40_000
+    assert len(composed.text) <= composed.input_token_budget * 8
+
+
+def test_questions_accept_measured_showcase_gate1_fan_in(prompt_pack, reference_pack) -> None:
+    spec = prompt_pack.prompt("clarification.questions")
+    analysis_results = next(item for item in spec.variables if item.name == "analysis_results")
+    assert analysis_results.max_size == 100_000
+
+    values = _values(spec)
+    values["analysis_results"] = "x" * 57_605
+    composed = PromptPackComposer(prompt_pack, reference_pack=reference_pack).compose_with_metadata(
+        spec.prompt_id, values
+    )
+
+    assert composed.input_token_budget == 30_000
+    assert len(composed.text) <= composed.input_token_budget * 8
+
+    checklist_spec = prompt_pack.prompt("clarification.rewrite-checklist")
+    checklist_analysis = next(
+        item for item in checklist_spec.variables if item.name == "analysis_results"
+    )
+    assert checklist_analysis.max_size == 100_000
+    checklist_values = _values(checklist_spec)
+    checklist_values["analysis_results"] = values["analysis_results"]
+    checklist = PromptPackComposer(
+        prompt_pack, reference_pack=reference_pack
+    ).compose_with_metadata(checklist_spec.prompt_id, checklist_values)
+    assert len(checklist.text) <= checklist.input_token_budget * 8
 
 
 def test_representative_prompts_fit_declared_stage_budgets_without_schema_duplication(
@@ -336,7 +391,7 @@ def test_snapshot_contains_digests_but_not_raw_source_or_credentials(
 def test_prompt_service_metadata_does_not_require_composing(prompt_pack) -> None:
     listed = list_prompts(prompt_pack)
     assert len(listed) == 20
-    assert listed[0]["pack_version"] == "1.1.1"
+    assert listed[0]["pack_version"] == "1.1.4"
     shown = cast(dict[str, object], show_prompt(prompt_pack, "rag.grounded-answer"))
     assert shown["output_schema"] == "rag-answer.schema.json"
     assert shown["reference_scope"] == ["glossary"]

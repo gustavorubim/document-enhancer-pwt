@@ -313,3 +313,29 @@ def test_macro_rejects_unresolvable_exact_evidence(
     # gateway repair policy and can never be cached as a domain report.
     with pytest.raises(ProviderError, match="structured output failed"):
         MacroReviewer(composer, gateway).review(analysis_request)
+
+
+def test_rag_invalid_candidate_chunk_is_quarantined_before_promotion(
+    composer: PromptPackComposer,
+    analysis_request: AnalysisRequest,
+    responses: dict[str, list[object]],
+    gateway_factory: GatewayFactory,
+) -> None:
+    invalid: Any = copy.deepcopy(responses["rag_readiness_reviewer"][0])
+    invalid["analyses"][0]["candidate_chunks"][0]["source_span_ids"] = ["SPAN-UNKNOWN00000001"]
+    gateway, model = gateway_factory({"rag_readiness_reviewer": [invalid]})
+
+    result = RagReadinessReviewer(composer, gateway).review(analysis_request)
+
+    assert isinstance(result.analysis, RagReadinessAnalysis)
+    assert result.analysis.candidate_chunks == []
+    quarantined = [
+        finding
+        for finding in result.analysis.findings
+        if finding.category == "candidate_chunk_quarantine"
+    ]
+    assert len(quarantined) == 1
+    assert quarantined[0].blocking is True
+    assert quarantined[0].requires_human_answer is True
+    assert quarantined[0].evidence[0].span_id == analysis_request.authoritative_span_ids[0]
+    assert len(model.calls) == 1

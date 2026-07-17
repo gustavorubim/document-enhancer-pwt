@@ -1529,7 +1529,7 @@ Acceptance: equivalent fixture facts across Markdown/DOCX/PDF normalize to compa
 - [x] M4.12 Implement and test exact model routing for `gemini-3.1-flash-lite`, `gemini-3.5-flash`, and `gemini-3.1-pro-preview`, including preview retirement detection and explicit fallback behavior.
 - [x] M4.13 Prove `gemini-embedding-2` through the pinned `GoogleGenerativeAIEmbeddings` integration or SDK adapter, including 768-dimensional output, independent batch items, input-limit handling, finite vectors, and cache metadata.
 
-Acceptance: all four branches can run concurrently against a fake model, emit schema-valid evidence-linked results, preserve disagreements, and fail closed on invalid structured output or budget exhaustion. **Verified 2026-07-16 on code commit `921d6ac`: 209 passed, 2 opt-in tests deselected; Ruff format/check, ty, schemas, reference/prompt packs, fixture corpus, build, and diff checks passed.**
+Acceptance: all four branches can run concurrently against a fake model, emit schema-valid evidence-linked results, preserve disagreements, and fail closed on invalid structured output or budget exhaustion. **Verified 2026-07-16 on code commit `921d6ac`: 209 passed, 2 opt-in tests deselected; Ruff format/check, ty, schemas, reference/prompt packs, fixture corpus, build, and diff checks passed. Live follow-up verified the 63-span process showcase on prompt pack `gemini_core` 1.1.4: the four specialists and finding synthesis completed within measured bounded inputs, while invalid candidate chunks remain quarantined rather than promoted.**
 
 ### M5 — Questions, reviewer inputs, checklist, and resumable graph
 
@@ -1544,7 +1544,7 @@ Acceptance: all four branches can run concurrently against a fake model, emit sc
 - [x] M5.9 Prove idempotent side effects across interrupt re-execution.
 - [x] M5.10 Implement `prompts list`, `prompts show`, and `prompts validate`, plus prompt-pack selection and resolved-prompt inspection in run artifacts.
 
-Acceptance: a CLI run pauses with reviewable files, exits with the waiting code, survives process termination, resumes after validated edits, and does not repeat unchanged upstream model calls. **Verified 2026-07-16 on merged code commit `80cec30`: 220 passed, 2 opt-in tests deselected; frozen sync, Ruff format/check, ty, schemas, reference/prompt packs, fixture corpus, build, and diff checks passed.**
+Acceptance: a CLI run pauses with reviewable files, exits with the waiting code, survives process termination, resumes after validated edits, and does not repeat unchanged upstream model calls. **Verified 2026-07-16 on merged code commit `80cec30`: 220 passed, 2 opt-in tests deselected; frozen sync, Ruff format/check, ty, schemas, reference/prompt packs, fixture corpus, build, and diff checks passed. Live follow-up ran `docenhance run` on the process showcase through `--until questions --json`; it exited 10 with status `waiting`, current stage `gate1`, no errors, and completed `analysis` plus `question_synthesis`.**
 
 ### M6 — Governed rewrite, Mermaid, and semantic sidecar
 
