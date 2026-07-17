@@ -407,7 +407,12 @@ def test_recorded_provider_boundary_from_discovery_through_audit_revision_and_re
                     for item in checklist.items
                 ]
             },
-            rewrite_draft.model_dump(mode="json"),
+            {
+                "body": rewrite_draft.body,
+                "source_span_ids": rewrite_draft.source_span_ids,
+                "approved_answer_ids": rewrite_draft.approved_answer_ids,
+                "open_issue_ids": rewrite_draft.open_issue_ids,
+            },
             independent.model_dump(mode="json"),
             invalid_patch.model_dump(mode="json"),
             valid_patch.model_dump(mode="json"),
@@ -623,10 +628,8 @@ def test_recorded_provider_boundary_from_discovery_through_audit_revision_and_re
     }
     assert _schema_properties(calls_by_stage["rewrite_checklist"][0]) == {"items"}
     assert _schema_properties(calls_by_stage["section_rewrite"][0]) == {
-        "section_id",
         "body",
         "source_span_ids",
-        "evidence",
         "approved_answer_ids",
         "open_issue_ids",
     }

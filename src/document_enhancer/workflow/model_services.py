@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import partial
 from hashlib import sha256
 from typing import Any, cast
 
@@ -17,7 +18,7 @@ from pydantic import BaseModel, Field, StrictStr
 
 from document_enhancer.audit import AuditRevisionPatchSet, apply_audit_revision_patches
 from document_enhancer.audit.content import ContentAuditRequest
-from document_enhancer.domain.analysis import AnalysisReport, Finding, FindingSet
+from document_enhancer.domain.analysis import AnalysisReport, EvidenceQuote, Finding, FindingSet
 from document_enhancer.domain.audit import Audit, IndependentAuditResult
 from document_enhancer.domain.base import StrictModel
 from document_enhancer.domain.enums import ChecklistAction, DocumentType
@@ -101,10 +102,11 @@ class _ChecklistProposalBatch(StrictModel):
     items: list[_ChecklistItemProposal] = Field(default_factory=list)
 
 
-class _GeminiSectionRewriteDraft(SectionRewriteDraft):
-    @classmethod
-    def model_json_schema(cls, *args: Any, **kwargs: Any) -> dict[str, Any]:
-        return _provider_schema(SectionRewriteDraft.model_json_schema(*args, **kwargs))
+class _SectionRewriteProposal(StrictModel):
+    body: StrictStr
+    source_span_ids: list[StrictStr] = Field(default_factory=list)
+    approved_answer_ids: list[StrictStr] = Field(default_factory=list)
+    open_issue_ids: list[StrictStr] = Field(default_factory=list)
 
 
 class _GeminiIndependentAuditResult(IndependentAuditResult):
@@ -334,6 +336,39 @@ def _promote_checklist(
     )
 
 
+def _promote_section_rewrite(
+    item: SectionRewriteInput,
+    allowed_open_issue_ids: set[str],
+    value: object,
+) -> SectionRewriteDraft:
+    """Attach application-owned section identity and exact approved ledger evidence."""
+
+    proposal = _SectionRewriteProposal.model_validate(value)
+    if len(proposal.source_span_ids) != len(set(proposal.source_span_ids)):
+        raise ValidationError("rewriter duplicated a source span handle")
+    if not set(proposal.source_span_ids).issubset(item.allowed_source_span_ids):
+        raise ValidationError("rewriter cited a source span outside the approved ledger")
+    if not set(proposal.approved_answer_ids).issubset(item.allowed_answer_ids):
+        raise ValidationError("rewriter cited an unapproved reviewer answer")
+    if not set(proposal.open_issue_ids).issubset(allowed_open_issue_ids):
+        raise ValidationError("rewriter created an ungoverned open issue")
+    evidence_by_span = {evidence.span_id: evidence for evidence in item.source_evidence}
+    return SectionRewriteDraft(
+        section_id=item.section_id,
+        body=proposal.body,
+        source_span_ids=proposal.source_span_ids,
+        evidence=[
+            EvidenceQuote(
+                span_id=evidence_by_span[span_id].span_id,
+                quote=evidence_by_span[span_id].quote,
+            )
+            for span_id in proposal.source_span_ids
+        ],
+        approved_answer_ids=proposal.approved_answer_ids,
+        open_issue_ids=proposal.open_issue_ids,
+    )
+
+
 def _invoke(
     composer: PromptPackComposer,
     gateway: GeminiModelGateway,
@@ -490,13 +525,14 @@ class GeminiGovernedRewriter:
         )
         sections = {section.section_id: section for section in model.sections}
         for item in request.inputs:
+            original = sections[item.section_id]
             draft = _invoke(
                 self.composer,
                 self.gateway,
                 prompt_id=self.prompt_id,
                 route=ROUTE_PRO_PREVIEW,
                 output_schema="section-rewrite.schema.json",
-                schema=_GeminiSectionRewriteDraft,
+                schema=_SectionRewriteProposal,
                 variables={
                     "document_type": request.document_type.value,
                     "document_metadata": {
@@ -523,21 +559,14 @@ class GeminiGovernedRewriter:
                 },
                 stage="section_rewrite",
                 input_digests=(item.source_digest,),
+                promote=partial(
+                    _promote_section_rewrite,
+                    item,
+                    set(original.open_issue_ids),
+                ),
+                result_schema=SectionRewriteDraft,
             )
-            if draft.section_id != item.section_id:
-                raise ValidationError("rewriter returned a different target section")
-            if not set(draft.source_span_ids).issubset(item.allowed_source_span_ids):
-                raise ValidationError("rewriter cited a source span outside the approved ledger")
-            if not set(draft.approved_answer_ids).issubset(item.allowed_answer_ids):
-                raise ValidationError("rewriter cited an unapproved reviewer answer")
-            allowed_evidence = {(value.span_id, value.quote) for value in item.source_evidence}
-            if any(
-                (value.span_id, value.quote) not in allowed_evidence for value in draft.evidence
-            ):
-                raise ValidationError("rewriter returned evidence outside the approved ledger")
-            original = sections[item.section_id]
-            if not set(draft.open_issue_ids).issubset(original.open_issue_ids):
-                raise ValidationError("rewriter created an ungoverned open issue")
+            draft = SectionRewriteDraft.model_validate(draft)
             sections[item.section_id] = original.model_copy(
                 update={
                     "body": draft.body,
