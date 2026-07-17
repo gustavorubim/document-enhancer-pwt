@@ -13,7 +13,6 @@ from typing import Any, Final
 ROUTE_FLASH_LITE: Final = "gemini-3.1-flash-lite"
 ROUTE_FLASH: Final = "gemini-3.5-flash"
 ROUTE_PRO_PREVIEW: Final = "gemini-3.1-pro-preview"
-EMBEDDING_MODEL: Final = "gemini-embedding-2"
 
 
 @dataclass(frozen=True, slots=True)
@@ -125,7 +124,6 @@ STAGE_ROUTES: Final[dict[str, str]] = {
     "macro": ROUTE_FLASH,
     "sections": ROUTE_FLASH,
     "discovery": ROUTE_FLASH,
-    "rag_readiness": ROUTE_FLASH,
     "audit": ROUTE_FLASH,
     "rewrite": ROUTE_PRO_PREVIEW,
     "reconciliation": ROUTE_PRO_PREVIEW,

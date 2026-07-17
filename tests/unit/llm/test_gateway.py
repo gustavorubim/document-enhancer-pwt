@@ -57,6 +57,7 @@ def gateway(
 
 
 def test_chat_model_initialization_is_explicit_for_developer_and_vertex() -> None:
+    pytest.importorskip("langchain_google_genai")
     developer = GeminiModelGateway(GeminiGatewayConfig(api_key="fake-key"))
     developer_model = developer._build_chat_model(resolve_route(ROUTE_FLASH_LITE))  # noqa: SLF001
     assert developer_model.model == ROUTE_FLASH_LITE

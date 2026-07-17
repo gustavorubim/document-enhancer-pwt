@@ -16,14 +16,12 @@ class WorkspaceConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     run_dir: Path = Path(".document-enhancer/runs")
-    catalog_path: Path = Path(".document-enhancer/rag/catalog.sqlite3")
 
 
 class ReferenceConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     reference_pack: Path = Path("reference_packs/enterprise_core")
-    prompt_pack: Path = Path("prompt_packs/gemini_core")
 
 
 class GeminiConfig(BaseModel):
@@ -33,8 +31,6 @@ class GeminiConfig(BaseModel):
     developer_model: str = "gemini-3.5-flash"
     structure_model: str = "gemini-3.1-flash-lite"
     rewrite_model: str = "gemini-3.1-pro-preview"
-    embedding_model: str = "gemini-embedding-2"
-    embedding_dimensions: int = Field(default=768, ge=1)
     allow_pro_fallback: bool = False
     project: str | None = None
     location: str | None = None
@@ -96,12 +92,9 @@ def _env_overrides(environ: dict[str, str]) -> dict[str, Any]:
         "DOCENHANCE_DEVELOPER_MODEL": ("gemini", "developer_model"),
         "DOCENHANCE_STRUCTURE_MODEL": ("gemini", "structure_model"),
         "DOCENHANCE_REWRITE_MODEL": ("gemini", "rewrite_model"),
-        "DOCENHANCE_EMBEDDING_MODEL": ("gemini", "embedding_model"),
-        "DOCENHANCE_EMBEDDING_DIMENSIONS": ("gemini", "embedding_dimensions"),
         "DOCENHANCE_VERTEX_PROJECT": ("gemini", "project"),
         "DOCENHANCE_VERTEX_LOCATION": ("gemini", "location"),
         "DOCENHANCE_RUN_DIR": ("workspace", "run_dir"),
-        "DOCENHANCE_CATALOG_PATH": ("workspace", "catalog_path"),
         "DOCENHANCE_LIVE_PROVIDER_CHECKS": ("policy", "live_provider_checks"),
         "DOCENHANCE_EXTERNAL_TRACING": ("policy", "external_tracing"),
     }
@@ -110,12 +103,7 @@ def _env_overrides(environ: dict[str, str]) -> dict[str, Any]:
         if variable not in environ:
             continue
         value: Any = environ[variable]
-        if field == "embedding_dimensions":
-            try:
-                value = int(value)
-            except ValueError as exc:
-                raise ConfigurationError(f"{variable} must be an integer") from exc
-        elif field in {"live_provider_checks", "external_tracing"}:
+        if field in {"live_provider_checks", "external_tracing"}:
             if value.lower() not in {"0", "1", "false", "true", "no", "yes"}:
                 raise ConfigurationError(f"{variable} must be boolean")
             value = value.lower() in {"1", "true", "yes"}

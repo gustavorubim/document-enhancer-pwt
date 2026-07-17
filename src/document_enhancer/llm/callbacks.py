@@ -2,11 +2,26 @@
 
 from __future__ import annotations
 
+import importlib
 from collections.abc import Mapping
 from typing import Any, cast
 
-from langchain_core.callbacks import BaseCallbackHandler
 from pydantic import BaseModel, ConfigDict, Field
+
+try:  # Keep the core/offline authoring path free of LangChain imports.
+    _ImportedCallbackBase = importlib.import_module("langchain_core.callbacks").BaseCallbackHandler
+except ImportError:  # pragma: no cover - exercised by minimal core installations
+
+    class _ImportedCallbackBase:
+        """Minimal callback shape used until the optional live adapter is installed."""
+
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            _ = args, kwargs
+
+
+# The optional import is intentionally dynamic.  Keep the class base opaque to the type checker
+# while retaining the real LangChain callback base when the live extra is installed.
+_CallbackBase: Any = _ImportedCallbackBase
 
 
 class UsageMetadata(BaseModel):
@@ -66,7 +81,7 @@ def _first_int(mapping: Mapping[str, Any], *names: str) -> int | None:
     return None
 
 
-class UsageCallbackHandler(BaseCallbackHandler):
+class UsageCallbackHandler(_CallbackBase):
     """Collect the last provider usage object without retaining prompts or content."""
 
     def __init__(self) -> None:

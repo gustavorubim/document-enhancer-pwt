@@ -28,9 +28,9 @@ def test_public_config_contains_no_credential_fields() -> None:
     rendered = repr(payload).lower()
     assert "api_key" not in rendered
     assert "password" not in rendered
-    assert payload["gemini"]["embedding_dimensions"] == 768
+    assert payload["workspace"]["run_dir"] == ".document-enhancer/runs"
 
 
 def test_invalid_environment_value_has_configuration_exit_contract() -> None:
     with pytest.raises(ConfigurationError):
-        load_config(environ={"DOCENHANCE_EMBEDDING_DIMENSIONS": "not-an-int"})
+        load_config(environ={"DOCENHANCE_BACKEND": "not-a-backend"})

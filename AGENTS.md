@@ -54,9 +54,7 @@ uv run ruff format --check .
 uv run ruff check .
 uv run ty check
 uv run pytest -m "not live_model and not public_download"
-uv run python scripts/generate_schemas.py --check
 uv run python scripts/verify_reference_pack.py reference_packs/enterprise_core
-uv run python scripts/verify_prompt_pack.py prompt_packs/gemini_core --reference-pack reference_packs/enterprise_core
 uv build
 ```
 

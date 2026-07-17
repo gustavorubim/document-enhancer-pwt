@@ -1,454 +1,84 @@
 # Document Enhancer
 
-Document Enhancer is a local-first, Gemini-first Python CLI for turning enterprise methodology, standard, process, and desktop-procedure documents into traceable human, semantic, and retrieval-ready artifacts.
-
-The repository now includes the foundational contracts, governed reference and prompt packs,
-source ingestion and structure recovery, the Gemini model gateway, four parallel analysis
-specialists, deterministic clarification artifacts, a durable two-gate LangGraph workflow, and a
-governed rewrite pipeline that derives Markdown, Mermaid, and semantic outputs from one validated
-intermediate model. The audited export pipeline now builds and promotes a validated local SQLite
-catalog, and the Rich CLI performs explainable retrieval and grounded cited Q&A over that catalog.
-
-## Verified status
-
-M0–M9 and the repository-level Definition of Done are verified as of 2026-07-16. The final M9
-integration gate passed with 341 tests and 2 explicit opt-in tests deselected; frozen sync, Ruff
-format/check, `ty`, generated schemas, both governed packs, all 60 generated corpus files, both
-evaluation artifacts, package build, and diff checks also passed. All 21 deterministic offline
-release thresholds continue to pass across 48 fixture-format evaluations. The exact final
-clean-clone and isolated-wheel SHA is recorded in the release handoff.
-
-The actual two-gate CLI workflow also completed for the checked-in `enterprise_core` process,
-methodology, standard, and desktop-procedure examples. Every run passed strict audit, built a valid
-sealed SQLite RAG package, promoted the cumulative catalog, returned explainable retrieval results,
-and produced a grounded cited answer. The companion negative case proves that incomplete governed
-input still fails closed without promoting RAG state. See the
-[operator guide](docs/operator-guide.md), [release proof](docs/release.md), and
-[evaluation report](evals/reports/m8-evaluation.md) for exact workflows and limitations. These are
-controlled offline results: those M8 governed proof runs recorded zero Gemini calls and zero public
-downloads.
-
-M9 separately adds bounded live-provider plumbing evidence over fictional content. The post-review
-smoke completed a Flash Lite checklist, one Pro section rewrite, an independent Flash audit,
-Gemini Embedding 2 document/query embeddings, validated SQLite promotion, and grounded retrieval.
-All three generation calls succeeded in one attempt with zero retries or structured repairs; the
-recorded total was 32,180 input and 1,109 output tokens, while provider cost remained unavailable.
-A separate real Rich `rag ask --explain` invocation exited successfully with a resolvable citation
-and `Grounding passed: True`. This proves route/schema/integration plumbing only. Representative
-enterprise-document quality, OCR, portfolio scale, and production security remain explicit
-follow-ups rather than implied release claims.
+Turn one governed source document into a reviewed, rewritten, audited, and graph-ready document
+bundle. The product is intentionally file-backed and linear: no workflow engine, database
+checkpoint, retrieval system, prompt-pack runtime, or compatibility mode is required.
 
 ## Quick start
 
 ```bash
 uv sync --frozen
-uv run docenhance --help
-uv run docenhance doctor
+
+# A file, or a directory containing exactly one .md, .txt, .docx, or .pdf source.
+uv run docenhance run .document-enhancer/inbox --document-type process
 ```
 
-The project requires Python 3.12 or 3.13 and uses `uv` for a reproducible environment. Provider
-credentials are never accepted as CLI arguments or committed configuration. The CLI does not
-automatically load `.env`; export the selected provider credential into the process environment
-before a live run.
-
-## Cookbook: enhance a document
-
-This section follows one document from local source file through the two human-review gates, final
-audit/export, and optional retrieval. Run the commands from the repository root.
-
-### 1. Install and check the local environment
+The command writes one unique run under `.document-enhancer/runs` and either finishes or exits with
+code `10` when business decisions are needed. Read `review/review.md`, answer only the questions in
+`review/decisions.yaml`, then continue the exact run:
 
 ```bash
-uv sync --frozen --no-editable
-export UV_NO_SYNC=1
-uv run docenhance version
-uv run docenhance doctor --json
-uv run docenhance prompts validate --json
+uv run docenhance continue RUN_ID
+uv run docenhance inspect RUN_ID
+uv run docenhance audit RUN_ID
 ```
 
-The non-editable install plus `UV_NO_SYNC=1` is the robust source-checkout setup on Python builds
-that skip hidden editable-install `.pth` files. It also prevents a later `uv run` from silently
-replacing the working install with the incompatible editable form. Unset `UV_NO_SYNC` when you
-intentionally want `uv run` to synchronize the environment again.
+Use `--execution-mode offline` for deterministic local operation (the default). For bounded Gemini
+enrichment, first run `uv sync --group live`, set provider credentials in `.env` or the environment,
+and use `--execution-mode live`. Only `GOOGLE_API_KEY`, `GEMINI_API_KEY`,
+`GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`, and `DOCENHANCE_BACKEND` are read from `.env`.
 
-The CLI accepts Markdown (`.md`), plain text (`.txt`), Word (`.docx`), and text-based PDF (`.pdf`)
-sources. Scanned or image-only PDFs require OCR before they can be used.
-
-### 2. Use the checked-in showcase DOCX
-
-The cookbook includes a seven-page fictional Word document designed to exercise the full product
-surface. It contains native headings, lists, captions, and tables; explicit roles, controls,
-decision rules, evidence, dependencies, and metrics; and four intentional conflicts that must be
-resolved by a person rather than silently guessed by the rewrite.
-
-Copy it to the recommended repository-local inbox and keep the original unchanged:
-
-```bash
-mkdir -p .document-enhancer/inbox
-cp examples/cookbook/aurora_ai_complaint_triage_process.docx \
-  .document-enhancer/inbox/aurora-ai-complaint-triage.docx
-SHOWCASE_SOURCE=.document-enhancer/inbox/aurora-ai-complaint-triage.docx
-```
-
-Open `examples/cookbook/aurora_ai_complaint_triage_process.docx` before the run if you want to
-compare the source with the final governed Markdown. The document is entirely fictional and
-contains no customer data. Rebuild the same DOCX from source at any time with:
-
-```bash
-uv run python scripts/generate_cookbook_example.py
-```
-
-The CLI also accepts a source from any other readable path.
-
-The entire `.document-enhancer/` directory is ignored by Git. This keeps confidential inputs,
-review artifacts, generated outputs, and the optional RAG catalog out of commits by default:
+## What a run produces
 
 ```text
-.document-enhancer/
-├── inbox/                         # source files supplied by the operator
-├── runs/<RUN_ID>/                 # isolated evidence and output for each run
-└── rag/catalog.sqlite3            # optional cumulative retrieval catalog
+runs/RUN_ID/
+├── run.json                    # compact, sole mutable run state
+├── source/                     # original bytes, normalized text, spans, parser quality
+├── recipe/compiled.json        # validated policy, rubric, and template fingerprint
+├── review/                     # macro/section/flow review, Mermaid, questions, decisions
+├── rewrite/plan.json           # source-backed approved rewrite plan
+├── output/                     # final.md, final.docx, semantic.json, ontology.json, graph.jsonl
+└── audit/                      # audit, change explanation, source-to-target map, optional seal
 ```
 
-Keep the original source unchanged while a run is active. The workflow copies it into the run,
-records its digest, and refuses to resume against incompatible source or configuration state.
+The five phases are extract, analyze, human review, rewrite, and verify. Large values live in named
+artifacts; `run.json` remains below 50 KB and records the selected execution mode so a live run
+continues live after human review.
 
-### 3. Choose the document type and execution mode
+## Quality boundaries
 
-Use the document type that describes the intended governed output:
+- Parsers preserve source bytes, block order, locations, stable span IDs, warnings, and digests.
+- Heuristics choose parser structure or bounded LLM structure recovery; providers cannot invent
+  source spans or replace deterministic evidence checks.
+- Reference packs define the document type, policy context, rubric, terminology, and templates.
+- The single decision file holds only genuine business questions. Unknown values remain explicit.
+- Final auditing checks source retention, required sections, graph references, unresolved blockers,
+  and template coverage before sealing an approved bundle.
+- The semantic JSON and JSONL graph are portable outputs for a future RAG, ontology, or search
+  system; no retrieval runtime ships in this repository.
 
-| `--document-type` | Use it for |
-| --- | --- |
-| `process` | Roles, activities, decisions, handoffs, controls, and evidence flows |
-| `methodology` | Models, calculations, assumptions, data, validation, and limitations |
-| `standard` | Mandatory requirements, exceptions, ownership, and compliance evidence |
-| `desktop_procedure` | Step-by-step operating instructions and escalation paths |
-
-Use `--execution-mode offline` for a deterministic, network-free workflow test. It validates the
-local orchestration and artifacts but does not measure Gemini quality. The normal live mode is the
-default and can send document content to the configured Gemini backend.
-
-For the Developer API, export the credential into the process environment before a live run:
-
-```bash
-export DOCENHANCE_BACKEND=developer_api
-export GEMINI_API_KEY='set-outside-the-repository'
-```
-
-The CLI does not accept credentials as arguments or configuration-file values and does not
-automatically load `.env`. Vertex AI operators should use Application Default Credentials and the
-project/location settings described in the [operator guide](docs/operator-guide.md).
-
-### 4. Start the run and save the run ID
-
-This live example uses the `process` template and always pauses at Gate 1 so the extracted Word
-structure, specialist findings, and clarification questions can be reviewed before rewriting:
-
-```bash
-uv run docenhance run \
-  "$SHOWCASE_SOURCE" \
-  --document-type process \
-  --until questions \
-  --json
-```
-
-For a network-free first pass, add `--execution-mode offline`:
-
-```bash
-uv run docenhance run \
-  "$SHOWCASE_SOURCE" \
-  --document-type process \
-  --execution-mode offline \
-  --until questions \
-  --json
-```
-
-Offline mode proves deterministic ingestion, checkpointing, gates, and artifact wiring. It may
-produce no clarification questions because it intentionally does not evaluate Gemini analysis
-quality; use the live mode to exercise conflict discovery and specialist reasoning on this source.
-
-The response contains a value such as `"run_id": "run-abc123..."`. Save it for later commands:
-
-```bash
-RUN_ID=run-abc123
-RUN_PATH=".document-enhancer/runs/$RUN_ID"
-```
-
-A waiting workflow exits with code `10` by design. This is a successful review pause, not a crash.
-At any point, inspect the persisted state and the next required action with:
-
-```bash
-uv run docenhance status "$RUN_ID" --json
-uv run docenhance current-stage "$RUN_ID"
-uv run docenhance next-action "$RUN_ID"
-```
-
-If `--run-dir PATH` was supplied when the run started, pass the same option to every later
-run-scoped command that supports it.
-
-### 5. Review and answer Gate 1
-
-Start with the human-readable questions and extracted source view. Edit only the designated YAML
-review surfaces; the other files are evidence generated by the workflow.
-
-| Purpose | Path under `$RUN_PATH` | Operator action |
-| --- | --- | --- |
-| Original source copy | `source/original.<ext>` | Compare only; do not edit |
-| Normalized text | `source/normalized.md` | Check extraction and reading order |
-| Structure diagnostics | `source/structure-quality.json` | Review detected structure problems |
-| Selected outline/view | `source/selected-view.json` | Confirm headings and boundaries |
-| Human-readable questions | `clarification/questions.md` | Read first; do not edit |
-| Authoritative questions | `clarification/questions.yaml` | Use the question IDs; do not edit |
-| Reviewer answers | `clarification/answers.yaml` | Add evidence-backed answers |
-| Rewrite direction | `clarification/steering.yaml` | Optionally set audience, tone, exclusions, and constraints |
-| Approved exceptions | `clarification/waivers.yaml` | Add only explicitly approved waivers |
-| Gate 1 validation result | `clarification/validation-report.json` | Inspect when Gate 1 remains waiting |
-
-Preserve the generated top-level metadata in `answers.yaml` and add entries under `answers`. A
-typical answer has this shape:
-
-```yaml
-answers:
-  - answer_id: ANS-REVIEW-001
-    question_id: Q-COPY-THE-ID-FROM-QUESTIONS
-    status: answered
-    answer: The Model Governance Lead approves the monthly limitation review.
-    responder: reviewer@example.com
-    evidence_reference: answer://review/ANS-REVIEW-001
-```
-
-For a live run of this fictional showcase, use the generated question text and IDs to map the
-following training decisions into `answers.yaml`. Question IDs are generated for each run, so copy
-them from `questions.yaml` rather than copying placeholder IDs literally:
-
-| Source conflict | Training decision | Suggested evidence reference |
-| --- | --- | --- |
-| P1 acknowledgement is stated as both 60 and 30 minutes | Require human acknowledgement within 30 minutes of receipt | `answer://cookbook/p1-sla` |
-| High-confidence routing is stated as both 0.80 and 0.85 | Use 0.85; values below 0.85 route to manual triage | `answer://cookbook/routing-confidence` |
-| Independent approval for actions affecting more than 25 complaints is missing | Require both the Complaint Operations Manager and Compliance duty officer | `answer://cookbook/batch-approval` |
-| Retention is stated as both five and seven years | Retain for seven years after case closure, subject to legal hold | `answer://cookbook/retention` |
-
-Use a fictional reviewer identity such as `cookbook-reviewer@example.invalid`. If the live analysis
-raises additional legitimate questions, answer them only when the source or a deliberate training
-decision supports the answer; otherwise leave them open or record an explicit waiver.
-
-An answered item requires a reviewer and an `answer://`, `reference://`, `source://`, or
-`steering://` evidence reference. Do not invent an answer merely to pass the gate. Leave it open,
-provide documented steering, or record a governed waiver with approver, reason, downstream impact,
-and review/expiry date.
-
-Resume after saving the YAML files:
-
-```bash
-uv run docenhance resume "$RUN_ID" --json
-```
-
-If Gate 1 validation is not satisfied, the workflow remains waiting with exit code `10` and writes
-actionable diagnostics to `clarification/validation-report.json`. Correct the named fields and
-resume the same run; do not start over.
-
-### 6. Review and approve Gate 2
-
-When the workflow reaches `gate2`, read:
+## Supported commands
 
 ```text
-$RUN_PATH/clarification/rewrite-checklist.md
-$RUN_PATH/clarification/rewrite-checklist.yaml
-```
-
-The Markdown file is the convenient reading surface. The YAML file is authoritative. Confirm that
-every blocking checklist item is answered or has an approved waiver, then record the approver and
-UTC approval timestamp in `rewrite-checklist.yaml`:
-
-```yaml
-approved_by: approver@example.com
-approved_at: '2026-07-16T18:00:00Z'
-```
-
-Do not approve an unresolved blocker. Resolve checklist statuses against the evidence and waivers
-already captured at Gate 1. When every blocking item is resolved and the checklist is approved,
-resume again:
-
-```bash
-uv run docenhance resume "$RUN_ID" --json
-```
-
-### 7. Review the completed enhancement
-
-The final response should report `"status": "succeeded"` and `"current_stage": "complete"`.
-Review the completed run in this order:
-
-| Review goal | Path under `$RUN_PATH` |
-| --- | --- |
-| Main human-readable result | `output/enhanced.md` |
-| Semantic representation | `output/enhanced.semantic.yaml` |
-| Unresolved or explicitly retained issues | `output/open-issues.yaml` |
-| Source disposition and rewrite evidence | `output/content-ledger.json` and `output/rewrite-inputs.json` |
-| Audit summary | `audit/report.md` |
-| Machine-readable audit decision | `audit/audit.json` |
-| Text and semantic change review | `audit/textual.diff.md` and `audit/semantic.diff.yaml` |
-| Source-to-output traceability | `audit/source-to-target.csv` |
-| Retrieval/export records | `export/chunks.jsonl`, `nodes.jsonl`, and `edges.jsonl` |
-| Sealed per-document RAG package | `rag/document-rag.sqlite3` |
-
-The run directory is an evidence bundle. Copy `output/enhanced.md` elsewhere if further editorial
-work is needed; do not overwrite the audited artifact in place.
-
-Recheck the final gates from the CLI:
-
-```bash
-uv run docenhance audit "$RUN_ID" --json
-uv run docenhance export "$RUN_ID" --json
-uv run docenhance rag verify "$RUN_ID" --json
-uv run docenhance rag inspect "$RUN_ID" --json
-```
-
-Audit, export, package, catalog, or grounding failures exit with code `30` and are not promoted as
-successful results.
-
-### 8. Add the result to the local RAG catalog and query it
-
-Live runs ingest a validated package into `.document-enhancer/rag/catalog.sqlite3` by default.
-Offline runs do not auto-ingest. Ingest an offline package explicitly after reviewing it:
-
-```bash
-uv run docenhance rag ingest "$RUN_ID" \
-  --catalog .document-enhancer/rag/catalog.sqlite3 \
-  --json
-```
-
-Inspect the cumulative catalog, then query it using the mode that built it:
-
-```bash
-uv run docenhance rag stats --json
-
-# Catalog built by a live run
-uv run docenhance rag search \
-  "What happens when AI routing confidence is below 0.85?" --explain
-uv run docenhance rag ask \
-  "What is the required P1 acknowledgement time, and who monitors breaches?" --explain
-
-# Catalog built by an offline run
-uv run docenhance rag search \
-  "What happens when AI routing confidence is below 0.85?" --offline --explain
-uv run docenhance rag ask \
-  "What is the required P1 acknowledgement time, and who monitors breaches?" --offline --explain
-```
-
-Use `--offline` with `rag search`, `rag ask`, or `rag chat` only when the catalog was built with the
-deterministic offline embedding profile. Live and offline embedding profiles cannot be mixed.
-
-### 9. Try the checked-in examples
-
-The synthetic corpus contains process, methodology, standard, and desktop-procedure documents in
-clean, mild, medium, and severe Markdown/DOCX variants. The methodology and desktop-procedure
-families also include text-based PDFs. For example:
-
-```bash
-uv run docenhance run \
-  fixtures/synthetic/corpus/monthly_loss_forecasting_methodology/medium.docx \
-  --document-type methodology \
-  --execution-mode offline \
-  --until questions \
-  --json
-```
-
-See the [fixture corpus guide](docs/fixture-corpus.md) for the full matrix. To exercise both review
-gates, audit/export, RAG packaging, ingestion, search, and a cited answer without credentials, run:
-
-```bash
-uv run python scripts/run_offline_demo.py \
-  --output .document-enhancer/m8-demo \
-  --force
-python -m json.tool .document-enhancer/m8-demo/demo-result.json
-```
-
-## Current commands
-
-```text
-docenhance doctor [--json]
-docenhance config show [--json]
 docenhance version
-docenhance run SOURCE [--document-type TYPE] [--structure-mode MODE] [--execution-mode live|offline] [--run-dir PATH] [--until questions|checklist|complete] [--gate2|--no-gate2] [--catalog-ingest|--no-catalog-ingest] [--catalog PATH] [--json]
-docenhance status RUN_ID [--run-dir PATH] [--json]
-docenhance current-stage RUN_ID [--run-dir PATH] [--json]
-docenhance next-action RUN_ID [--run-dir PATH] [--json]
-docenhance resume RUN_ID [--run-dir PATH] [--execution-mode live|offline] [--json]
-docenhance audit RUN_ID [--run-dir PATH] [--json]
-docenhance export RUN_ID [--run-dir PATH] [--json]
-docenhance prompts list [--json]
-docenhance prompts show PROMPT_ID [--composed] [--json]
-docenhance prompts validate [--json]
-docenhance rag build RUN_ID [--run-dir PATH] [--offline] [--json]
-docenhance rag verify RUN_ID_OR_PACKAGE [--run-dir PATH] [--json]
-docenhance rag inspect RUN_ID_OR_PACKAGE [--run-dir PATH] [--json]
-docenhance rag ingest RUN_ID [--run-dir PATH] [--catalog PATH] [--json]
-docenhance rag search QUERY [--catalog PATH] [--offline] [--explain] [--json]
-docenhance rag ask QUESTION [--catalog PATH] [--offline] [--explain] [--json]
-docenhance rag chat [--catalog PATH] [--session ID] [--no-save] [--offline] [--json]
-docenhance rag sources ANSWER_OR_SESSION_ID [--catalog PATH] [--json]
-docenhance rag graph ENTITY_ID [--catalog PATH] [--depth 1|2] [--json]
-docenhance rag stats [--catalog PATH] [--json]
+docenhance run SOURCE [--document-type TYPE] [--execution-mode offline|live]
+docenhance continue RUN_ID
+docenhance status RUN_ID
+docenhance inspect RUN_ID
+docenhance audit RUN_ID
+docenhance validate-recipe [--document-type TYPE]
 ```
 
-The normal `run` mode is live. Use `--execution-mode offline` for the explicit network-free
-test/demo path. The workflow writes editable clarification artifacts first, then after the review
-gates writes the content ledger, rewrite inputs, enhanced model, enhanced Markdown, open issues,
-semantic sidecar, Mermaid validation, audit/diff/export bundle, and sealed RAG package under the
-selected run directory. It can then promote that package into the cumulative catalog for the Rich
-retrieval and grounded-answer commands. See `docs/rag-cli.md` for the local RAG workflow and
-persistence behavior.
+Supported document types are `process`, `methodology`, `standard`, and `desktop_procedure`.
+The checked-in `reference_packs/enterprise_core` pack is the default.
 
-## Verification
+## Development gate
 
 ```bash
-uv sync --frozen
-uv run ruff format --check .
-uv run ruff check .
-uv run ty check
-uv run pytest -m "not live_model and not public_download"
-uv run python scripts/generate_schemas.py --check
+scripts/gate_core.sh
 uv run python scripts/verify_reference_pack.py reference_packs/enterprise_core
-uv run python scripts/verify_prompt_pack.py prompt_packs/gemini_core \
-  --reference-pack reference_packs/enterprise_core
-uv run python scripts/generate_fixture_corpus.py --check
-uv run python scripts/run_evaluations.py --check
 uv build
-git diff --check
 ```
 
-For the stronger release proof, run `scripts/verify_release.sh HEAD`; it repeats the gate in a
-temporary clean clone and then validates the built wheel from a separate isolated environment.
-The checked-in offline evaluation report and exact limitations are in
-`evals/reports/m8-evaluation.md`.
-
-The opt-in fictional M9 post-review smoke requires an exported Gemini credential and explicit live
-enablement. It writes only local, ignored artifacts and a sanitized evidence summary:
-
-```bash
-export DOCENHANCE_RUN_LIVE=1
-export DOCENHANCE_BACKEND=developer_api
-uv run python scripts/run_live_postreview_smoke.py \
-  --output .document-enhancer/m9-live-postreview \
-  --force --json
-
-uv run docenhance rag ask \
-  "Who owns the monthly evidence review?" \
-  --catalog .document-enhancer/m9-live-postreview/catalog.sqlite3 \
-  --explain
-```
-
-The smoke harness keeps its final RAG answer deterministic to isolate post-review generation and
-embedding contracts. The second command deliberately verifies the actual configured live RAG CLI
-boundary over the resulting catalog.
-
-Compatibility tests are offline by default. They validate the installed LangChain, LangGraph, Deep Agents, SQLite FTS5, sqlite-vec, and adapter shapes without sending document content anywhere. Live Gemini structured-output and embedding profile checks are separately marked `live_model` and require explicit opt-in.
-
-## Data handling
-
-Source documents and derived artifacts are treated as untrusted, confidential data. The workflow
-logs event metadata only, redacts credential-shaped and raw-content values from prompt snapshots,
-keeps provider tools disabled by default, and writes run artifacts atomically under the selected
-local run directory. A local `.env` is ignored by Git and never loaded automatically by the CLI.
-The limited live acceptance harness uses an allowlisted external-environment loader; it never emits
-the credential or writes it to run artifacts, output, or logs.
+The focused gate covers parser behavior, all four document types, the human decision pause,
+rewrite/audit artifacts, semantic exports, live-provider seams, and CLI behavior.

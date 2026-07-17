@@ -11,20 +11,19 @@ requires-python = ">=3.12,<3.14"
 license = { text = "MIT" }
 authors = [{ name = "Document Enhancer contributors" }]
 dependencies = [
-  "deepagents>=0.3,<1",
-  "langchain>=1.0,<2",
-  "langchain-google-genai>=4.0,<5",
-  "langgraph>=1.0,<2",
   "markdown-it-py>=3.0,<5",
-  "numpy>=2.0,<3",
   "pydantic>=2.10,<3",
   "pypdf>=5.0,<7",
   "python-docx>=1.1,<2",
   "rich>=13.9,<15",
   "ruamel.yaml>=0.18,<0.19",
-  "sqlite-vec==0.1.9",
   "typer>=0.16,<1",
   "typing-extensions>=4.12,<5",
+]
+
+[project.optional-dependencies]
+live = [
+  "langchain-google-genai>=4.0,<5",
 ]
 
 [dependency-groups]
@@ -36,6 +35,9 @@ dev = [
   "ruff>=0.12,<1",
   "ty>=0.0.1,<1",
 ]
+live = [
+  "langchain-google-genai>=4.0,<5",
+]
 
 [project.scripts]
 docenhance = "document_enhancer.cli:main"
@@ -45,7 +47,6 @@ packages = ["src/document_enhancer"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "reference_packs" = "document_enhancer/data/reference_packs"
-"prompt_packs" = "document_enhancer/data/prompt_packs"
 
 [tool.hatch.build.targets.sdist]
 include = [
@@ -53,10 +54,8 @@ include = [
   "/tests",
   "/scripts",
   "/fixtures",
-  "/evals",
   "/docs",
   "/reference_packs",
-  "/prompt_packs",
   "/README.md",
   "/pyproject.toml",
 ]

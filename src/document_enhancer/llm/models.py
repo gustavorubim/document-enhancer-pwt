@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import importlib
 import json
 import os
 import re
@@ -383,7 +384,9 @@ class GeminiModelGateway:
             if hasattr(model, "with_route"):
                 model = model.with_route(route)
             return model
-        from langchain_google_genai import ChatGoogleGenerativeAI
+        ChatGoogleGenerativeAI = importlib.import_module(
+            "langchain_google_genai"
+        ).ChatGoogleGenerativeAI
 
         kwargs: dict[str, Any] = {
             "model": route.model,
@@ -1008,32 +1011,6 @@ class GeminiModelGateway:
                 return await asyncio.to_thread(self.invoke, **kwargs)
         except asyncio.CancelledError:
             raise
-
-    def embed_documents(self, *, profile: str, texts: Sequence[str]) -> Sequence[Sequence[float]]:
-        from .embeddings import EmbeddingProfile, GeminiEmbeddingAdapter
-
-        if profile != "gemini-embedding-2":
-            raise ValueError(f"unknown embedding profile: {profile}")
-        adapter = GeminiEmbeddingAdapter(
-            profile=EmbeddingProfile(dimensions=768, backend=self.config.backend.value),
-            api_key=self.config.api_key.get_secret_value() if self.config.api_key else None,
-            project=self.config.project,
-            location=self.config.location,
-        )
-        return adapter.embed_documents(list(texts))
-
-    def embed_query(self, *, profile: str, text: str) -> Sequence[float]:
-        from .embeddings import EmbeddingProfile, GeminiEmbeddingAdapter
-
-        if profile != "gemini-embedding-2":
-            raise ValueError(f"unknown embedding profile: {profile}")
-        adapter = GeminiEmbeddingAdapter(
-            profile=EmbeddingProfile(dimensions=768, backend=self.config.backend.value),
-            api_key=self.config.api_key.get_secret_value() if self.config.api_key else None,
-            project=self.config.project,
-            location=self.config.location,
-        )
-        return adapter.embed_query(text)
 
 
 class FakeStructuredModel:
