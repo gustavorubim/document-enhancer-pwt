@@ -3,14 +3,17 @@ from __future__ import annotations
 import shutil
 import sqlite3
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
-from document_enhancer.domain.run import RagAnswer
-from document_enhancer.llm import EmbeddingProfile, GeminiEmbeddingAdapter
+from document_enhancer.domain.enums import RagAnswerStatus
+from document_enhancer.domain.run import RagAnswer, RagCitation
+from document_enhancer.llm import EmbeddingProfile, GeminiEmbeddingAdapter, gemini_schema
 from document_enhancer.rag import (
     DeterministicRagModel,
     OfflineDeterministicEmbedder,
+    PromptPackRagModelPort,
     RagRuntime,
     RetrievalFilters,
     SessionStore,
@@ -18,7 +21,7 @@ from document_enhancer.rag import (
     catalog_embedding_profile,
 )
 from document_enhancer.rag.catalog_reader import CatalogReadError
-from document_enhancer.rag.models import ChatMessage, GroundingAudit
+from document_enhancer.rag.models import ChatMessage, GroundingAudit, RelevanceGrade
 from document_enhancer.rag.retrievers import GraphRetriever
 from document_enhancer.rag.vector_store import ExactScanPolicy, SQLiteCatalogVectorStore
 
@@ -51,6 +54,116 @@ def _runtime(
         model or DeterministicRagModel(),
         context_token_budget=context_budget,
     )
+
+
+class _RagPromptSpec:
+    model_route = "rag-test-route"
+
+
+class _RagPromptPack:
+    version = "test"
+
+    def prompt(self, _prompt_id: str) -> _RagPromptSpec:
+        return _RagPromptSpec()
+
+
+class _RagComposer:
+    pack = _RagPromptPack()
+
+    def compose(self, _prompt_id: str, _variables: dict[str, object]) -> str:
+        return "test prompt"
+
+
+class _StructuredOnlyGateway:
+    def __init__(self, *, include_claim_citations: bool = True) -> None:
+        self.schema_names: list[str] = []
+        self.include_claim_citations = include_claim_citations
+
+    def structured(self, *, route: str, schema: type[Any], prompt: str) -> Any:
+        del route, prompt
+        gemini_schema(schema)
+        self.schema_names.append(schema.__name__)
+        if schema.__name__ == "_RagQueryProposal":
+            return schema(normalized_question="normalized cobalt review")
+        if issubclass(schema, RelevanceGrade):
+            return schema(
+                sufficient=True,
+                relevant_chunk_ids=("CHUNK-TEST",),
+                reason="test relevance grade",
+            )
+        if schema.__name__ == "_RagAnswerProposal":
+            return schema(
+                status=RagAnswerStatus.PARTIAL,
+                answer_markdown="The owner records the evidence. [CIT-TEST]",
+                claim_citations=(
+                    [
+                        {
+                            "claim": "The owner records the evidence.",
+                            "citation_ids": ["CIT-TEST"],
+                        }
+                    ]
+                    if self.include_claim_citations
+                    else []
+                ),
+                caveats=[],
+                unsupported_claims=[],
+            )
+        if issubclass(schema, GroundingAudit):
+            return schema(passed=True, reason="test grounding audit")
+        raise AssertionError(f"unexpected schema {schema}")
+
+    def embed_documents(self, *, profile: str, texts: list[str]) -> list[list[float]]:
+        del profile, texts
+        raise AssertionError("RAG prompt model must not call embeddings")
+
+    def embed_query(self, *, profile: str, text: str) -> list[float]:
+        del profile, text
+        raise AssertionError("RAG prompt model must not call embeddings")
+
+
+def test_prompt_pack_rag_model_uses_gemini_schemas_on_structured_fallback() -> None:
+    gateway = _StructuredOnlyGateway()
+    model = PromptPackRagModelPort(
+        cast(Any, _RagComposer()),
+        cast(Any, gateway),
+    )
+
+    citation = RagCitation(
+        citation_id="CIT-TEST",
+        chunk_id="CHUNK-TEST",
+        document_id="DOC-TEST",
+        version_id="DOCV-TEST",
+        section_id="SEC-TEST",
+        section_path=["Process"],
+    )
+    assert model.rewrite("Who owns it?", (), {"catalog_generation": 1}) == (
+        "normalized cobalt review"
+    )
+    assert model.grade("Who owns it?", ()).sufficient is True
+    answer = model.generate("Who owns it?", "context", (citation,))
+    assert answer.citations[0].document_id == "DOC-TEST"
+    assert model.audit("Who owns it?", "context", answer).passed is True
+    assert "_RagAnswerProposal" in gateway.schema_names
+    assert "_GeminiGroundingAudit" in gateway.schema_names
+
+
+def test_prompt_pack_rag_model_rejects_answer_without_claim_citations() -> None:
+    gateway = _StructuredOnlyGateway(include_claim_citations=False)
+    model = PromptPackRagModelPort(
+        cast(Any, _RagComposer()),
+        cast(Any, gateway),
+    )
+    citation = RagCitation(
+        citation_id="CIT-TEST",
+        chunk_id="CHUNK-TEST",
+        document_id="DOC-TEST",
+        version_id="DOCV-TEST",
+        section_id="SEC-TEST",
+        section_path=["Process"],
+    )
+
+    with pytest.raises(ValueError, match="requires explicit claim citations"):
+        model.generate("Who owns it?", "context", (citation,))
 
 
 def test_vector_store_profiles_scores_metadata_and_corruption_fail_closed(tmp_path: Path) -> None:

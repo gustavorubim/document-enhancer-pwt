@@ -48,7 +48,7 @@ def test_fixture_finding_targets_the_single_smoke_section() -> None:
     request = type("Request", (), {"document_id": "DOC-M9", "source_digest": "a" * 64})()
     result = _analysis_with_one_owner_question(request)
     assert result.blocking_count == 1
-    assert result.findings[0].target_template_section == "SEC-PROCESS-CONTENT"
+    assert result.findings[0].target_template_section == "SEC-PROC-PURPOSE"
 
 
 def test_live_call_shape_is_exact_and_bounded() -> None:

@@ -11,6 +11,7 @@ answer itself uses the deterministic offline model over the resulting live-index
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import shutil
@@ -27,13 +28,22 @@ from rich.table import Table
 
 from document_enhancer.clarification import load_yaml
 from document_enhancer.clarification.artifacts import write_yaml
-from document_enhancer.config import load_config
+from document_enhancer.config import load_config, yaml_parser
 from document_enhancer.domain.analysis import Finding, FindingSet
 from document_enhancer.domain.enums import (
     DocumentType,
+    EntityType,
     FindingSeverity,
     FindingType,
     QuestionStatus,
+)
+from document_enhancer.domain.ontology import (
+    CompletionCondition,
+    Input,
+    Output,
+    ProcessStep,
+    Role,
+    Trigger,
 )
 from document_enhancer.domain.questions import (
     Answer,
@@ -61,6 +71,7 @@ from document_enhancer.rag import (
     verify_package,
 )
 from document_enhancer.references.loader import load_reference_pack
+from document_enhancer.rewrite import EnhancedDocumentModel
 from document_enhancer.workflow import DocumentWorkflow, WorkflowServices
 from document_enhancer.workflow.model_services import (
     GeminiAuditRevisionRunner,
@@ -72,6 +83,7 @@ from document_enhancer.workflow.model_services import (
 ROOT = Path(__file__).resolve().parents[1]
 PROMPT_PACK = ROOT / "prompt_packs/gemini_core"
 REFERENCE_PACK = ROOT / "reference_packs/enterprise_core"
+SMOKE_SECTION_ID = "SEC-PROC-PURPOSE"
 SOURCE_TEXT = """# Monthly evidence review
 
 The monthly evidence review is recorded in the fictional Harbor Evidence Vault. The approved
@@ -138,13 +150,83 @@ class TimedEmbeddingAdapter:
         return cast(list[float], self._record("query", self.delegate.embed_query, text))
 
 
+class SmokeProcessRewriter:
+    """Wrap the live rewriter with deterministic smoke-only process graph completion."""
+
+    def __init__(self, delegate: GeminiGovernedRewriter) -> None:
+        self.delegate = delegate
+
+    def rewrite(self, request: Any) -> EnhancedDocumentModel:
+        return _add_smoke_process_step(self.delegate.rewrite(request))
+
+
+def _add_smoke_process_step(model: EnhancedDocumentModel) -> EnhancedDocumentModel:
+    if any(item.entity_type is EntityType.PROCESS_STEP for item in model.objects):
+        return model
+    section = model.sections[0]
+    source_span_id = section.source_span_ids[0] if section.source_span_ids else None
+    provenance = model.version.provenance.model_copy(
+        update={
+            "source_span_id": source_span_id,
+            "section_id": section.section_id,
+            "extraction_method": "m9.live-smoke-deterministic",
+        }
+    )
+    role = Role(
+        id="ROLE-M9-SMOKE-OWNER",
+        name=ANSWER_TEXT,
+        provenance=provenance,
+    )
+    trigger = Trigger(
+        id="TRG-M9-SMOKE-MONTHLY",
+        name="Monthly evidence review schedule",
+        provenance=provenance,
+    )
+    input_item = Input(
+        id="IN-M9-SMOKE-EVIDENCE",
+        name="Monthly evidence review record",
+        provenance=provenance,
+    )
+    output_item = Output(
+        id="OUT-M9-SMOKE-REVIEW",
+        name="Reviewed monthly evidence",
+        provenance=provenance,
+    )
+    completion = CompletionCondition(
+        id="DONE-M9-SMOKE-001",
+        name="Evidence review recorded",
+        condition="The approved analyst records the monthly evidence review.",
+        provenance=provenance,
+    )
+    step = ProcessStep(
+        id="STEP-M9-SMOKE-001",
+        name="Review monthly evidence",
+        action="Review and record the monthly evidence review in the Harbor Evidence Vault.",
+        performer_ids=[role.id],
+        trigger_ids=[trigger.id],
+        input_ids=[input_item.id],
+        output_ids=[output_item.id],
+        completion_condition_id=completion.id,
+        next_step_id="STEP-M9-SMOKE-001",
+        provenance=provenance,
+    )
+    objects = [*model.objects, role, trigger, input_item, output_item, completion, step]
+    sections = [
+        item.model_copy(update={"object_ids": [*item.object_ids, step.id]})
+        if item.section_id == section.section_id
+        else item
+        for item in model.sections
+    ]
+    return model.model_copy(update={"objects": objects, "sections": sections})
+
+
 def _analysis_with_one_owner_question(request: Any) -> FindingSet:
     finding = Finding(
         finding_id="F-M9-OWNER-001",
         category="ownership",
         severity=FindingSeverity.BLOCKER,
         finding_type=FindingType.MISSING,
-        target_template_section="SEC-PROCESS-CONTENT",
+        target_template_section=SMOKE_SECTION_ID,
         impact="The monthly evidence review needs an approved accountable role.",
         proposed_disposition="Ask the reviewer for the approved role.",
         requires_human_answer=True,
@@ -167,6 +249,120 @@ def _composer() -> PromptPackComposer:
     )
 
 
+def _canonical_json(value: object) -> bytes:
+    return json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+        default=str,
+    ).encode()
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _smoke_reference_pack(root: Path) -> Path:
+    """Create a one-section reference pack for the bounded live plumbing check."""
+
+    pack = root / "reference_pack"
+    if (pack / "manifest.yaml").is_file():
+        return pack
+    shutil.copytree(REFERENCE_PACK, pack)
+    template_path = pack / "templates/process/template.md"
+    requirements_path = pack / "templates/process/requirements.yaml"
+    rubric_path = pack / "rubrics/process.yaml"
+    template_path.write_text(
+        """---
+template_id: TPL-PROCESS-SMOKE-001
+document_type: process
+reference_pack: m9_smoke_core
+reference_pack_version: 1.0.0
+document_id: "{{ document.id }}"
+document_version: "{{ document.version }}"
+status: "{{ document.status }}"
+---
+
+<!-- AUTHORING: Bounded live smoke template. Do not use as enterprise production evidence. -->
+# {{ document.title }}
+
+## Purpose
+
+{{ sections.purpose }}
+""",
+        encoding="utf-8",
+    )
+    requirements_path.write_text(
+        """schema_version: "0.1"
+template_id: TPL-PROCESS-SMOKE-001
+document_type: process
+version: 1.0.0
+description: Bounded one-section process template used only for the M9 live plumbing smoke.
+rendering:
+  placeholder_syntax: "{{ dotted.path }}"
+  missing_value: TBD
+  authoring_comments: stripped
+sections:
+  - id: SEC-PROC-PURPOSE
+    heading: Purpose
+    order: 10
+    required: true
+    cardinality: one
+    expected_content: source-supported process purpose, owner, evidence location, and review action
+    ontology_hooks: [Process, Statement, Role, Evidence]
+    lint_rules: [purpose_is_explicit]
+    rubric_criteria: [COM-SCOPE-001]
+tables: []
+""",
+        encoding="utf-8",
+    )
+    rubric_path.write_text(
+        """schema_version: "0.1"
+rubric_id: RUBRIC-PROCESS-SMOKE-001
+version: 1.0.0
+document_type: process
+inherits: rubrics/common.yaml
+common_dimensions_retained: true
+criteria: []
+template_mappings:
+  - requirement_id: SEC-PROC-PURPOSE
+    criterion_ids: [COM-SCOPE-001]
+""",
+        encoding="utf-8",
+    )
+    parser = yaml_parser()
+    manifest_path = pack / "manifest.yaml"
+    manifest = parser.load(manifest_path.read_text(encoding="utf-8"))
+    manifest["pack_id"] = "m9_smoke_core"
+    manifest["version"] = "1.0.0"
+    manifest["description"] = "Bounded runtime reference pack for the M9 live post-review smoke."
+    manifest["supported_document_types"]["process"]["template"] = "templates/process/template.md"
+    manifest["supported_document_types"]["process"]["requirements"] = (
+        "templates/process/requirements.yaml"
+    )
+    for entry in manifest["files"]:
+        entry["sha256"] = _sha256_file(pack / entry["path"])
+    pack_payload = [
+        {"path": entry["path"], "sha256": entry["sha256"]}
+        for entry in sorted(manifest["files"], key=lambda item: item["path"])
+    ]
+    manifest["pack_sha256"] = hashlib.sha256(_canonical_json(pack_payload)).hexdigest()
+    manifest_for_digest = {
+        key: value
+        for key, value in manifest.items()
+        if key not in {"manifest_sha256", "pack_sha256"}
+    }
+    manifest["manifest_sha256"] = hashlib.sha256(_canonical_json(manifest_for_digest)).hexdigest()
+    with manifest_path.open("w", encoding="utf-8") as handle:
+        parser.dump(manifest, handle)
+    return pack
+
+
 def _services(
     root: Path,
     source: Path,
@@ -176,10 +372,8 @@ def _services(
     run_id: str | None = None,
 ) -> WorkflowServices:
     composer = _composer()
+    reference_pack = _smoke_reference_pack(root)
     routed_gateway = cast(GeminiModelGateway, gateway)
-    # Keeping the workflow reference-pack field unset creates exactly one synthetic target
-    # section for this thin plumbing probe. The model services still receive the governed prompt
-    # and reference context through the composer above.
     return WorkflowServices(
         run_root=root / "runs",
         source=source,
@@ -191,7 +385,7 @@ def _services(
         analysis_runner=_analysis_with_one_owner_question,
         question_generator=None,
         checklist_generator=GeminiChecklistGenerator(composer, routed_gateway),
-        rewrite_runner=GeminiGovernedRewriter(composer, routed_gateway),
+        rewrite_runner=SmokeProcessRewriter(GeminiGovernedRewriter(composer, routed_gateway)),
         content_auditor=GeminiContentAuditor(
             composer, routed_gateway, document_type=DocumentType.PROCESS
         ),
@@ -201,6 +395,7 @@ def _services(
         structure_mode="parser",
         gate2_enabled=True,
         offline=False,
+        reference_pack=reference_pack,
         auto_catalog_ingest=True,
         catalog_path=root / "catalog.sqlite3",
         embedding_profile=embedding.profile,

@@ -228,6 +228,52 @@ def test_model_render_and_sidecar_share_ids_and_explicit_open_issues(tmp_path: P
     assert issue_ids.isdisjoint({item.id for item in semantic.objects})
 
 
+def test_renderer_preserves_model_sections_not_referenced_by_template(tmp_path: Path) -> None:
+    normalized = _normalized(tmp_path)
+    sections = [
+        {
+            "id": "SEC-PROCESS-CONTENT",
+            "heading": "Document content",
+            "anchor": "document-content",
+        }
+    ]
+    ledger = build_content_ledger(
+        normalized,
+        document_id="DOC-M6-EXTRA-SECTION",
+        target_sections=sections,
+    )
+    inputs = build_rewrite_inputs(normalized, ledger, sections=sections)
+    model = build_enhanced_document(
+        inputs,
+        document_id="DOC-M6-EXTRA-SECTION",
+        document_type=DocumentType.PROCESS,
+        ledger=ledger,
+    )
+    section = model.sections[0]
+    model = model.model_copy(
+        update={
+            "sections": [
+                section.model_copy(
+                    update={
+                        "body": section.body
+                        + "\n<!-- authoring-only -->\nLiteral {{owner}} marker."
+                    }
+                )
+            ]
+        }
+    )
+
+    markdown = render_enhanced_markdown(
+        model, reference_pack=Path("reference_packs/enterprise_core")
+    )
+
+    assert "## Additional governed sections" in markdown
+    assert "### Document content" in markdown
+    assert "The process starts each month." in markdown
+    assert "&lt;!-- authoring-only --&gt;" in markdown
+    assert r"\{\{owner\}\}" in markdown
+
+
 def test_mermaid_revision_budget_and_fail_closed_exhaustion() -> None:
     diagram = MermaidDiagram(
         diagram_id="DIAG-M6-FLOW",

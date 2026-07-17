@@ -29,7 +29,7 @@ from document_enhancer.clarification import (
 from document_enhancer.config import yaml_parser
 from document_enhancer.domain.analysis import AnalysisReport, FindingSet
 from document_enhancer.domain.audit import Audit
-from document_enhancer.domain.enums import DocumentType
+from document_enhancer.domain.enums import DocumentType, QuestionStatus
 from document_enhancer.domain.questions import (
     AnswersArtifact,
     ContentLedger,
@@ -695,6 +695,31 @@ def _load_reviewer_inputs(
     return questions, answers, steering, waivers
 
 
+def _content_audit_reviewer_inputs(answers: AnswersArtifact) -> dict[str, object]:
+    approved_answers: list[dict[str, object]] = []
+    for answer in answers.answers:
+        if answer.status is not QuestionStatus.ANSWERED:
+            continue
+        approved_answers.append(
+            {
+                "answer_id": answer.answer_id,
+                "question_id": answer.question_id,
+                "answer": answer.answer,
+                "responder": answer.responder,
+                "evidence_reference": answer.evidence_reference,
+                "new_semantic_objects": [
+                    {
+                        "id": item.id,
+                        "entity_type": item.entity_type.value,
+                        "name": item.name,
+                    }
+                    for item in answer.new_semantic_objects
+                ],
+            }
+        )
+    return {"approved_answers": approved_answers}
+
+
 def gate1_node(state: WorkflowState, services: WorkflowServices) -> WorkflowState:
     questions, answers, steering, waivers = _load_reviewer_inputs(state, services)
     raw = _as_raw(state["raw"])
@@ -1120,7 +1145,7 @@ def audit_node(state: WorkflowState, services: WorkflowServices) -> WorkflowStat
     if not enhanced_path.is_file():
         raise ValidationError("enhanced Markdown is missing before audit")
     counters = _as_revision_counters(state.get("revision_counters"), services)
-    _questions, _answers, _steering, waivers = _load_reviewer_inputs(state, services)
+    _questions, answers, _steering, waivers = _load_reviewer_inputs(state, services)
     state["waivers"] = waivers
     audit = build_audit(
         run_id=str(state["run_id"]),
@@ -1133,6 +1158,7 @@ def audit_node(state: WorkflowState, services: WorkflowServices) -> WorkflowStat
         counters=counters,
         requirements=_m7_requirements(services),
         waivers=waivers,
+        reviewer_inputs=_content_audit_reviewer_inputs(answers),
         content_auditor=services.content_auditor,
     )
     state["audit_result"] = audit

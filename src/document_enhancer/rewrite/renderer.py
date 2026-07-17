@@ -13,6 +13,7 @@ from .mermaid import generate_mermaid
 from .models import EnhancedDocumentModel, StructuredTable
 
 _TABLE_ROW_RE = re.compile(r"(?m)^\|[^\n]*\{\{\s*tables\.([A-Za-z0-9_-]+)\s*\}\}[^\n]*\|\s*$")
+_SECTION_PLACEHOLDER_RE = re.compile(r"\{\{\s*sections\.([A-Za-z0-9_-]+)\s*\}\}")
 _MERMAID_BLOCK_RE = re.compile(r"```mermaid\s+.*?```", re.DOTALL | re.IGNORECASE)
 
 
@@ -48,6 +49,23 @@ def _additional_tables(model: EnhancedDocumentModel, template: str) -> str:
                 "",
             ]
         )
+    return "\n".join(blocks)
+
+
+def _additional_sections(model: EnhancedDocumentModel, template: str) -> str:
+    rendered_keys = set(_SECTION_PLACEHOLDER_RE.findall(template))
+    extra = [
+        section
+        for section in model.sections
+        if section.anchor not in rendered_keys and section.section_id not in rendered_keys
+    ]
+    if not extra:
+        return ""
+    blocks = ["## Additional governed sections", ""]
+    for section in extra:
+        heading = render_template_text("{{ value }}", {"value": section.heading}).strip()
+        body = render_template_text("{{ value }}", {"value": section.body}).strip()
+        blocks.extend([f"### {heading}", "", body, ""])
     return "\n".join(blocks)
 
 
@@ -126,6 +144,9 @@ def render_enhanced_markdown(
 
     template = _MERMAID_BLOCK_RE.sub(mermaid_replace, template)
     rendered = render_template_text(template, _payload(model))
+    additional_sections = _additional_sections(model, template)
+    if additional_sections:
+        rendered = rendered.rstrip() + "\n\n" + additional_sections
     rendered = rendered.rstrip() + "\n\n" + _additional_tables(model, template)
     rendered = rendered.rstrip() + "\n\n" + _table_index(model)
     rendered = rendered.rstrip() + "\n"

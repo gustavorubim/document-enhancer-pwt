@@ -333,6 +333,11 @@ class _NegativeAuditor:
         )
 
 
+class _UnavailableAuditor:
+    def audit(self, request: ContentAuditRequest) -> IndependentAuditResult:
+        raise RuntimeError(f"provider unavailable for {request.document_id}")
+
+
 def test_independent_auditor_is_isolated_evidence_linked_and_cannot_override_determinism(
     tmp_path: Path,
 ) -> None:
@@ -350,6 +355,7 @@ def test_independent_auditor_is_isolated_evidence_linked_and_cannot_override_det
         "semantic_document",
         "checklist_digest",
         "steering_digest",
+        "reviewer_inputs",
     }
 
     with pytest.raises(PydanticValidationError):
@@ -392,6 +398,18 @@ def test_independent_auditor_is_isolated_evidence_linked_and_cannot_override_det
             chunks=build_chunks(model),
             audit=failed,
         )
+
+
+def test_unavailable_independent_auditor_routes_to_human_review_not_auto_revision(
+    tmp_path: Path,
+) -> None:
+    audit, _ = _audit(tmp_path, content_auditor=_UnavailableAuditor())
+
+    assert audit.independent_audit.status == "unavailable"
+    assert audit.independent_audit.provider == "_UnavailableAuditor"
+    assert audit.routing.blocker_ids == ["INDEPENDENT-AUDIT-NOT-PASSED"]
+    assert audit.routing.route == "human_review"
+    assert audit.status is AuditStatus.WAITING
 
 
 def test_auto_revision_routing_is_bounded_and_exhaustion_fails_closed(tmp_path: Path) -> None:

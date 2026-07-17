@@ -102,7 +102,7 @@ file_digests:
   analysis/rag-readiness.md: 0b7979f88719289fc98dec5f059fc19c77402ea345b79f366dea2538c97053d1
   analysis/sections.md: 5e523f5ae64ff0a0c78f4147fdd7c291ceb510706ba7a6e5df1e85fc1a92a309
   analysis/synthesize-findings.md: 66b05c01f84317fd46addbad1b6dd4e0754028e22a5a3274106d3181e56b7a92
-  audit/content-fidelity.md: 24318ca0ba89520121f9c77cddf96681b1b08645daf733f9475a2d70d4b8bed8
+  audit/content-fidelity.md: e33ef67bcdb94ef9118b3f8db8d2f87be228417293e91de1dddd32b47c96aac1
   audit/remediation-routing.md: aad1588c9bd94cd173e8d23a2ad70c860721da474af30cc2009fbcf997a61118
   clarification/questions.md: 5f93094f593d75e577f37bbc2e923c2aa8f9afccc2a1713421981e8fc654b587
   clarification/rewrite-checklist.md: eb9cdc3fca09009753aba679dab64c0761638c9be67409c4c96b8c8d8a7ae436

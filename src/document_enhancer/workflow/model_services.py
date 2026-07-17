@@ -12,9 +12,9 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from functools import partial
 from hashlib import sha256
-from typing import Any, cast
+from typing import Any, Literal, cast
 
-from pydantic import BaseModel, Field, StrictStr
+from pydantic import BaseModel, Field, StrictBool, StrictStr
 
 from document_enhancer.audit import (
     AuditIssueResolutionPatch,
@@ -24,7 +24,12 @@ from document_enhancer.audit import (
 )
 from document_enhancer.audit.content import ContentAuditRequest
 from document_enhancer.domain.analysis import AnalysisReport, EvidenceQuote, Finding, FindingSet
-from document_enhancer.domain.audit import Audit, IndependentAuditResult
+from document_enhancer.domain.audit import (
+    Audit,
+    AuditEvidence,
+    ContentAuditFinding,
+    IndependentAuditResult,
+)
 from document_enhancer.domain.base import StrictModel
 from document_enhancer.domain.enums import ChecklistAction, DocumentType
 from document_enhancer.domain.questions import (
@@ -114,10 +119,30 @@ class _SectionRewriteProposal(StrictModel):
     open_issue_ids: list[StrictStr] = Field(default_factory=list)
 
 
-class _GeminiIndependentAuditResult(IndependentAuditResult):
+class _AuditEvidenceProposal(StrictModel):
+    locator: StrictStr
+    quote: StrictStr | None = None
+    digest: StrictStr | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+
+
+class _ContentAuditFindingProposal(StrictModel):
+    category: StrictStr
+    severity: Literal["low", "medium", "high", "blocker"]
+    summary: StrictStr
+    blocking: StrictBool = False
+    auto_revisable: StrictBool = False
+    source_evidence: list[_AuditEvidenceProposal] = Field(min_length=1)
+    output_evidence: list[_AuditEvidenceProposal] = Field(min_length=1)
+    proposed_disposition: StrictStr
+
+
+class _IndependentAuditProposal(StrictModel):
+    status: Literal["pass", "fail", "unavailable"]
+    findings: list[_ContentAuditFindingProposal] = Field(default_factory=list)
+
     @classmethod
     def model_json_schema(cls, *args: Any, **kwargs: Any) -> dict[str, Any]:
-        return _provider_schema(IndependentAuditResult.model_json_schema(*args, **kwargs))
+        return _provider_schema(super().model_json_schema(*args, **kwargs))
 
 
 class _AuditRevisionPatchProposal(StrictModel):
@@ -377,6 +402,85 @@ def _promote_section_rewrite(
     )
 
 
+def _promote_audit_evidence(
+    proposal: _AuditEvidenceProposal,
+    *,
+    artifact: str,
+    artifact_text: str,
+) -> AuditEvidence:
+    quote = proposal.quote if proposal.quote and proposal.quote in artifact_text else None
+    # Persist exact model quotes only when they are grounded. Otherwise fall back to the
+    # deterministic artifact digest and drop the unverified quote.
+    return AuditEvidence(
+        artifact=artifact,
+        locator=proposal.locator,
+        quote=quote,
+        digest=None if quote is not None else sha256(artifact_text.encode("utf-8")).hexdigest(),
+    )
+
+
+def _promote_independent_audit(
+    request: ContentAuditRequest,
+    value: object,
+) -> IndependentAuditResult:
+    proposal = _IndependentAuditProposal.model_validate(value)
+    findings: list[ContentAuditFinding] = []
+    for index, finding in enumerate(proposal.findings, start=1):
+        source_evidence = [
+            _promote_audit_evidence(
+                item,
+                artifact=request.source_artifact,
+                artifact_text=request.source_markdown,
+            )
+            for item in finding.source_evidence
+        ]
+        output_evidence = [
+            _promote_audit_evidence(
+                item,
+                artifact=request.output_artifact,
+                artifact_text=request.enhanced_markdown,
+            )
+            for item in finding.output_evidence
+        ]
+        seed = _json(
+            {
+                "document_id": request.document_id,
+                "index": index,
+                "category": finding.category,
+                "summary": finding.summary,
+                "source": [item.model_dump(mode="json") for item in source_evidence],
+                "output": [item.model_dump(mode="json") for item in output_evidence],
+            }
+        )
+        findings.append(
+            ContentAuditFinding(
+                finding_id=f"F-AUDIT-{sha256(seed.encode('utf-8')).hexdigest()[:16].upper()}",
+                category=finding.category,
+                severity=finding.severity,
+                summary=finding.summary,
+                blocking=finding.blocking,
+                auto_revisable=finding.auto_revisable,
+                source_evidence=source_evidence,
+                output_evidence=output_evidence,
+                proposed_disposition=finding.proposed_disposition,
+            )
+        )
+    audit_seed = _json(
+        {
+            "document_id": request.document_id,
+            "status": proposal.status,
+            "finding_ids": [finding.finding_id for finding in findings],
+        }
+    )
+    return IndependentAuditResult(
+        audit_id=f"INDAUD-{sha256(audit_seed.encode('utf-8')).hexdigest()[:16].upper()}",
+        status=proposal.status,
+        findings=findings,
+        provider=f"google/{ROUTE_FLASH}",
+        isolated_context=True,
+    )
+
+
 def _promote_audit_revision(
     model: EnhancedDocumentModel,
     audit: Audit,
@@ -386,6 +490,46 @@ def _promote_audit_revision(
     proposal = _AuditRevisionPatchProposal.model_validate(raw)
     patches = AuditRevisionPatchSet.model_validate(proposal.model_dump(mode="python"))
     return apply_audit_revision_patches(model, audit, patches)
+
+
+def _audit_revision_prompt_input(audit: Audit) -> dict[str, object]:
+    """Keep revision prompts focused on approved blockers, not full audit diffs."""
+
+    blocker_ids = set(audit.routing.blocker_ids)
+    deterministic_blockers = [
+        check.model_dump(
+            mode="json",
+            include={
+                "check_id",
+                "name",
+                "category",
+                "details",
+                "evidence",
+                "auto_revisable",
+            },
+        )
+        for check in audit.deterministic_checks
+        if check.blocking and not check.passed and check.check_id in blocker_ids
+    ]
+    content_findings = [
+        finding.model_dump(mode="json")
+        for finding in audit.independent_audit.findings
+        if finding.blocking and finding.finding_id in blocker_ids
+    ]
+    return {
+        "audit_id": audit.audit_id,
+        "document_id": audit.document_id,
+        "version_id": audit.version_id,
+        "routing": audit.routing.model_dump(mode="json"),
+        "independent_audit": {
+            "audit_id": audit.independent_audit.audit_id,
+            "status": audit.independent_audit.status,
+            "provider": audit.independent_audit.provider,
+        },
+        "deterministic_blockers": deterministic_blockers,
+        "content_findings": content_findings,
+        "unresolved_issue_ids": audit.unresolved_issue_ids,
+    }
 
 
 def _invoke(
@@ -615,13 +759,15 @@ class GeminiContentAuditor:
         self.document_type = document_type
 
     def audit(self, request: ContentAuditRequest) -> IndependentAuditResult:
+        source_digest = sha256(request.source_markdown.encode("utf-8")).hexdigest()
+        enhanced_digest = sha256(request.enhanced_markdown.encode("utf-8")).hexdigest()
         artifact = _invoke(
             self.composer,
             self.gateway,
             prompt_id=self.prompt_id,
             route=ROUTE_FLASH,
             output_schema="independent-audit.schema.json",
-            schema=_GeminiIndependentAuditResult,
+            schema=_IndependentAuditProposal,
             variables={
                 "document_type": self.document_type.value,
                 "document_metadata": {"document_id": request.document_id},
@@ -631,21 +777,16 @@ class GeminiContentAuditor:
                     {
                         "checklist_digest": request.checklist_digest,
                         "steering_digest": request.steering_digest,
+                        **request.reviewer_inputs,
                     }
                 ),
             },
             stage="independent_content_fidelity_audit",
+            input_digests=(source_digest, enhanced_digest),
+            promote=partial(_promote_independent_audit, request),
+            result_schema=IndependentAuditResult,
         )
-        for finding in artifact.findings:
-            for evidence in finding.source_evidence:
-                if evidence.quote and evidence.quote not in request.source_markdown:
-                    raise ValidationError("content auditor cited source text that is not present")
-            for evidence in finding.output_evidence:
-                if evidence.quote and evidence.quote not in request.enhanced_markdown:
-                    raise ValidationError("content auditor cited output text that is not present")
-        return artifact.model_copy(
-            update={"provider": f"google/{ROUTE_FLASH}", "isolated_context": True}
-        )
+        return IndependentAuditResult.model_validate(artifact)
 
 
 class GeminiAuditRevisionRunner:
@@ -663,6 +804,7 @@ class GeminiAuditRevisionRunner:
         self.document_type = document_type
 
     def revise(self, model: EnhancedDocumentModel, audit: Audit) -> EnhancedDocumentModel:
+        audit_input = _audit_revision_prompt_input(audit)
         revised = _invoke(
             self.composer,
             self.gateway,
@@ -674,11 +816,11 @@ class GeminiAuditRevisionRunner:
                 "document_type": self.document_type.value,
                 "document_metadata": {"document_id": model.document.id},
                 "enhanced_document": _json(model),
-                "audit_findings": _json(audit),
+                "audit_findings": _json(audit_input),
                 "reviewer_inputs": "",
             },
             stage="bounded_revision",
-            input_digests=(_json_digest(model), _json_digest(audit)),
+            input_digests=(_json_digest(model), _json_digest(audit_input)),
             promote=partial(_promote_audit_revision, model, audit),
             result_schema=EnhancedDocumentModel,
         )

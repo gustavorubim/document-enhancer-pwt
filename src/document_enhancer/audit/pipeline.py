@@ -39,6 +39,7 @@ def build_audit(
     counters: RevisionCounters,
     requirements: Mapping[str, object] | None = None,
     waivers: WaiversArtifact | None = None,
+    reviewer_inputs: Mapping[str, object] | None = None,
     content_auditor: ContentAuditor | None = None,
 ) -> Audit:
     checks = run_deterministic_audit(
@@ -68,6 +69,7 @@ def build_audit(
                     source_markdown=source_markdown,
                     enhanced_markdown=enhanced_markdown,
                     semantic_document=semantic,
+                    reviewer_inputs=dict(reviewer_inputs or {}),
                 )
             )
         except Exception:
@@ -94,9 +96,10 @@ def build_audit(
     ]
     if independent.status != "pass" and not content_blockers:
         blocker_ids.append("INDEPENDENT-AUDIT-NOT-PASSED")
+    auto_revision_candidates = [*deterministic_blockers, *content_blockers]
     auto_revisable = (
-        bool(blocker_ids)
-        and all(item.auto_revisable for item in [*deterministic_blockers, *content_blockers])
+        bool(auto_revision_candidates)
+        and all(item.auto_revisable for item in auto_revision_candidates)
         and not unresolved_ids
     )
     remaining = max(0, counters.max_audit_revisions - counters.audit_revision)

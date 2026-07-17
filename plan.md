@@ -1,6 +1,6 @@
 # Document Enhancer implementation plan
 
-Status: M0-M8 offline implementation complete; M9 live-provider boundary remediation planned
+Status: M0-M9 implementation and bounded live-provider plumbing verification complete
 
 Repository state when written: empty Git repository
 
@@ -1822,24 +1822,38 @@ offline release gate and clean-clone proof pass.
 
 ### 30.4 Task checklist
 
-- [ ] M9.1 Add minimal discovery object and relationship DTOs containing semantic judgments, local keys, exact span references, and optional model confidence only.
-- [ ] M9.2 Add deterministic discovery promotion that allocates stable provisional IDs, canonical prefixes, provenance infrastructure, layers/review states, endpoint types, and edge IDs.
-- [ ] M9.3 Quarantine item-level promotion failures with safe structured reasons; never fabricate missing confidence or silently omit failed candidates.
-- [ ] M9.4 Replace the discovery persistence-schema projection with the DTO/promoter boundary and prove repeated identical inputs produce identical promoted IDs and graph artifacts.
-- [ ] M9.5 Add an optional post-parse promotion/validation callback inside the bounded gateway attempt loop.
-- [ ] M9.6 Feed one correction attempt only sanitized `location`, `error type`, and `message` fields; exclude input values, source text, prompts, credentials, and host paths.
-- [ ] M9.7 Record distinct attempt/prompt digests, repair count, and safe error class; prove failed parsing or promotion cannot populate the response cache.
-- [ ] M9.8 Replace broad stage scopes with the minimum governed references: macro gets rubrics/governance; section mapping gets template structure; discovery gets ontology and relevant template requirements; RAG readiness gets retrieval/ontology context; synthesis gets finding rules.
-- [ ] M9.9 Send the question generator the deterministic baseline questions/findings rather than the complete analysis-run object and redundant full source; send checklist generation only the governed questions, answers, steering, waivers, and template requirements.
-- [ ] M9.10 Calibrate prompt budgets against `enterprise_core` 2.0 compositions and add budget-relative regression tests instead of fixed prompt-length heuristics.
-- [ ] M9.11 Replace full-document audit revision output with a narrow patch DTO keyed to existing section/issue IDs and evidence handles.
-- [ ] M9.12 Apply revision patches deterministically, reject unknown targets/unsupported fields, and re-run complete enhanced-document and audit validation before acceptance.
-- [ ] M9.13 Persist each successful analysis branch and its safe call manifest before fan-in; preserve failures/quarantines as explicit stage artifacts.
-- [ ] M9.14 Keep required analysis completion fail-closed while allowing Gate-1 reviewers to inspect successful sibling evidence and the exact unresolved stage.
-- [ ] M9.15 Pass offline recorded-provider integration tests across discovery, questions, checklist, section rewrite, independent audit, patch revision, checkpoint/resume, and cache invalidation.
-- [ ] M9.16 Pass limited live route/schema compatibility and one severe fictional document through structure recovery, all analysis branches, question synthesis, and the Gate-1 pause without retries or fallback where practical.
-- [ ] M9.17 Pass a thin fictional post-review workflow through checklist, one Pro section rewrite, independent Flash audit, Gemini embedding, SQLite promotion, and one cited Rich CLI answer; record routes, attempts, tokens, latency, and unavailable cost honestly.
-- [ ] M9.18 Run the full fail-fast integration gate, clean-clone/wheel proof, update `README.md`, this plan, evaluations, and `FOLLOW_UP.md`, push main, and remove completed M9 worktrees.
+- [x] M9.1 Add minimal discovery object and relationship DTOs containing semantic judgments, local keys, exact span references, and optional model confidence only.
+- [x] M9.2 Add deterministic discovery promotion that allocates stable provisional IDs, canonical prefixes, provenance infrastructure, layers/review states, endpoint types, and edge IDs.
+- [x] M9.3 Quarantine item-level promotion failures with safe structured reasons; never fabricate missing confidence or silently omit failed candidates.
+- [x] M9.4 Replace the discovery persistence-schema projection with the DTO/promoter boundary and prove repeated identical inputs produce identical promoted IDs and graph artifacts.
+- [x] M9.5 Add an optional post-parse promotion/validation callback inside the bounded gateway attempt loop.
+- [x] M9.6 Feed one correction attempt only sanitized `location`, `error type`, and `message` fields; exclude input values, source text, prompts, credentials, and host paths.
+- [x] M9.7 Record distinct attempt/prompt digests, repair count, and safe error class; prove failed parsing or promotion cannot populate the response cache.
+- [x] M9.8 Replace broad stage scopes with the minimum governed references: macro gets rubrics/governance; section mapping gets template structure; discovery gets ontology and relevant template requirements; RAG readiness gets retrieval/ontology context; synthesis gets finding rules.
+- [x] M9.9 Send the question generator the deterministic baseline questions/findings rather than the complete analysis-run object and redundant full source; send checklist generation only the governed questions, answers, steering, waivers, and template requirements.
+- [x] M9.10 Calibrate prompt budgets against `enterprise_core` 2.0 compositions and add budget-relative regression tests instead of fixed prompt-length heuristics.
+- [x] M9.11 Replace full-document audit revision output with a narrow patch DTO keyed to existing section/issue IDs and evidence handles.
+- [x] M9.12 Apply revision patches deterministically, reject unknown targets/unsupported fields, and re-run complete enhanced-document and audit validation before acceptance.
+- [x] M9.13 Persist each successful analysis branch and its safe call manifest before fan-in; preserve failures/quarantines as explicit stage artifacts.
+- [x] M9.14 Keep required analysis completion fail-closed while allowing Gate-1 reviewers to inspect successful sibling evidence and the exact unresolved stage.
+- [x] M9.15 Pass offline recorded-provider integration tests across discovery, questions, checklist, section rewrite, independent audit, patch revision, checkpoint/resume, and cache invalidation.
+- [x] M9.16 Pass limited live route/schema compatibility and one severe fictional document through structure recovery, all analysis branches, question synthesis, and the Gate-1 pause without retries or fallback where practical.
+- [x] M9.17 Pass a thin fictional post-review workflow through checklist, one Pro section rewrite, independent Flash audit, Gemini embedding, SQLite promotion, and one cited Rich CLI answer; record routes, attempts, tokens, latency, and unavailable cost honestly.
+- [x] M9.18 Run the full fail-fast integration gate, clean-clone/wheel proof, update `README.md`, this plan, evaluations, and `FOLLOW_UP.md`, push main, and remove completed M9 worktrees.
+
+Acceptance: the provider boundary is narrow, application-owned identities and provenance are
+promoted deterministically, invalid proposals remain visible, and the fictional live path reaches
+audited RAG output. **Verified 2026-07-16 in the M9 closure: the integrated gate passed with 341
+tests and 2 explicit opt-in tests deselected, plus frozen sync, Ruff format/check, `ty`, schema,
+reference/prompt-pack, fixture/evaluation drift, build, and diff checks. The bounded post-review
+live smoke completed checklist, one section rewrite, independent audit, four document embeddings,
+one query embedding, SQLite promotion, and grounded retrieval. Its three model calls used
+`gemini-3.1-flash-lite`, `gemini-3.1-pro-preview`, and `gemini-3.5-flash`, each in one attempt with
+zero retries or structured repairs; total recorded usage was 32,180 input and 1,109 output tokens,
+and provider cost was honestly unavailable. A separate real `docenhance rag ask --explain` command
+returned exit 0, a resolvable citation, and `Grounding passed: True`. This is fictional plumbing
+evidence, not representative enterprise-quality evidence; that evaluation remains in
+`FOLLOW_UP.md`. The exact verified closure SHA is recorded in the release handoff.**
 
 ### 30.5 Acceptance and testing boundary
 

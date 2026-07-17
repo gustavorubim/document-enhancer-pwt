@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from collections.abc import Mapping
 from pathlib import Path
@@ -366,6 +367,63 @@ def test_recorded_provider_boundary_from_discovery_through_audit_revision_and_re
         provider="recorded-provider",
         isolated_context=True,
     )
+    source_proposal_quote = "The Forecast Analyst completes the approved monthly close."
+    independent_proposal = {
+        "status": independent.status,
+        "findings": [
+            {
+                "category": independent_finding.category,
+                "severity": independent_finding.severity,
+                "summary": independent_finding.summary,
+                "blocking": independent_finding.blocking,
+                "auto_revisable": independent_finding.auto_revisable,
+                "source_evidence": [
+                    {
+                        "locator": evidence.locator,
+                        "quote": source_proposal_quote,
+                    }
+                    for evidence in independent_finding.source_evidence
+                ],
+                "output_evidence": [
+                    {
+                        "locator": evidence.locator,
+                        "quote": evidence.quote,
+                    }
+                    for evidence in independent_finding.output_evidence
+                ],
+                "proposed_disposition": independent_finding.proposed_disposition,
+            }
+        ],
+    }
+    source_artifact_digest = hashlib.sha256(
+        normalized.normalized_markdown.encode("utf-8")
+    ).hexdigest()
+    audit_finding_seed = json.dumps(
+        {
+            "document_id": DOCUMENT_ID,
+            "index": 1,
+            "category": independent_finding.category,
+            "summary": independent_finding.summary,
+            "source": [
+                {
+                    "artifact": "source/normalized.md",
+                    "digest": source_artifact_digest,
+                    "locator": evidence.locator,
+                    "quote": None,
+                }
+                for evidence in independent_finding.source_evidence
+            ],
+            "output": [
+                evidence.model_dump(mode="json") for evidence in independent_finding.output_evidence
+            ],
+        },
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+    promoted_audit_finding_id = (
+        f"F-AUDIT-{hashlib.sha256(audit_finding_seed.encode('utf-8')).hexdigest()[:16].upper()}"
+    )
     revised_body = rewrite_draft.body + " Evidence is retained in the approved close record."
     valid_patch = AuditRevisionPatchSet(
         section_patches=[
@@ -373,7 +431,7 @@ def test_recorded_provider_boundary_from_discovery_through_audit_revision_and_re
                 section_id=rewrite_input.section_id,
                 revised_body=revised_body,
                 evidence_span_ids=[rewrite_input.allowed_source_span_ids[0]],
-                audit_finding_ids=[AUDIT_FINDING_ID],
+                audit_finding_ids=[promoted_audit_finding_id],
             )
         ]
     )
@@ -403,7 +461,7 @@ def test_recorded_provider_boundary_from_discovery_through_audit_revision_and_re
                 "approved_answer_ids": rewrite_draft.approved_answer_ids,
                 "open_issue_ids": rewrite_draft.open_issue_ids,
             },
-            independent.model_dump(mode="json"),
+            independent_proposal,
             {"section_patches": [], "issue_resolutions": []},
             valid_patch.model_dump(mode="json"),
         ],
@@ -541,6 +599,12 @@ def test_recorded_provider_boundary_from_discovery_through_audit_revision_and_re
     assert audited.status == "fail"
     assert audited.provider == f"google/{ROUTE_FLASH}"
     assert audited.isolated_context is True
+    assert audited.findings[0].finding_id == promoted_audit_finding_id
+    assert audited.findings[0].source_evidence[0].quote is None
+    assert (
+        audited.findings[0].source_evidence[0].digest
+        == hashlib.sha256(normalized.normalized_markdown.encode("utf-8")).hexdigest()
+    )
 
     audit = Audit(
         audit_id="AUDIT-M9-001",
@@ -551,7 +615,7 @@ def test_recorded_provider_boundary_from_discovery_through_audit_revision_and_re
         routing=AuditRoutingDecision(
             route="auto_revise",
             reason="the recorded blocker is source-supported and auto-revisable",
-            blocker_ids=[AUDIT_FINDING_ID],
+            blocker_ids=[promoted_audit_finding_id],
             audit_revision=0,
             remaining_audit_revisions=1,
         ),
@@ -624,18 +688,19 @@ def test_recorded_provider_boundary_from_discovery_through_audit_revision_and_re
         "open_issue_ids",
     }
     assert _schema_properties(calls_by_stage["independent_content_fidelity_audit"][0]) == {
-        "audit_id",
         "status",
         "findings",
-        "provider",
-        "isolated_context",
-        "generated_at",
     }
     assert _schema_properties(calls_by_stage["bounded_revision"][0]) == {
         "section_patches",
         "issue_resolutions",
     }
     corrective_prompt = str(calls_by_stage["bounded_revision"][1]["prompt"])
+    revision_prompt = str(calls_by_stage["bounded_revision"][0]["prompt"])
+    assert '"content_findings"' in revision_prompt
+    assert '"textual_diff"' not in revision_prompt
+    assert '"semantic_diff"' not in revision_prompt
+    assert '"source_to_target"' not in revision_prompt
     assert "DOCUMENT_ENHANCER_VALIDATION_FEEDBACK" in corrective_prompt
     assert "SEC-PROC-UNKNOWN" not in corrective_prompt
     assert "This invalid target must never enter the response cache." not in corrective_prompt

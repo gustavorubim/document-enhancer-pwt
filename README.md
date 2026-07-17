@@ -11,13 +11,12 @@ catalog, and the Rich CLI performs explainable retrieval and grounded cited Q&A 
 
 ## Verified status
 
-M0–M8 and the repository-level Definition of Done are verified as of 2026-07-16. The complete
-post-integration offline gate passed on governed-workflow merge `2b46d21`: 268 tests passed and 2
-explicit opt-in tests were deselected; frozen sync, import smoke, Ruff format/check, ty, generated
-schemas, both governed packs, all 60 generated corpus files, both evaluation artifacts, package
-build, and diff checks also passed. All 21 deterministic offline release thresholds passed across
-48 fixture-format evaluations. A separate temporary clean-clone and isolated-wheel proof passed at
-`5b763b8`.
+M0–M9 and the repository-level Definition of Done are verified as of 2026-07-16. The final M9
+integration gate passed with 341 tests and 2 explicit opt-in tests deselected; frozen sync, Ruff
+format/check, `ty`, generated schemas, both governed packs, all 60 generated corpus files, both
+evaluation artifacts, package build, and diff checks also passed. All 21 deterministic offline
+release thresholds continue to pass across 48 fixture-format evaluations. The exact final
+clean-clone and isolated-wheel SHA is recorded in the release handoff.
 
 The actual two-gate CLI workflow also completed for the checked-in `enterprise_core` process,
 methodology, standard, and desktop-procedure examples. Every run passed strict audit, built a valid
@@ -26,9 +25,18 @@ and produced a grounded cited answer. The companion negative case proves that in
 input still fails closed without promoting RAG state. See the
 [operator guide](docs/operator-guide.md), [release proof](docs/release.md), and
 [evaluation report](evals/reports/m8-evaluation.md) for exact workflows and limitations. These are
-controlled offline results, not claims about live Gemini quality or public-source generalization;
-all governed proof runs recorded zero Gemini calls and zero public downloads, and live-model and
-public-download evaluations remain explicit opt-in checks that were not run.
+controlled offline results: those M8 governed proof runs recorded zero Gemini calls and zero public
+downloads.
+
+M9 separately adds bounded live-provider plumbing evidence over fictional content. The post-review
+smoke completed a Flash Lite checklist, one Pro section rewrite, an independent Flash audit,
+Gemini Embedding 2 document/query embeddings, validated SQLite promotion, and grounded retrieval.
+All three generation calls succeeded in one attempt with zero retries or structured repairs; the
+recorded total was 32,180 input and 1,109 output tokens, while provider cost remained unavailable.
+A separate real Rich `rag ask --explain` invocation exited successfully with a resolvable citation
+and `Grounding passed: True`. This proves route/schema/integration plumbing only. Representative
+enterprise-document quality, OCR, portfolio scale, and production security remain explicit
+follow-ups rather than implied release claims.
 
 ## Quick start
 
@@ -371,6 +379,26 @@ For the stronger release proof, run `scripts/verify_release.sh HEAD`; it repeats
 temporary clean clone and then validates the built wheel from a separate isolated environment.
 The checked-in offline evaluation report and exact limitations are in
 `evals/reports/m8-evaluation.md`.
+
+The opt-in fictional M9 post-review smoke requires an exported Gemini credential and explicit live
+enablement. It writes only local, ignored artifacts and a sanitized evidence summary:
+
+```bash
+export DOCENHANCE_RUN_LIVE=1
+export DOCENHANCE_BACKEND=developer_api
+uv run python scripts/run_live_postreview_smoke.py \
+  --output .document-enhancer/m9-live-postreview \
+  --force --json
+
+uv run docenhance rag ask \
+  "Who owns the monthly evidence review?" \
+  --catalog .document-enhancer/m9-live-postreview/catalog.sqlite3 \
+  --explain
+```
+
+The smoke harness keeps its final RAG answer deterministic to isolate post-review generation and
+embedding contracts. The second command deliberately verifies the actual configured live RAG CLI
+boundary over the resulting catalog.
 
 Compatibility tests are offline by default. They validate the installed LangChain, LangGraph, Deep Agents, SQLite FTS5, sqlite-vec, and adapter shapes without sending document content anywhere. Live Gemini structured-output and embedding profile checks are separately marked `live_model` and require explicit opt-in.
 

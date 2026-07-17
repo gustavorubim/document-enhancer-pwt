@@ -11,8 +11,10 @@ from time import perf_counter
 from typing import Any, Protocol, TypedDict, cast
 
 from langgraph.graph import END, START, StateGraph
+from pydantic import BaseModel, Field, StrictStr
 
 from document_enhancer.contracts import ModelGateway
+from document_enhancer.domain.base import StrictModel
 from document_enhancer.domain.enums import RagAnswerStatus
 from document_enhancer.domain.run import ClaimCitation, RagAnswer, RagCitation, RagQuery
 from document_enhancer.prompting.composer import PromptPackComposer
@@ -27,6 +29,85 @@ from .models import (
 )
 from .retrievers import HybridRetriever
 from .retrievers.base import generation
+
+_UNSUPPORTED_GEMINI_SCHEMA_KEYS = {
+    "discriminator",
+    "exclusiveMaximum",
+    "exclusiveMinimum",
+    "maxLength",
+    "maximum",
+    "minLength",
+    "minimum",
+    "multipleOf",
+    "pattern",
+    "uniqueItems",
+}
+
+
+def _provider_schema(value: Any) -> Any:
+    if isinstance(value, list):
+        return [_provider_schema(item) for item in value]
+    if not isinstance(value, dict):
+        return value
+    cleaned: dict[str, Any] = {}
+    for original_key, item in value.items():
+        if original_key in _UNSUPPORTED_GEMINI_SCHEMA_KEYS:
+            continue
+        if original_key == "const":
+            cleaned["enum"] = [item]
+            continue
+        key = "anyOf" if original_key == "oneOf" else original_key
+        cleaned[key] = False if key == "additionalProperties" else _provider_schema(item)
+    return cleaned
+
+
+class _GeminiRagQuery(RagQuery):
+    @classmethod
+    def model_json_schema(cls, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        return _provider_schema(RagQuery.model_json_schema(*args, **kwargs))
+
+
+class _GeminiRelevanceGrade(RelevanceGrade):
+    @classmethod
+    def model_json_schema(cls, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        return _provider_schema(RelevanceGrade.model_json_schema(*args, **kwargs))
+
+
+class _GeminiRagAnswer(RagAnswer):
+    @classmethod
+    def model_json_schema(cls, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        return _provider_schema(RagAnswer.model_json_schema(*args, **kwargs))
+
+
+class _GeminiGroundingAudit(GroundingAudit):
+    @classmethod
+    def model_json_schema(cls, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        return _provider_schema(GroundingAudit.model_json_schema(*args, **kwargs))
+
+
+_PROVIDER_SCHEMAS: dict[type[Any], type[Any]] = {
+    RelevanceGrade: _GeminiRelevanceGrade,
+    RagAnswer: _GeminiRagAnswer,
+    GroundingAudit: _GeminiGroundingAudit,
+}
+
+
+class _RagQueryProposal(StrictModel):
+    question: StrictStr | None = None
+    normalized_question: StrictStr | None = None
+
+
+class _ClaimCitationProposal(StrictModel):
+    claim: StrictStr
+    citation_ids: list[StrictStr] = Field(default_factory=list)
+
+
+class _RagAnswerProposal(StrictModel):
+    status: RagAnswerStatus
+    answer_markdown: StrictStr
+    claim_citations: list[_ClaimCitationProposal] = Field(default_factory=list)
+    caveats: list[StrictStr] = Field(default_factory=list)
+    unsupported_claims: list[StrictStr] = Field(default_factory=list)
 
 
 class RagRuntimeError(RuntimeError):
@@ -179,10 +260,36 @@ class PromptPackRagModelPort:
         self.composer = composer
         self.gateway = gateway
 
-    def _call(self, prompt_id: str, schema: type[Any], variables: Mapping[str, object]) -> Any:
+    def _call(
+        self,
+        prompt_id: str,
+        schema: type[Any],
+        variables: Mapping[str, object],
+        *,
+        promote: Any | None = None,
+        result_schema: type[Any] | None = None,
+    ) -> Any:
         spec = self.composer.pack.prompt(prompt_id)
         prompt = self.composer.compose(prompt_id, variables)
-        return self.gateway.structured(route=spec.model_route, schema=schema, prompt=prompt)
+        invoke = getattr(self.gateway, "invoke", None)
+        provider_schema = _PROVIDER_SCHEMAS.get(schema, schema)
+        if (
+            callable(invoke)
+            and isinstance(provider_schema, type)
+            and issubclass(provider_schema, BaseModel)
+        ):
+            return invoke(
+                route=spec.model_route,
+                schema=provider_schema,
+                prompt=prompt,
+                prompt_id=prompt_id,
+                prompt_version=self.composer.pack.version,
+                promote=promote,
+                result_schema=result_schema or schema,
+            ).artifact
+        return self.gateway.structured(
+            route=spec.model_route, schema=provider_schema, prompt=prompt
+        )
 
     def rewrite(
         self,
@@ -191,10 +298,10 @@ class PromptPackRagModelPort:
         metadata: Mapping[str, object],
     ) -> str:
         value = cast(
-            RagQuery,
+            _RagQueryProposal,
             self._call(
                 "rag.history-aware-query",
-                RagQuery,
+                _RagQueryProposal,
                 {
                     "question": question,
                     "history": "\n".join(f"{item.role}: {item.content}" for item in history),
@@ -202,7 +309,7 @@ class PromptPackRagModelPort:
                 },
             ),
         )
-        return value.normalized_question or value.question
+        return value.normalized_question or value.question or question
 
     def grade(self, question: str, hits: Sequence[RetrievalHit]) -> RelevanceGrade:
         return cast(
@@ -228,23 +335,25 @@ class PromptPackRagModelPort:
         *,
         repair: GroundingAudit | None = None,
     ) -> RagAnswer:
-        return cast(
-            RagAnswer,
-            self._call(
-                "rag.grounded-answer",
-                RagAnswer,
-                {
-                    "question": question,
-                    "retrieved_chunks": context,
-                    "document_metadata": {
-                        "allowed_citations": [item.model_dump(mode="json") for item in citations]
-                    },
-                    "reviewer_inputs": (
-                        json.dumps(repair.model_dump(mode="json"), sort_keys=True) if repair else ""
-                    ),
+        value = self._call(
+            "rag.grounded-answer",
+            _RagAnswerProposal,
+            {
+                "question": question,
+                "retrieved_chunks": context,
+                "document_metadata": {
+                    "allowed_citations": [item.model_dump(mode="json") for item in citations]
                 },
-            ),
+                "reviewer_inputs": (
+                    json.dumps(repair.model_dump(mode="json"), sort_keys=True) if repair else ""
+                ),
+            },
+            promote=lambda candidate: _promote_rag_answer(question, citations, candidate),
+            result_schema=RagAnswer,
         )
+        if isinstance(value, RagAnswer):
+            return value
+        return _promote_rag_answer(question, citations, value)
 
     def audit(self, question: str, context: str, answer: RagAnswer) -> GroundingAudit:
         return cast(
@@ -351,6 +460,44 @@ class DeterministicRagModel:
 
 def _stable_id(prefix: str, value: str) -> str:
     return f"{prefix}-{hashlib.sha256(value.encode('utf-8')).hexdigest()[:16].upper()}"
+
+
+def _promote_rag_answer(
+    question: str,
+    citations: Sequence[RagCitation],
+    value: object,
+) -> RagAnswer:
+    proposal = _RagAnswerProposal.model_validate(value)
+    allowed = {citation.citation_id: citation for citation in citations}
+    claim_citations = [
+        ClaimCitation(claim=item.claim, citation_ids=item.citation_ids)
+        for item in proposal.claim_citations
+    ]
+    cited_ids = {citation_id for item in claim_citations for citation_id in item.citation_ids}
+    unknown = cited_ids - set(allowed)
+    if unknown:
+        raise ValueError(f"RAG answer cited unknown handles: {sorted(unknown)}")
+    if any(not item.citation_ids for item in claim_citations):
+        raise ValueError("RAG answer contains a claim without an allowed citation handle")
+    status = proposal.status
+    if status is RagAnswerStatus.INSUFFICIENT and claim_citations:
+        status = RagAnswerStatus.PARTIAL
+    if status in {RagAnswerStatus.ANSWERED, RagAnswerStatus.PARTIAL} and (
+        not claim_citations or not cited_ids
+    ):
+        raise ValueError("answered or partial RAG proposal requires explicit claim citations")
+    selected_citations = [citation for citation in citations if citation.citation_id in cited_ids]
+    return RagAnswer(
+        answer_id=_stable_id("ANS", f"{question}\0{proposal.answer_markdown}"),
+        query_id=_stable_id("QRY", question),
+        status=status,
+        answer_markdown=proposal.answer_markdown,
+        citations=selected_citations,
+        claim_citations=claim_citations,
+        caveats=proposal.caveats,
+        unsupported_claims=proposal.unsupported_claims,
+        model_route=None,
+    )
 
 
 def _insufficient_answer(question: str, reason: str) -> RagAnswer:

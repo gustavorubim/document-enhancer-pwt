@@ -23,6 +23,7 @@ class ContentAuditRequest(StrictModel):
     semantic_document: SemanticDocument
     checklist_digest: StrictStr | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     steering_digest: StrictStr | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    reviewer_inputs: dict[str, object] = Field(default_factory=dict)
 
 
 class ContentAuditor(Protocol):
