@@ -13,13 +13,14 @@ from dataclasses import dataclass
 from hashlib import sha256
 from typing import Any, cast
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, StrictStr
 
 from document_enhancer.audit import AuditRevisionPatchSet, apply_audit_revision_patches
 from document_enhancer.audit.content import ContentAuditRequest
 from document_enhancer.domain.analysis import AnalysisReport, Finding, FindingSet
 from document_enhancer.domain.audit import Audit, IndependentAuditResult
-from document_enhancer.domain.enums import DocumentType
+from document_enhancer.domain.base import StrictModel
+from document_enhancer.domain.enums import ChecklistAction, DocumentType
 from document_enhancer.domain.questions import (
     AnswersArtifact,
     ContentLedger,
@@ -88,10 +89,16 @@ class _GeminiQuestionsArtifact(QuestionsArtifact):
         return _provider_schema(QuestionsArtifact.model_json_schema(*args, **kwargs))
 
 
-class _GeminiRewriteChecklist(RewriteChecklist):
-    @classmethod
-    def model_json_schema(cls, *args: Any, **kwargs: Any) -> dict[str, Any]:
-        return _provider_schema(RewriteChecklist.model_json_schema(*args, **kwargs))
+class _ChecklistItemProposal(StrictModel):
+    item_key: StrictStr
+    action: ChecklistAction
+    verification_method: StrictStr
+    acceptance_criterion: StrictStr
+    reason: StrictStr | None = None
+
+
+class _ChecklistProposalBatch(StrictModel):
+    items: list[_ChecklistItemProposal] = Field(default_factory=list)
 
 
 class _GeminiSectionRewriteDraft(SectionRewriteDraft):
@@ -291,6 +298,42 @@ def _promote_questions(
     return artifact
 
 
+def _promote_checklist(
+    baseline: RewriteChecklist,
+    value: object,
+) -> RewriteChecklist:
+    """Apply semantic checklist proposals without delegating governed identity or evidence."""
+
+    proposals = _ChecklistProposalBatch.model_validate(value)
+    baseline_by_id = {item.checklist_item_id: item for item in baseline.items}
+    proposed_by_id: dict[str, _ChecklistItemProposal] = {}
+    for proposal in proposals.items:
+        if proposal.item_key not in baseline_by_id:
+            raise ValidationError("checklist generator returned an unknown baseline item")
+        if proposal.item_key in proposed_by_id:
+            raise ValidationError("checklist generator duplicated a baseline item")
+        proposed_by_id[proposal.item_key] = proposal
+    missing = set(baseline_by_id) - set(proposed_by_id)
+    if missing:
+        raise ValidationError("checklist generator omitted a governed baseline item")
+    promoted_items = []
+    for item in baseline.items:
+        proposal = proposed_by_id[item.checklist_item_id]
+        promoted_items.append(
+            item.model_copy(
+                update={
+                    "action": proposal.action,
+                    "verification_method": proposal.verification_method,
+                    "acceptance_criterion": proposal.acceptance_criterion,
+                    "reason": proposal.reason if proposal.reason is not None else item.reason,
+                }
+            )
+        )
+    return RewriteChecklist.model_validate(
+        baseline.model_copy(update={"items": promoted_items}).model_dump(mode="python")
+    )
+
+
 def _invoke(
     composer: PromptPackComposer,
     gateway: GeminiModelGateway,
@@ -398,7 +441,7 @@ class GeminiChecklistGenerator:
             prompt_id=self.prompt_id,
             route=ROUTE_FLASH_LITE,
             output_schema="rewrite-checklist.schema.json",
-            schema=_GeminiRewriteChecklist,
+            schema=_ChecklistProposalBatch,
             variables={
                 "document_type": document_type.value,
                 "document_metadata": {"document_id": questions.document_id},
@@ -407,14 +450,10 @@ class GeminiChecklistGenerator:
             },
             stage="rewrite_checklist",
             input_digests=(_json_digest(checklist_input), _json_digest(reviewer)),
+            promote=lambda value: _promote_checklist(baseline, value),
+            result_schema=RewriteChecklist,
         )
-        if artifact.document_id != baseline.document_id:
-            raise ValidationError("checklist generator returned a different document identity")
-        required_questions = {item.question_id for item in baseline.items if item.question_id}
-        returned_questions = {item.question_id for item in artifact.items if item.question_id}
-        if not required_questions.issubset(returned_questions):
-            raise ValidationError("checklist generator omitted a governed question")
-        return artifact
+        return RewriteChecklist.model_validate(artifact)
 
 
 @dataclass(frozen=True, slots=True)

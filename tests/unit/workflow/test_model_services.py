@@ -128,6 +128,44 @@ def test_question_generator_sends_baseline_and_referenced_findings_not_full_fano
     assert all(len(digest) == 64 for digest in input_digests)
 
 
+def test_checklist_generator_rejects_unknown_baseline_item() -> None:
+    findings = _finding_set("SPAN-ABCDEF12")
+    questions = synthesize_questions(
+        findings,
+        document_id="DOC-STAGE-CONTEXT-001",
+        strict_blocking=True,
+    ).questions
+    baseline = build_rewrite_checklist(
+        questions,
+        answers=AnswersArtifact(document_id=questions.document_id),
+        steering=None,
+        waivers=WaiversArtifact(document_id=questions.document_id),
+    )
+    proposal = {
+        "items": [
+            {
+                "item_key": "CHK-UNKNOWN-001",
+                "action": baseline.items[0].action.value,
+                "verification_method": baseline.items[0].verification_method,
+                "acceptance_criterion": baseline.items[0].acceptance_criterion,
+                "reason": baseline.items[0].reason,
+            }
+        ]
+    }
+
+    with pytest.raises(ValidationError, match="unknown baseline item"):
+        GeminiChecklistGenerator(
+            _composer(), cast(GeminiModelGateway, _CapturingGateway(proposal))
+        ).generate(
+            baseline=baseline,
+            questions=questions,
+            answers=AnswersArtifact(document_id=questions.document_id),
+            steering=None,
+            waivers=WaiversArtifact(document_id=questions.document_id),
+            document_type=DocumentType.PROCESS,
+        )
+
+
 def test_question_prompt_input_excludes_unrelated_analysis_fanout(tmp_path: Path) -> None:
     source = tmp_path / "messy.md"
     source.write_text("# Control review\n\nThe control owner is absent.\n", encoding="utf-8")
@@ -224,7 +262,20 @@ def test_checklist_generator_sends_governed_seed_summaries_and_compact_reviewer_
         steering=steering,
         waivers=waivers,
     )
-    gateway = _CapturingGateway(baseline)
+    gateway = _CapturingGateway(
+        {
+            "items": [
+                {
+                    "item_key": item.checklist_item_id,
+                    "action": item.action.value,
+                    "verification_method": item.verification_method,
+                    "acceptance_criterion": item.acceptance_criterion,
+                    "reason": item.reason,
+                }
+                for item in baseline.items
+            ]
+        }
+    )
 
     generated = GeminiChecklistGenerator(_composer(), cast(GeminiModelGateway, gateway)).generate(
         baseline=baseline,

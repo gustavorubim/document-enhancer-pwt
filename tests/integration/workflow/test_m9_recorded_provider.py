@@ -395,7 +395,18 @@ def test_recorded_provider_boundary_from_discovery_through_audit_revision_and_re
             _discovery_response(),
             _discovery_response(),
             questions.model_dump(mode="json"),
-            checklist.model_dump(mode="json"),
+            {
+                "items": [
+                    {
+                        "item_key": item.checklist_item_id,
+                        "action": item.action.value,
+                        "verification_method": item.verification_method,
+                        "acceptance_criterion": item.acceptance_criterion,
+                        "reason": item.reason,
+                    }
+                    for item in checklist.items
+                ]
+            },
             rewrite_draft.model_dump(mode="json"),
             independent.model_dump(mode="json"),
             invalid_patch.model_dump(mode="json"),
@@ -610,14 +621,7 @@ def test_recorded_provider_boundary_from_discovery_through_audit_revision_and_re
         "generated_at",
         "digest",
     }
-    assert _schema_properties(calls_by_stage["rewrite_checklist"][0]) == {
-        "checklist_id",
-        "document_id",
-        "items",
-        "approved_by",
-        "approved_at",
-        "digest",
-    }
+    assert _schema_properties(calls_by_stage["rewrite_checklist"][0]) == {"items"}
     assert _schema_properties(calls_by_stage["section_rewrite"][0]) == {
         "section_id",
         "body",
