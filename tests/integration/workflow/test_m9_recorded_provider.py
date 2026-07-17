@@ -366,16 +366,6 @@ def test_recorded_provider_boundary_from_discovery_through_audit_revision_and_re
         provider="recorded-provider",
         isolated_context=True,
     )
-    invalid_patch = AuditRevisionPatchSet(
-        section_patches=[
-            AuditSectionRevisionPatch(
-                section_id="SEC-PROC-UNKNOWN",
-                revised_body="This invalid target must never enter the response cache.",
-                evidence_span_ids=[rewrite_input.allowed_source_span_ids[0]],
-                audit_finding_ids=[AUDIT_FINDING_ID],
-            )
-        ]
-    )
     revised_body = rewrite_draft.body + " Evidence is retained in the approved close record."
     valid_patch = AuditRevisionPatchSet(
         section_patches=[
@@ -414,7 +404,7 @@ def test_recorded_provider_boundary_from_discovery_through_audit_revision_and_re
                 "open_issue_ids": rewrite_draft.open_issue_ids,
             },
             independent.model_dump(mode="json"),
-            invalid_patch.model_dump(mode="json"),
+            {"section_patches": [], "issue_resolutions": []},
             valid_patch.model_dump(mode="json"),
         ],
     )

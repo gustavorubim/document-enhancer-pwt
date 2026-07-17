@@ -16,7 +16,12 @@ from typing import Any, cast
 
 from pydantic import BaseModel, Field, StrictStr
 
-from document_enhancer.audit import AuditRevisionPatchSet, apply_audit_revision_patches
+from document_enhancer.audit import (
+    AuditIssueResolutionPatch,
+    AuditRevisionPatchSet,
+    AuditSectionRevisionPatch,
+    apply_audit_revision_patches,
+)
 from document_enhancer.audit.content import ContentAuditRequest
 from document_enhancer.domain.analysis import AnalysisReport, EvidenceQuote, Finding, FindingSet
 from document_enhancer.domain.audit import Audit, IndependentAuditResult
@@ -115,10 +120,13 @@ class _GeminiIndependentAuditResult(IndependentAuditResult):
         return _provider_schema(IndependentAuditResult.model_json_schema(*args, **kwargs))
 
 
-class _GeminiAuditRevisionPatchSet(AuditRevisionPatchSet):
+class _AuditRevisionPatchProposal(StrictModel):
+    section_patches: list[AuditSectionRevisionPatch] = Field(default_factory=list)
+    issue_resolutions: list[AuditIssueResolutionPatch] = Field(default_factory=list)
+
     @classmethod
     def model_json_schema(cls, *args: Any, **kwargs: Any) -> dict[str, Any]:
-        return _provider_schema(AuditRevisionPatchSet.model_json_schema(*args, **kwargs))
+        return _provider_schema(super().model_json_schema(*args, **kwargs))
 
 
 def _json(value: object) -> str:
@@ -367,6 +375,17 @@ def _promote_section_rewrite(
         approved_answer_ids=proposal.approved_answer_ids,
         open_issue_ids=proposal.open_issue_ids,
     )
+
+
+def _promote_audit_revision(
+    model: EnhancedDocumentModel,
+    audit: Audit,
+    value: object,
+) -> EnhancedDocumentModel:
+    raw = value.model_dump(mode="python") if isinstance(value, BaseModel) else value
+    proposal = _AuditRevisionPatchProposal.model_validate(raw)
+    patches = AuditRevisionPatchSet.model_validate(proposal.model_dump(mode="python"))
+    return apply_audit_revision_patches(model, audit, patches)
 
 
 def _invoke(
@@ -650,7 +669,7 @@ class GeminiAuditRevisionRunner:
             prompt_id=self.prompt_id,
             route=ROUTE_PRO_PREVIEW,
             output_schema="audit-revision-patch.schema.json",
-            schema=_GeminiAuditRevisionPatchSet,
+            schema=_AuditRevisionPatchProposal,
             variables={
                 "document_type": self.document_type.value,
                 "document_metadata": {"document_id": model.document.id},
@@ -660,7 +679,7 @@ class GeminiAuditRevisionRunner:
             },
             stage="bounded_revision",
             input_digests=(_json_digest(model), _json_digest(audit)),
-            promote=lambda value: apply_audit_revision_patches(model, audit, value),
+            promote=partial(_promote_audit_revision, model, audit),
             result_schema=EnhancedDocumentModel,
         )
         return EnhancedDocumentModel.model_validate(revised)

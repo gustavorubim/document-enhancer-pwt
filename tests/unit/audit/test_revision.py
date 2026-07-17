@@ -278,7 +278,11 @@ def test_model_service_sends_only_patch_schema_and_promotes_to_strict_document(
     assert revised.sections[0].body.endswith("completion evidence.")
     assert gateway.call is not None
     provider_schema = cast(type[Any], gateway.call["schema"])
-    assert issubclass(provider_schema, AuditRevisionPatchSet)
+    assert not issubclass(provider_schema, AuditRevisionPatchSet)
+    assert set(provider_schema.model_json_schema()["properties"]) == {
+        "section_patches",
+        "issue_resolutions",
+    }
     assert gateway.call["result_schema"] is EnhancedDocumentModel
     assert len(json.dumps(provider_schema.model_json_schema())) < 10_000
     assert "Output schema name: audit-revision-patch.schema.json" in gateway.call["prompt"]
