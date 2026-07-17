@@ -27,10 +27,32 @@ _FLOW_WORDS = re.compile(
     r"\b(?:first|then|next|after|before|when|if|until|owner|responsible|approve|review|submit|notify|escalat)\w*\b",
     re.IGNORECASE,
 )
+_TITLE_ALIASES = {
+    "definitions and controlled terminology": {"definitions"},
+    "preconditions triggers and scheduling": {"preconditions triggers and inputs"},
+    "inputs and entry criteria": {"preconditions triggers and inputs"},
+    "related requirements policies standards and documents": {"appendix a source inventory"},
+}
 
 
 def normalise_title(value: str) -> str:
-    return re.sub(r"[^a-z0-9]+", " ", value.lower()).strip()
+    normalized = re.sub(r"[^a-z0-9]+", " ", value.lower()).strip()
+    return re.sub(r"^\d+(?: \d+)*\s+", "", normalized)
+
+
+def title_matches(requirement: str, candidate: str) -> bool:
+    """Match a recipe heading to a numbered, compact, or combined source heading."""
+
+    expected = normalise_title(requirement)
+    actual = normalise_title(candidate)
+    if not expected or not actual:
+        return False
+    if expected == actual or actual in _TITLE_ALIASES.get(expected, set()):
+        return True
+    expected_words = set(expected.split())
+    actual_words = set(actual.split())
+    shared = expected_words & actual_words
+    return len(shared) >= 2 and len(shared) / min(len(expected_words), len(actual_words)) >= 0.75
 
 
 def evidence_for_offset(blocks: tuple[Any, ...], offset: int) -> list[str]:
@@ -66,10 +88,9 @@ def build_review(
         rubric_ids = [
             str(item["criterion_id"]) for item in recipe.rubric_criteria if item.get("criterion_id")
         ]
-        present_titles = {normalise_title(item.title) for item in sections}
         for requirement in recipe.required_section_items:
             heading = str(requirement.get("heading") or requirement.get("id") or "")
-            if not heading or normalise_title(heading) in present_titles:
+            if not heading or any(title_matches(heading, item.title) for item in sections):
                 continue
             requirement_id = str(requirement.get("id") or "unknown")
             criteria = requirement.get("rubric_criteria") or []
@@ -127,6 +148,20 @@ def build_review(
                         reason="The selected rubric marks this criterion as a hard blocker.",
                     )
                 )
+        if "conflicting draft statements" in source_text.lower():
+            questions.append(
+                Question(
+                    question_id="question-open-points-001",
+                    prompt=(
+                        "How should the final document handle the pilot-approval conflicts listed "
+                        "in the open-points section?"
+                    ),
+                    reason=(
+                        "The source explicitly identifies conflicting operational values that require "
+                        "owner steering rather than automatic resolution."
+                    ),
+                )
+            )
     if not any(block.block_type == "heading" for block in blocks):
         findings.append(
             Finding(

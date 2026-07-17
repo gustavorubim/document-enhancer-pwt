@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from document_enhancer.core.recipes import load_recipe
+from document_enhancer.core.review import title_matches
 
 
 @pytest.mark.unit
@@ -29,3 +30,10 @@ def test_recipe_exposes_tables_and_requirement_classes() -> None:
     assert len(recipe.tables) >= 1
     assert len(recipe.recipe_digest) == 64
     assert all(recipe.classify(item) == "required" for item in recipe.required_section_items)
+
+
+@pytest.mark.unit
+def test_recipe_heading_matching_accepts_numbered_and_combined_source_sections() -> None:
+    assert title_matches("Purpose", "2. Purpose")
+    assert title_matches("Inputs and entry criteria", "6. Preconditions, triggers, and inputs")
+    assert title_matches("Metrics, service levels, and monitoring", "14. Metrics and monitoring")

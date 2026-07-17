@@ -7,7 +7,7 @@ from typing import Any
 
 from .models import AuditReport, ReviewReport
 from .recipes import Recipe
-from .review import normalise_title
+from .review import title_matches
 
 
 def semantic_references_valid(semantic: dict[str, Any]) -> bool:
@@ -32,10 +32,12 @@ def source_sections_retained(review: ReviewReport, final_text: str) -> bool:
 def required_sections_present(recipe: Recipe | None, final_text: str) -> bool:
     if not recipe:
         return True
-    normalized_final = normalise_title(final_text)
+    headings = [
+        line.lstrip("# ").strip() for line in final_text.splitlines() if line.startswith("#")
+    ]
     for requirement in recipe.required_section_items:
         heading = str(requirement.get("heading") or requirement.get("id") or "")
-        if heading and normalise_title(heading) not in normalized_final:
+        if heading and not any(title_matches(heading, item) for item in headings):
             return False
     return True
 

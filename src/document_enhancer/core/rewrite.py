@@ -22,7 +22,7 @@ from .models import (
     SemanticNode,
 )
 from .recipes import Recipe
-from .review import normalise_title
+from .review import title_matches
 
 
 def compile_rewrite_plan(
@@ -56,12 +56,14 @@ def compile_rewrite_plan(
     ]
     required_section_ids: list[str] = []
     if recipe:
-        present_titles = {normalise_title(item.title): item.section_id for item in review.sections}
         for requirement in recipe.required_section_items:
             heading = str(requirement.get("heading") or requirement.get("id") or "")
-            section_id = present_titles.get(normalise_title(heading))
-            if section_id:
-                required_section_ids.append(section_id)
+            matching = next(
+                (item.section_id for item in review.sections if title_matches(heading, item.title)),
+                None,
+            )
+            if matching:
+                required_section_ids.append(matching)
     return RewritePlan(
         recipe_id=review.recipe_id,
         source_digest=source_digest,
