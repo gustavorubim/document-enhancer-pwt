@@ -187,7 +187,55 @@ continues live after human review.
 - Final auditing checks source retention, required sections, graph references, unresolved blockers,
   section assessments, and dual flow artifacts before sealing an approved bundle.
 - Semantic JSON and JSONL graph exports are portable for a future RAG/ontology consumer; no retrieval
-  runtime ships on the authoring path.
+  runtime is required on the authoring path.
+
+## Optional local RAG and GraphRAG CLI
+
+Install the optional retrieval dependencies, finish and seal the documents you want to query, then
+build an explicit local catalog:
+
+```bash
+uv sync --frozen
+
+# The listed runs replace the current catalog. Only passing, sealed bundles are accepted.
+uv run docenhance rag index RUN_ID_1 RUN_ID_2
+
+# Deliberately select every passing sealed run under the configured run directory instead.
+uv run docenhance rag index --all-sealed
+
+uv run docenhance rag inspect
+uv run docenhance rag ask "Who owns the control and how often is it reviewed?" --show-trace
+uv run docenhance rag chat
+```
+
+Published-package users install `document-enhancer[rag]`. Indexing uses Gemini Embeddings 2 by
+default and reads the same recognized, ignored `.env` credentials as live authoring. The explicit
+`--offline` indexing option uses deterministic feature-hash vectors only for tests and local CLI
+demonstrations; it is not a semantic embedding profile.
+
+The RAG catalog is written under `.document-enhancer/rag/catalog/` unless `--catalog` or
+`DOCENHANCE_RAG_CATALOG` selects another path. A build stages and validates the SQLite FTS5 catalog,
+FAISS index, graph topology, row counts, embedding profile, and SHA-256 file digests before replacing
+the prior catalog. A failed or tampered input leaves the promoted catalog unchanged.
+
+Corpus selection is intentionally conservative:
+
+- only explicitly named runs are indexed unless `--all-sealed` is supplied;
+- only the approved `markdown/07-final-document.md` is embedded;
+- original sources, review reports, decisions, audits, and change explanations are not embedded;
+- `json/09-ontology.json` is loaded as namespaced graph nodes and edges rather than embedded as text;
+- every answer source displays its run ID, heading path, and stable chunk ID.
+
+`rag ask` and `rag chat` use hybrid FAISS/FTS retrieval and may search again when evidence points to
+another indexed document. They can also traverse one or two real `core.graph.v1` edges. The agent has
+only two read-only retrieval tools—no web, shell, arbitrary filesystem, authoring, or write tools.
+Visible claims must cite evidence actually retrieved for that question; unknown or missing citations,
+conflicting evidence, and absent evidence produce `insufficient` instead of an invented answer.
+
+Rich chat is in-memory and bounded. `/sources`, `/trace`, `/clear`, `/help`, and `/exit` are supported;
+no session, hidden reasoning, or conversation is persisted. FAISS files are trusted only as generated
+local workspace artifacts whose paths and hashes match the catalog manifest. Rebuild the whole small
+catalog when the selected sealed corpus or embedding profile changes.
 
 ## Supported commands
 
@@ -200,6 +248,10 @@ docenhance stage-two RUN_ID
 docenhance status RUN_ID
 docenhance inspect RUN_ID
 docenhance audit RUN_ID
+docenhance rag index RUN_ID... [--all-sealed]
+docenhance rag inspect [--json]
+docenhance rag ask "QUESTION" [--run RUN_ID] [--show-trace] [--json]
+docenhance rag chat [--run RUN_ID] [--show-trace]
 docenhance validate-recipe [--document-type TYPE]
 ```
 

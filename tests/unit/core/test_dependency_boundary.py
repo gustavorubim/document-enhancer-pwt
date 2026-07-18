@@ -12,7 +12,7 @@ def test_core_imports_without_retrieval_or_agent_frameworks() -> None:
 import importlib.abc
 import sys
 
-blocked = ("deepagents", "langchain", "langchain_core", "langgraph", "numpy", "sqlite_vec")
+blocked = ("deepagents", "faiss", "langchain", "langchain_core", "langgraph", "numpy", "sqlite_vec")
 
 class BlockOptional(importlib.abc.MetaPathFinder):
     def find_spec(self, fullname, path=None, target=None):
@@ -35,3 +35,12 @@ assert CoreRunner is not None
         check=False,
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_optional_rag_surface_imports_when_extra_is_installed() -> None:
+    from document_enhancer.retrieval.agent import RagAnswerer
+    from document_enhancer.retrieval.catalog import RagCatalog, RagCatalogBuilder
+
+    assert RagAnswerer is not None
+    assert RagCatalog is not None
+    assert RagCatalogBuilder is not None

@@ -1,0 +1,7 @@
+Document Enhancer RAG
+Ask a question first.
+/sources  /trace  /clear  /help  /exit
+Grounded answer.
+Sources
+Retrieval trace
+Conversation context cleared.

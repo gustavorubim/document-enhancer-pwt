@@ -25,6 +25,18 @@ class ReferenceConfig(BaseModel):
     reference_pack: Path = Path("reference_packs/enterprise_core")
 
 
+class RagConfig(BaseModel):
+    """Local, non-secret retrieval settings."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    catalog_dir: Path = Path(".document-enhancer/rag/catalog")
+    embedding_model: str = "gemini-embedding-2"
+    embedding_dimensions: int = Field(default=768, ge=128, le=3072)
+    chunk_size: int = Field(default=2400, ge=400, le=12000)
+    chunk_overlap: int = Field(default=300, ge=0, le=2000)
+
+
 class GeminiConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -56,6 +68,7 @@ class AppConfig(BaseModel):
 
     workspace: WorkspaceConfig = WorkspaceConfig()
     references: ReferenceConfig = ReferenceConfig()
+    rag: RagConfig = RagConfig()
     gemini: GeminiConfig = GeminiConfig()
     policy: PolicyConfig = PolicyConfig()
 
@@ -96,6 +109,11 @@ def _env_overrides(environ: dict[str, str]) -> dict[str, Any]:
         "DOCENHANCE_VERTEX_PROJECT": ("gemini", "project"),
         "DOCENHANCE_VERTEX_LOCATION": ("gemini", "location"),
         "DOCENHANCE_RUN_DIR": ("workspace", "run_dir"),
+        "DOCENHANCE_RAG_CATALOG": ("rag", "catalog_dir"),
+        "DOCENHANCE_RAG_EMBEDDING_MODEL": ("rag", "embedding_model"),
+        "DOCENHANCE_RAG_EMBEDDING_DIMENSIONS": ("rag", "embedding_dimensions"),
+        "DOCENHANCE_RAG_CHUNK_SIZE": ("rag", "chunk_size"),
+        "DOCENHANCE_RAG_CHUNK_OVERLAP": ("rag", "chunk_overlap"),
         "DOCENHANCE_LIVE_PROVIDER_CHECKS": ("policy", "live_provider_checks"),
         "DOCENHANCE_EXTERNAL_TRACING": ("policy", "external_tracing"),
     }
@@ -103,11 +121,17 @@ def _env_overrides(environ: dict[str, str]) -> dict[str, Any]:
     for variable, (section, field) in mapping.items():
         if variable not in environ:
             continue
-        value: Any = environ[variable]
+        raw_value = environ[variable]
+        value: Any = raw_value
+        if field in {"embedding_dimensions", "chunk_size", "chunk_overlap"}:
+            try:
+                value = int(raw_value)
+            except ValueError as exc:
+                raise ConfigurationError(f"{variable} must be an integer") from exc
         if field in {"live_provider_checks", "external_tracing"}:
-            if value.lower() not in {"0", "1", "false", "true", "no", "yes"}:
+            if raw_value.lower() not in {"0", "1", "false", "true", "no", "yes"}:
                 raise ConfigurationError(f"{variable} must be boolean")
-            value = value.lower() in {"1", "true", "yes"}
+            value = raw_value.lower() in {"1", "true", "yes"}
         result.setdefault(section, {})[field] = value
     return result
 

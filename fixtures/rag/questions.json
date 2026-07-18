@@ -1,0 +1,22 @@
+[
+  {"case_id":"exact-owner","question":"Who owns the Alpha control?","expected_run_ids":["run-a"],"answerable":true,"minimum_retrieval_actions":1,"category":"exact"},
+  {"case_id":"exact-policy","question":"Which policy governs Alpha?","expected_run_ids":["run-a"],"answerable":true,"minimum_retrieval_actions":1,"category":"exact"},
+  {"case_id":"paraphrase-review","question":"How frequently is the governing rule examined?","expected_run_ids":["run-b"],"answerable":true,"minimum_retrieval_actions":1,"category":"paraphrase"},
+  {"case_id":"identifier-policy","question":"What does POL-42 require?","expected_run_ids":["run-b"],"answerable":true,"minimum_retrieval_actions":1,"category":"identifier"},
+  {"case_id":"graph-control","question":"What control is connected to the Alpha overview?","expected_run_ids":["run-a"],"answerable":true,"minimum_retrieval_actions":2,"category":"graph-hop"},
+  {"case_id":"cross-owner-frequency","question":"Who reviews the policy governing Alpha and how often?","expected_run_ids":["run-a","run-b"],"answerable":true,"minimum_retrieval_actions":2,"category":"cross-document"},
+  {"case_id":"cross-policy-committee","question":"Name Alpha's governing policy and its reviewing committee.","expected_run_ids":["run-a","run-b"],"answerable":true,"minimum_retrieval_actions":2,"category":"cross-document"},
+  {"case_id":"filtered-alpha","question":"Within Alpha, what policy is named?","expected_run_ids":["run-a"],"answerable":true,"minimum_retrieval_actions":1,"category":"filter"},
+  {"case_id":"filtered-policy","question":"Within the policy, what cadence is stated?","expected_run_ids":["run-b"],"answerable":true,"minimum_retrieval_actions":1,"category":"filter"},
+  {"case_id":"citation-two-doc","question":"Explain the relationship between Alpha and POL-42.","expected_run_ids":["run-a","run-b"],"answerable":true,"minimum_retrieval_actions":2,"category":"citation"},
+  {"case_id":"missing-budget","question":"What is the implementation budget?","expected_run_ids":[],"answerable":false,"minimum_retrieval_actions":1,"category":"insufficient"},
+  {"case_id":"missing-date","question":"On what calendar date was Alpha approved?","expected_run_ids":[],"answerable":false,"minimum_retrieval_actions":1,"category":"insufficient"},
+  {"case_id":"missing-email","question":"What is the owner's email address?","expected_run_ids":[],"answerable":false,"minimum_retrieval_actions":1,"category":"insufficient"},
+  {"case_id":"missing-vendor","question":"Which external vendor operates the control?","expected_run_ids":[],"answerable":false,"minimum_retrieval_actions":1,"category":"insufficient"},
+  {"case_id":"missing-country","question":"Which country hosts the review?","expected_run_ids":[],"answerable":false,"minimum_retrieval_actions":1,"category":"insufficient"},
+  {"case_id":"missing-cost","question":"How much does the monthly review cost?","expected_run_ids":[],"answerable":false,"minimum_retrieval_actions":1,"category":"insufficient"},
+  {"case_id":"missing-exception","question":"Who approved an exception to POL-42?","expected_run_ids":[],"answerable":false,"minimum_retrieval_actions":1,"category":"insufficient"},
+  {"case_id":"missing-location","question":"In which office is the Risk Committee located?","expected_run_ids":[],"answerable":false,"minimum_retrieval_actions":1,"category":"insufficient"},
+  {"case_id":"missing-system","question":"Which ticketing system records the review?","expected_run_ids":[],"answerable":false,"minimum_retrieval_actions":1,"category":"insufficient"},
+  {"case_id":"missing-retention","question":"How many years is review evidence retained?","expected_run_ids":[],"answerable":false,"minimum_retrieval_actions":1,"category":"insufficient"}
+]

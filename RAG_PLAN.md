@@ -82,13 +82,13 @@ Default location: `.document-enhancer/rag/catalog/`
 catalog/
 ├── manifest.json       # schema, selected bundle digests, chunker and embedding profile, file hashes
 ├── catalog.sqlite3     # chunk metadata, FTS5 text, graph nodes/edges, graph-to-chunk links
-└── faiss/              # LangChain FAISS index and local docstore
+└── faiss/              # Native FAISS index; SQLite is the validated docstore
 ```
 
 Build into a sibling temporary directory, validate counts and hashes, and atomically promote the
-directory. A failed build must leave the previous catalog untouched. The FAISS loader may enable
-local deserialization only for artifacts generated under this workspace and only after manifest
-path and SHA-256 validation; arbitrary downloaded indexes are rejected.
+directory. A failed build must leave the previous catalog untouched. Persist only FAISS's native
+index format; keep text and metadata in SQLite. This avoids pickle deserialization entirely, and
+arbitrary downloaded indexes are rejected by manifest path, SHA-256, dimension, and row-count checks.
 
 ### Chunking
 
@@ -190,8 +190,7 @@ line. Never check a live-provider reward from a fake, skipped, unavailable, or `
   - Evidence: pending.
 - [ ] **RAG-0.3 — Add only the optional RAG dependency group.**
   - Reward: normal installation remains authoring-only; `document-enhancer[rag]` installs the
-    minimum locked LangChain agent, Google provider, text-splitter, community FAISS, and
-    `faiss-cpu` packages.
+    minimum locked LangChain agent, Google provider, text-splitter, and `faiss-cpu` packages.
   - Verify: `uv sync --frozen`, package metadata test, and `uv build`.
   - Evidence: pending.
 
@@ -359,9 +358,9 @@ The feature is mergeable only when RAG-0 through RAG-6 and A1 through A7 are che
 - [x] Current focused boundary tests pass:
   `uv run pytest tests/unit/core/test_core_indexing.py tests/unit/core/test_core_indexing_adapter.py tests/unit/core/test_dependency_boundary.py -q`
   -> `7 passed in 0.38s`.
-- [x] The locked environment currently has `langchain-google-genai 4.2.7`, including document/query
-  embedding methods and configurable output dimensionality; LangChain agent, community FAISS,
-  text-splitter, Deep Agents, and FAISS packages are not currently installed.
+- [x] The planning baseline had `langchain-google-genai 4.2.7`, including document/query embedding
+  methods and configurable output dimensionality; the RAG branch now locks the optional agent,
+  text-splitter, and native FAISS packages without Deep Agents.
 
 ## External API references verified while planning
 
