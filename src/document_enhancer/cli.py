@@ -8,6 +8,11 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
+from rich import box
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
+from rich.text import Text
 
 from . import __version__
 from .config import load_config
@@ -20,7 +25,7 @@ from .core import (
     RunRecord,
     RunStore,
 )
-from .core.layout import AUDIT, AUDIT_MARKDOWN, DECISIONS_YAML, HTML_REPORT
+from .core.layout import AUDIT, AUDIT_MARKDOWN, DECISIONS_YAML, FINAL_MARKDOWN, HTML_REPORT
 from .core.recipes import load_recipe
 from .errors import DocumentEnhancerError
 from .llm.models import GeminiGatewayConfig, GeminiModelGateway
@@ -51,6 +56,81 @@ def _emit_json(payload: object) -> None:
 
 def _fail(error: Exception) -> None:
     typer.echo(f"error: {error}", err=True)
+
+
+def _console() -> Console:
+    """Create a console at call time so Typer tests and redirected output are respected."""
+
+    return Console(highlight=False)
+
+
+def _step(console: Console, number: int, total: int, title: str, detail: str) -> None:
+    heading = Text()
+    heading.append(f"STEP {number}/{total}  ", style="bold bright_cyan")
+    heading.append(title, style="bold white")
+    body = Table.grid(padding=(0, 1))
+    body.add_row(heading)
+    body.add_row(Text(detail, style="bright_black"))
+    console.print(Panel(body, border_style="cyan", padding=(1, 2)))
+
+
+def _success(console: Console, message: str) -> None:
+    console.print(Text.assemble(("✓ ", "bold green"), (message, "green")))
+
+
+def _inspection_payload(root: Path, run_id: str) -> dict[str, object]:
+    store = RunStore(root)
+    record = store.load_run(run_id)
+    return {
+        "schema_version": "core.cli.v1",
+        "command": "inspect",
+        "run": record.model_dump(mode="json"),
+        "audit": store.read_json(run_id, AUDIT) if store.exists(run_id, AUDIT) else None,
+    }
+
+
+def _audit_payload(root: Path, run_id: str) -> dict[str, object]:
+    result = json.loads((root / run_id / AUDIT).read_text(encoding="utf-8"))
+    return {
+        **result,
+        "schema_version": "core.cli.audit.v1",
+        "run_id": run_id,
+        "report": str(root / run_id / AUDIT_MARKDOWN),
+    }
+
+
+def _render_inspection(console: Console, payload: dict[str, object], *, root: Path) -> None:
+    run = payload["run"]
+    assert isinstance(run, dict)
+    table = Table(title="Bundle inspection", box=box.ROUNDED, border_style="bright_cyan")
+    table.add_column("Field", style="bold cyan", no_wrap=True)
+    table.add_column("Value", style="white")
+    artifacts = run.get("artifacts")
+    table.add_row("Run", str(run.get("run_id", "unknown")))
+    table.add_row("Status", str(run.get("status", "unknown")).upper())
+    table.add_row("Phase", str(run.get("phase", "unknown")).replace("_", " ").title())
+    table.add_row("Artifacts", str(len(artifacts) if isinstance(artifacts, dict) else 0))
+    table.add_row("Bundle", str(root / str(run.get("run_id", ""))))
+    table.add_row("HTML reviewer", str(root / str(run.get("run_id", "")) / HTML_REPORT))
+    console.print(table)
+
+
+def _render_audit(console: Console, payload: dict[str, object]) -> None:
+    checks = payload.get("checks")
+    check_values = checks if isinstance(checks, dict) else {}
+    table = Table(title="Final audit", box=box.ROUNDED, border_style="green")
+    table.add_column("Check", style="bold")
+    table.add_column("Result", justify="center")
+    for name, passed in check_values.items():
+        label = str(name).replace("_", " ").title()
+        result = Text("PASS", style="bold green") if passed else Text("FAIL", style="bold red")
+        table.add_row(label, result)
+    console.print(table)
+    summary = str(payload.get("summary") or "No audit summary was provided.")
+    status = str(payload.get("status") or "fail").upper()
+    color = "green" if status == "PASS" else "red"
+    console.print(Panel(summary, title=f"[bold {color}]{status}[/] audit", border_style=color))
+    console.print(f"[bold]Audit report:[/] {payload.get('report')}")
 
 
 def _load_project_env() -> None:
@@ -149,13 +229,29 @@ def _print_record(record: RunRecord, *, root: Path, json_output: bool) -> None:
     if json_output:
         _emit_json(value)
         return
-    typer.echo(f"run {value['run_id']}")
-    typer.echo(f"status: {value['status']}")
-    typer.echo(f"phase: {value['phase']}")
-    typer.echo(f"artifacts: {root / str(value['run_id'])}")
-    typer.echo(f"report: {root / str(value['run_id']) / HTML_REPORT}")
+    console = _console()
+    status = str(value["status"])
+    color = "green" if status == "succeeded" else "yellow" if status == "waiting" else "red"
+    table = Table(box=box.ROUNDED, border_style=color, title="Document Enhancer run")
+    table.add_column("Field", style="bold cyan", no_wrap=True)
+    table.add_column("Value")
+    table.add_row("Run", str(value["run_id"]))
+    table.add_row("Status", Text(status.upper(), style=f"bold {color}"))
+    table.add_row("Phase", str(value["phase"]).replace("_", " ").title())
+    table.add_row("Bundle", str(root / str(value["run_id"])))
+    table.add_row("HTML reviewer", str(root / str(value["run_id"]) / HTML_REPORT))
+    console.print(table)
     if value["status"] == "waiting":
-        typer.echo(f"next: edit {root / str(value['run_id']) / DECISIONS_YAML}")
+        console.print(
+            Panel(
+                "Read the numbered review reports, answer every blocking decision, set "
+                "[bold]approve_rewrite: true[/], save the YAML file, and run "
+                f"[bold cyan]docenhance stage-two {value['run_id']}[/].\n\n"
+                f"Decision file: {root / str(value['run_id']) / DECISIONS_YAML}",
+                title="[bold yellow]Human review required[/]",
+                border_style="yellow",
+            )
+        )
 
 
 @app.command()
@@ -189,13 +285,46 @@ def run_document(
             raise DocumentEnhancerError("--until must be questions or complete")
         config = load_config()
         root = (run_dir or config.workspace.run_dir).expanduser()
-        result = _runner(
+        selected_source = _select_source(source)
+        selected_reference_pack = _reference_pack(reference_pack)
+        workflow = _runner(
             root=root,
-            reference_pack=_reference_pack(reference_pack),
+            reference_pack=selected_reference_pack,
             document_type=document_type,
             structure_mode=structure_mode,
             execution_mode=execution_mode,
-        ).start(_select_source(source), stop_at=until)
+        )
+        if json_output:
+            result = workflow.start(selected_source, stop_at=until)
+        else:
+            console = _console()
+            _step(
+                console,
+                1,
+                2,
+                "Validate the Stage 1 configuration",
+                f"Source: {selected_source}\n"
+                f"Document type: {document_type}  •  Execution: {execution_mode}  •  "
+                f"Structure recovery: {structure_mode}\n"
+                f"Run workspace: {root}",
+            )
+            _success(console, "Source, recipe, execution mode, and output workspace are ready.")
+            _step(
+                console,
+                2,
+                2,
+                "Analyze the source and prepare the review gate",
+                "The runner will extract and normalize source evidence, evaluate the document "
+                "against the selected recipe, review every section, infer and propose process "
+                "flows, generate questions with safe suggestions where appropriate, and write "
+                "the numbered Markdown, JSON, Mermaid, and HTML review artifacts.",
+            )
+            with console.status("[bold cyan]Building the Stage 1 review bundle…[/]"):
+                result = workflow.start(selected_source, stop_at=until)
+            _success(
+                console,
+                "Stage 1 analysis, enhanced decision file, and HTML reviewer were generated.",
+            )
     except (DocumentEnhancerError, FileNotFoundError, RuntimeError, ValueError) as error:
         _fail(error)
         raise typer.Exit(20) from error
@@ -220,13 +349,30 @@ def continue_document(
         root = (run_dir or config.workspace.run_dir).expanduser()
         record = RunStore(root).load_run(run_id)
         document_type = record.recipe.rsplit("/", 1)[-1]
-        result = _runner(
+        workflow = _runner(
             root=root,
             reference_pack=_reference_pack(reference_pack),
             document_type=document_type,
             structure_mode="auto",
             execution_mode=record.execution_mode,
-        ).resume(run_id)
+        )
+        if json_output:
+            result = workflow.resume(run_id)
+        else:
+            console = _console()
+            _step(
+                console,
+                1,
+                1,
+                "Apply decisions and produce the final bundle",
+                "Validating the human decision contract, compiling the rewrite plan, applying "
+                "approved answers, exporting graph artifacts, and running deterministic checks.",
+            )
+            console.print(f"[bold]Decision file:[/] {root / run_id / DECISIONS_YAML}")
+            with console.status("[bold cyan]Rewriting, exporting, and verifying…[/]"):
+                result = workflow.resume(run_id)
+            if result.status == "succeeded":
+                _success(console, "Rewrite and deterministic verification completed.")
     except (DocumentEnhancerError, FileNotFoundError, RuntimeError, ValueError) as error:
         _fail(error)
         raise typer.Exit(20) from error
@@ -254,7 +400,7 @@ def status(
             "run_id": record.run_id,
             "status": record.status,
             "phase": record.phase,
-            "next_action": f"edit {DECISIONS_YAML} and continue"
+            "next_action": f"edit {DECISIONS_YAML} and run stage-two"
             if record.status == "waiting"
             else "none",
             "artifacts": {
@@ -282,20 +428,20 @@ def inspect(
 
     try:
         root = (run_dir or load_config().workspace.run_dir).expanduser()
-        store = RunStore(root)
-        record = store.load_run(run_id)
-        payload = {
-            "schema_version": "core.cli.v1",
-            "command": "inspect",
-            "run": record.model_dump(mode="json"),
-            "audit": store.read_json(run_id, AUDIT) if store.exists(run_id, AUDIT) else None,
-        }
+        payload = _inspection_payload(root, run_id)
         if json_output:
             _emit_json(payload)
         else:
-            typer.echo(f"run {record.run_id}: {record.status} ({record.phase})")
-            typer.echo(f"bundle: {root / run_id}")
-            typer.echo(f"artifacts: {len(record.artifacts)}")
+            console = _console()
+            _step(
+                console,
+                1,
+                1,
+                "Inspect the completed bundle",
+                "Reading durable run state, counting registered artifacts, and locating the "
+                "human-readable HTML reviewer and final audit.",
+            )
+            _render_inspection(console, payload, root=root)
     except (FileNotFoundError, ValueError) as error:
         _fail(error)
         raise typer.Exit(20) from error
@@ -311,19 +457,20 @@ def audit(
 
     try:
         root = (run_dir or load_config().workspace.run_dir).expanduser()
-        path = root / run_id / AUDIT
-        result = json.loads(path.read_text(encoding="utf-8"))
-        payload = {
-            **result,
-            "schema_version": "core.cli.audit.v1",
-            "run_id": run_id,
-            "report": str(root / run_id / AUDIT_MARKDOWN),
-        }
+        payload = _audit_payload(root, run_id)
         if json_output:
             _emit_json(payload)
         else:
-            typer.echo(f"{str(payload.get('status', 'fail')).upper()} audit")
-            typer.echo(f"report: {payload['report']}")
+            console = _console()
+            _step(
+                console,
+                1,
+                1,
+                "Review the final promotion audit",
+                "Displaying every deterministic check and the bundle's final promotability "
+                "decision. A passing audit is required before the seal is trusted.",
+            )
+            _render_audit(console, payload)
     except FileNotFoundError as error:
         _fail(error)
         raise typer.Exit(20) from error
@@ -331,6 +478,147 @@ def audit(
         _fail(error)
         raise typer.Exit(20) from error
     if payload.get("status") != "pass":
+        raise typer.Exit(30)
+
+
+@app.command("stage-two")
+def stage_two(
+    run_id: Annotated[str, typer.Argument(help="Run ID with completed reviewer decisions.")],
+    run_dir: Annotated[Path | None, typer.Option("--run-dir")] = None,
+    reference_pack: Annotated[Path | None, typer.Option("--reference-pack")] = None,
+    json_output: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    """Continue, inspect, and audit one run as a narrated Stage 2 workflow."""
+
+    try:
+        root = (run_dir or load_config().workspace.run_dir).expanduser()
+        current = RunStore(root).load_run(run_id)
+        document_type = current.recipe.rsplit("/", 1)[-1]
+        workflow = _runner(
+            root=root,
+            reference_pack=_reference_pack(reference_pack),
+            document_type=document_type,
+            structure_mode="auto",
+            execution_mode=current.execution_mode,
+        )
+        console = None if json_output else _console()
+        if console:
+            console.rule("[bold bright_cyan]Document Enhancer · Stage 2[/]")
+            console.print(
+                "This command applies the saved human decisions, inspects the completed bundle, "
+                "and presents the final audit in one continuous workflow.\n"
+            )
+            _step(
+                console,
+                1,
+                3,
+                "Continue the reviewed run",
+                "Validating question IDs and immutable question context, resolving accepted "
+                "suggestions, rewriting the document, exporting portable artifacts, and sealing "
+                "only after deterministic checks pass.",
+            )
+            console.print(f"[bold]Decision file:[/] {root / run_id / DECISIONS_YAML}")
+            with console.status("[bold cyan]Applying decisions and building final outputs…[/]"):
+                result = workflow.resume(run_id)
+        else:
+            result = workflow.resume(run_id)
+
+        if result.status == "waiting":
+            payload = {
+                "schema_version": "core.cli.stage-two.v1",
+                "command": "stage-two",
+                "run": result.model_dump(mode="json"),
+                "inspection": None,
+                "audit": None,
+            }
+            if json_output:
+                _emit_json(payload)
+            else:
+                assert console is not None
+                console.print(
+                    Panel(
+                        "Stage 2 remains paused. Resolve every blocking question, choose a "
+                        "non-deferred disposition, and set [bold]approve_rewrite: true[/].\n\n"
+                        f"Unresolved: {', '.join(result.unresolved_question_ids) or 'review approval'}",
+                        title="[bold yellow]Human decisions still required[/]",
+                        border_style="yellow",
+                    )
+                )
+            raise typer.Exit(10)
+        if console:
+            if result.status == "succeeded":
+                _success(console, "The rewrite and export phases completed successfully.")
+            else:
+                console.print(
+                    Text.assemble(
+                        ("! ", "bold red"),
+                        (
+                            "The rewrite completed, but verification blocked promotion. "
+                            "Inspecting the bundle and failed checks now.",
+                            "red",
+                        ),
+                    )
+                )
+            _step(
+                console,
+                2,
+                3,
+                "Inspect the generated bundle",
+                "Confirming durable run state, artifact registration, final output locations, "
+                "and the regenerated HTML reviewer.",
+            )
+        inspection_payload = _inspection_payload(root, run_id)
+        if console:
+            _render_inspection(console, inspection_payload, root=root)
+            if result.status == "succeeded":
+                _success(console, "The final bundle is complete and internally registered.")
+            else:
+                console.print(
+                    Text(
+                        "The unsealed outputs are registered for diagnosis and correction.",
+                        style="yellow",
+                    )
+                )
+            _step(
+                console,
+                3,
+                3,
+                "Present the final audit",
+                "Reading the promotion decision and showing each deterministic quality, "
+                "traceability, decision, flow, and graph check.",
+            )
+        audit_payload = _audit_payload(root, run_id)
+        if json_output:
+            _emit_json(
+                {
+                    "schema_version": "core.cli.stage-two.v1",
+                    "command": "stage-two",
+                    "run": result.model_dump(mode="json"),
+                    "inspection": inspection_payload,
+                    "audit": audit_payload,
+                }
+            )
+        else:
+            assert console is not None
+            _render_audit(console, audit_payload)
+            color = "green" if audit_payload.get("status") == "pass" else "red"
+            console.print(
+                Panel(
+                    f"Stage 2 finished with audit status "
+                    f"[bold {color}]{str(audit_payload.get('status', 'fail')).upper()}[/].\n\n"
+                    f"Bundle: {root / run_id}\n"
+                    f"HTML reviewer: {HTML_REPORT}\n"
+                    f"Final document: {FINAL_MARKDOWN}",
+                    title="[bold]Stage 2 complete[/]",
+                    border_style=color,
+                )
+            )
+    except typer.Exit:
+        raise
+    except (DocumentEnhancerError, FileNotFoundError, RuntimeError, ValueError) as error:
+        _fail(error)
+        raise typer.Exit(20) from error
+    if audit_payload.get("status") != "pass":
         raise typer.Exit(30)
 
 

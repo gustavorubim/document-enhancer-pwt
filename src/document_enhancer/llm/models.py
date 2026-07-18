@@ -384,9 +384,17 @@ class GeminiModelGateway:
             if hasattr(model, "with_route"):
                 model = model.with_route(route)
             return model
-        ChatGoogleGenerativeAI = importlib.import_module(
-            "langchain_google_genai"
-        ).ChatGoogleGenerativeAI
+        try:
+            ChatGoogleGenerativeAI = importlib.import_module(
+                "langchain_google_genai"
+            ).ChatGoogleGenerativeAI
+        except ModuleNotFoundError as exc:
+            if exc.name != "langchain_google_genai":
+                raise
+            raise GatewayConfigurationError(
+                "Live Gemini support is not installed. Run `uv sync --group live` in the "
+                "project checkout, or install the `document-enhancer[live]` package extra."
+            ) from exc
 
         kwargs: dict[str, Any] = {
             "model": route.model,
@@ -854,6 +862,8 @@ class GeminiModelGateway:
             except BaseException as exc:
                 if isinstance(exc, (KeyboardInterrupt, SystemExit, asyncio.CancelledError)):
                     raise
+                if isinstance(exc, GatewayConfigurationError):
+                    raise
                 classification = classify_provider_error(exc)
                 if classification == RetryClass.LIFECYCLE:
                     lifecycle = ModelLifecycleError(
@@ -921,8 +931,10 @@ class GeminiModelGateway:
                         output_budget=output_budget,
                     )
                     self.last_manifest = manifest
+                    cause_detail = str(exc).strip() or type(exc).__name__
                     raise ProviderError(
-                        "Gemini provider call failed under the configured retry policy"
+                        "Gemini provider call failed under the configured retry policy "
+                        f"after {attempts} attempt(s) ({classification.value}): {cause_detail}"
                     ) from exc
                 provider_retries += 1
                 time.sleep(self.config.retry_backoff_seconds * (2 ** (provider_retries - 1)))
