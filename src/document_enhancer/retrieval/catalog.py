@@ -450,6 +450,96 @@ class RagCatalog:
             ).fetchall()
             return tuple(self._chunk(str(row["chunk_id"])) for row in rows)
 
+    def graph_snapshot(self, *, run_ids: Sequence[str] | None = None) -> dict[str, object]:
+        """Return a portable, read-only graph and linked-evidence snapshot for visualization."""
+
+        with self._db_lock:
+            allowed = set(run_ids or ())
+            self._validate_run_ids(allowed)
+            where = ""
+            parameters: list[object] = []
+            if allowed:
+                placeholders = ",".join("?" for _ in allowed)
+                where = f" WHERE run_id IN ({placeholders})"
+                parameters.extend(sorted(allowed))
+            node_rows = self.connection.execute(
+                "SELECT node_id, run_id, original_node_id, label, node_type, provenance_span_ids "
+                f"FROM nodes{where} ORDER BY run_id, node_id",
+                parameters,
+            ).fetchall()
+            edge_rows = self.connection.execute(
+                "SELECT run_id, source, target, edge_type, provenance_span_ids "
+                f"FROM edges{where} ORDER BY run_id, source, target, edge_type",
+                parameters,
+            ).fetchall()
+            document_rows = self.connection.execute(
+                f"SELECT run_id, min(document_title) AS title FROM chunks{where} "
+                "GROUP BY run_id ORDER BY run_id",
+                parameters,
+            ).fetchall()
+            chunk_where = ""
+            chunk_parameters: list[object] = []
+            if allowed:
+                placeholders = ",".join("?" for _ in allowed)
+                chunk_where = f" WHERE c.run_id IN ({placeholders})"
+                chunk_parameters.extend(sorted(allowed))
+            chunk_rows = self.connection.execute(
+                "SELECT cn.node_id, c.chunk_id, c.run_id, c.document_title, c.heading_path, c.text "
+                "FROM chunk_nodes AS cn JOIN chunks AS c ON c.chunk_id = cn.chunk_id"
+                f"{chunk_where} ORDER BY c.run_id, cn.node_id, c.section_ordinal, c.chunk_ordinal",
+                chunk_parameters,
+            ).fetchall()
+
+            evidence: dict[str, list[dict[str, object]]] = defaultdict(list)
+            documents = {str(row["run_id"]): str(row["title"]) for row in document_rows}
+            for row in chunk_rows:
+                text = " ".join(str(row["text"]).split())
+                evidence[str(row["node_id"])].append(
+                    {
+                        "chunk_id": str(row["chunk_id"]),
+                        "heading_path": json.loads(str(row["heading_path"])),
+                        "excerpt": text[:360] + ("…" if len(text) > 360 else ""),
+                    }
+                )
+            nodes = [
+                {
+                    "id": str(row["node_id"]),
+                    "run_id": str(row["run_id"]),
+                    "original_id": str(row["original_node_id"]),
+                    "label": str(row["label"]),
+                    "type": str(row["node_type"]),
+                    "provenance_span_ids": json.loads(str(row["provenance_span_ids"])),
+                    "evidence": evidence.get(str(row["node_id"]), []),
+                }
+                for row in node_rows
+            ]
+            edges = [
+                {
+                    "run_id": str(row["run_id"]),
+                    "source": str(row["source"]),
+                    "target": str(row["target"]),
+                    "type": str(row["edge_type"]),
+                    "provenance_span_ids": json.loads(str(row["provenance_span_ids"])),
+                }
+                for row in edge_rows
+            ]
+            return {
+                "schema_version": "document-enhancer.graph-visualization.v1",
+                "catalog_digest": self.inspect()["catalog_digest"],
+                "documents": [
+                    {"run_id": run_id, "title": title}
+                    for run_id, title in sorted(documents.items())
+                ],
+                "nodes": nodes,
+                "edges": edges,
+                "counts": {
+                    "documents": len(documents),
+                    "nodes": len(nodes),
+                    "edges": len(edges),
+                    "linked_nodes": sum(bool(item["evidence"]) for item in nodes),
+                },
+            }
+
     def search(
         self,
         query: str,

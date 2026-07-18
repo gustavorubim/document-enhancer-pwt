@@ -381,6 +381,40 @@ uv run docenhance rag chat \
 
 Inside chat, use `/sources`, `/trace`, `/clear`, `/help`, and `/exit`.
 
+### Export the graph observatory
+
+Export the complete indexed topology as one self-contained HTML file. The command is read-only and
+does not call an embedding or chat provider:
+
+```bash
+uv run docenhance rag graph --output rag-graph.html
+```
+
+Open `rag-graph.html` directly in a browser—no server, CDN, or installation is required. The file
+embeds the selected catalog graph, linked evidence excerpts, CSS, and JavaScript. Drag to rotate the
+3D force layout, Shift-drag to pan, use the wheel or trackpad to zoom, search by label/ID/type, filter
+by document/node/relationship type, and select nodes to inspect neighbors, provenance spans, and
+linked final-document chunks.
+
+Restrict the export to selected indexed document versions by repeating `--run`:
+
+```bash
+uv run docenhance rag graph \
+  --run 918108480c23-93606487d4 \
+  --run cb5c3f51a738-672995c3c6 \
+  --output selected-rag-graph.html
+```
+
+The exporter refuses to overwrite a file unless `--force` is supplied. Use `--json` for
+machine-readable output metadata:
+
+```bash
+uv run docenhance rag graph \
+  --output rag-graph.html \
+  --force \
+  --json
+```
+
 ## Supported commands
 
 ```text
@@ -394,6 +428,7 @@ docenhance inspect RUN_ID
 docenhance audit RUN_ID
 docenhance rag index RUN_ID... [--all-sealed]
 docenhance rag inspect [--json]
+docenhance rag graph [--run RUN_ID] [--output FILE] [--force] [--json]
 docenhance rag ask "QUESTION" [--run RUN_ID] [--scope auto|focused|corpus] [--coverage retrieval|exhaustive] [--show-trace] [--json]
 docenhance rag chat [--run RUN_ID] [--scope auto|focused|corpus] [--coverage retrieval|exhaustive] [--show-trace]
 docenhance validate-recipe [--document-type TYPE]

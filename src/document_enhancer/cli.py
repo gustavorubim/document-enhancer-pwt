@@ -973,6 +973,53 @@ def rag_inspect(
         raise typer.Exit(20) from error
 
 
+@rag_app.command("graph")
+def rag_graph(
+    output: Annotated[
+        Path,
+        typer.Option("--output", "-o", help="Single self-contained HTML file to create."),
+    ] = Path("rag-graph.html"),
+    run_ids: Annotated[list[str] | None, typer.Option("--run")] = None,
+    catalog: Annotated[Path | None, typer.Option("--catalog")] = None,
+    force: Annotated[
+        bool, typer.Option("--force", help="Replace an existing output file.")
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    """Export a dependency-free navigable 3D graph as one local HTML file."""
+
+    try:
+        from .retrieval.catalog import RagCatalog, read_catalog_profile
+        from .retrieval.embeddings import IdentityEmbeddings
+        from .retrieval.visualization import write_graph_html
+
+        config = load_config()
+        catalog_path = (catalog or config.rag.catalog_dir).expanduser()
+        profile = read_catalog_profile(catalog_path)
+        with RagCatalog.open(catalog_path, IdentityEmbeddings(profile)) as opened:
+            snapshot = opened.graph_snapshot(run_ids=run_ids)
+        payload = write_graph_html(snapshot, output, force=force)
+        if json_output:
+            _emit_json(payload)
+        else:
+            console = _console()
+            counts = cast(dict[str, object], payload["counts"])
+            table = Table(title="3D graph export", box=box.ROUNDED, border_style="bright_cyan")
+            table.add_column("Field", style="bold cyan")
+            table.add_column("Value")
+            table.add_row("HTML", str(payload["output"]))
+            table.add_row("Documents", str(counts["documents"]))
+            table.add_row("Nodes / edges", f"{counts['nodes']} / {counts['edges']}")
+            table.add_row("Evidence-linked nodes", str(counts["linked_nodes"]))
+            table.add_row("Size", f"{int(cast(int, payload['size_bytes'])) / 1024:.1f} KiB")
+            table.add_row("Dependencies", "none — data, CSS, and JavaScript are embedded")
+            console.print(table)
+            _success(console, "Open the HTML file directly in a browser; no server is required.")
+    except (FileNotFoundError, ImportError, RuntimeError, ValueError) as error:
+        _fail(error)
+        raise typer.Exit(20) from error
+
+
 @rag_app.command("ask")
 def rag_ask(
     question: Annotated[str, typer.Argument(help="Question to answer from indexed evidence.")],

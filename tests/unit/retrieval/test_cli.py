@@ -62,6 +62,69 @@ def test_rag_index_and_inspect_json_cli(tmp_path: Path) -> None:
 
 
 @pytest.mark.unit
+def test_rag_graph_cli_exports_one_self_contained_html(tmp_path: Path) -> None:
+    write_bundle(
+        tmp_path / "runs",
+        "run-cli",
+        "# CLI Document\n\n## Overview\n\nThe owner reviews the control monthly.\n",
+    )
+    catalog = tmp_path / "catalog"
+    assert (
+        runner.invoke(
+            app,
+            [
+                "rag",
+                "index",
+                "run-cli",
+                "--run-dir",
+                str(tmp_path / "runs"),
+                "--catalog",
+                str(catalog),
+                "--offline",
+                "--json",
+            ],
+        ).exit_code
+        == 0
+    )
+    output = tmp_path / "exports" / "graph.html"
+
+    exported = runner.invoke(
+        app,
+        [
+            "rag",
+            "graph",
+            "--catalog",
+            str(catalog),
+            "--run",
+            "run-cli",
+            "--output",
+            str(output),
+            "--json",
+        ],
+    )
+    duplicate = runner.invoke(
+        app,
+        ["rag", "graph", "--catalog", str(catalog), "--output", str(output)],
+    )
+
+    assert exported.exit_code == 0, exported.output
+    payload = json.loads(exported.stdout)
+    assert payload["self_contained"] is True
+    assert payload["counts"] == {
+        "documents": 1,
+        "edges": 0,
+        "linked_nodes": 1,
+        "nodes": 1,
+    }
+    html = output.read_text(encoding="utf-8")
+    assert "Document Enhancer · Graph Observatory" in html
+    assert "Interactive 3D document graph" in html
+    assert "https://" not in html and "http://" not in html
+    assert duplicate.exit_code == 20
+    assert "pass --force" in duplicate.output
+
+
+@pytest.mark.unit
 def test_rag_ask_rich_and_json_render_validated_sources(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -373,6 +373,32 @@ line. Never check a live-provider reward from a fake, skipped, unavailable, or `
     formatting, lint, and typing clean, `143 passed, 2 deselected`, reference pack OK, wheel and
     source distribution built.
 
+## RAG-8 - Self-contained graph observatory
+
+- [x] **RAG-8.1 — Expose a filtered read-only graph snapshot from the validated catalog.**
+  - Reward: nodes, edges, document identity, provenance, and linked final-chunk excerpts are exported
+    without provider calls or access to unsealed authoring artifacts.
+  - Verify: catalog tests cover complete and per-run snapshots, evidence linkage, stable counts, and
+    rejection of an unknown run filter.
+  - Evidence: focused retrieval suite -> `42 passed, 2 deselected`; live catalog snapshot -> 5
+    documents, 115 nodes, 80 edges, and 75 evidence-linked nodes.
+- [x] **RAG-8.2 — Export one navigable local HTML file with no runtime dependency.**
+  - Reward: embedded data, CSS, and JavaScript provide perspective 3D force layout, rotate, pan,
+    zoom, search, filters, selection, neighbor highlighting, provenance, and evidence inspection;
+    no server, CDN, or external asset is required.
+  - Verify: HTML tests reject overwrite without `--force`, escape untrusted graph text inside the
+    script payload, and assert that no HTTP URL or external script is emitted.
+  - Evidence: exported `/private/tmp/document-enhancer-rag-graph.html` as one 100,146-byte file;
+    browser inspection confirmed search, filtering, neighbor navigation, evidence/provenance,
+    responsive rendering, zero console warnings/errors, and exactly one network request (the HTML).
+- [x] **RAG-8.3 — Deliver the exporter through the supported CLI and cookbook.**
+  - Reward: `docenhance rag graph --output FILE` supports repeated run filters, fail-closed overwrite,
+    Rich confirmation, and deterministic JSON metadata; README documents the complete journey.
+  - Verify: CLI tests build an offline catalog, export one file, validate counts/content, and prove
+    the duplicate-output failure path.
+  - Evidence: full gate -> formatting, lint, and typing clean, `146 passed, 2 deselected in 4.30s`,
+    reference pack OK, wheel and source distribution built.
+
 ## Final acceptance rewards
 
 - [x] **A1:** Two selected sealed bundles produce a validated FAISS index, FTS catalog, and traversable
@@ -393,7 +419,7 @@ line. Never check a live-provider reward from a fake, skipped, unavailable, or `
   - Evidence: `0a5e2c4`; dependency boundary -> `2 passed in 0.40s`; full gate -> `135 passed,
     2 deselected in 3.92s`, reference pack OK, wheel and sdist built.
 
-The feature is mergeable only when RAG-0 through RAG-6 and A1 through A7 are checked with evidence.
+The feature is mergeable only when RAG-0 through RAG-8 and A1 through A7 are checked with evidence.
 
 ## Deferred after v1
 

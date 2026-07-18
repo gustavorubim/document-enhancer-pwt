@@ -5,6 +5,7 @@ import json
 import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
@@ -99,6 +100,41 @@ def test_atomic_catalog_hybrid_search_namespaces_graph_and_filters(tmp_path: Pat
             catalog.expand_graph(["sec-overview"])
         with pytest.raises(ValueError, match="one or two"):
             catalog.expand_graph(["run-a::sec-overview"], depth=3)
+
+
+@pytest.mark.unit
+def test_graph_snapshot_is_portable_evidence_linked_and_filterable(tmp_path: Path) -> None:
+    first, second = _corpus(tmp_path)
+    path = tmp_path / "catalog"
+    embeddings = DeterministicEmbeddings()
+    RagCatalogBuilder(path, embeddings).build([first, second])
+
+    with RagCatalog.open(path, embeddings) as catalog:
+        complete = catalog.graph_snapshot()
+        filtered = catalog.graph_snapshot(run_ids=["run-a"])
+        with pytest.raises(ValueError, match="not indexed"):
+            catalog.graph_snapshot(run_ids=["missing"])
+
+    assert complete["schema_version"] == "document-enhancer.graph-visualization.v1"
+    assert complete["counts"] == {
+        "documents": 2,
+        "nodes": 3,
+        "edges": 1,
+        "linked_nodes": 3,
+    }
+    nodes = cast(list[dict[str, Any]], complete["nodes"])
+    control = next(item for item in nodes if item["id"] == "run-a::sec-controls")
+    assert control["type"] == "Control"
+    assert control["evidence"][0]["heading_path"] == ["Alpha Process", "Controls"]
+    assert "control owner" in control["evidence"][0]["excerpt"]
+    assert filtered["counts"] == {
+        "documents": 1,
+        "nodes": 2,
+        "edges": 1,
+        "linked_nodes": 2,
+    }
+    documents = cast(list[dict[str, Any]], filtered["documents"])
+    assert {item["run_id"] for item in documents} == {"run-a"}
 
 
 @pytest.mark.unit
