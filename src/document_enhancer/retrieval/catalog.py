@@ -424,6 +424,32 @@ class RagCatalog:
             ).hexdigest(),
         }
 
+    def run_ids(self) -> tuple[str, ...]:
+        """Return the catalog's explicit document versions in stable order."""
+
+        return tuple(
+            str(item["run_id"]) for item in cast(list[dict[str, str]], self.manifest["bundles"])
+        )
+
+    def chunks(self, *, run_ids: Sequence[str] | None = None) -> tuple[RagChunk, ...]:
+        """Read every chunk for selected runs in deterministic document order."""
+
+        with self._db_lock:
+            allowed = set(run_ids or ())
+            self._validate_run_ids(allowed)
+            parameters: list[object] = []
+            where = ""
+            if allowed:
+                placeholders = ",".join("?" for _ in allowed)
+                where = f" WHERE run_id IN ({placeholders})"
+                parameters.extend(sorted(allowed))
+            rows = self.connection.execute(
+                "SELECT chunk_id FROM chunks"
+                f"{where} ORDER BY run_id, section_ordinal, chunk_ordinal, chunk_id",
+                parameters,
+            ).fetchall()
+            return tuple(self._chunk(str(row["chunk_id"])) for row in rows)
+
     def search(
         self,
         query: str,

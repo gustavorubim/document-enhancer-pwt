@@ -344,6 +344,26 @@ line. Never check a live-provider reward from a fake, skipped, unavailable, or `
   - Evidence: `0a5e2c4`; exact gate above -> formatting clean, lint clean, typing clean,
     `135 passed, 2 deselected in 3.92s`, reference pack `OK` (27 files), wheel and sdist built.
 
+## RAG-7 - Adaptive corpus questions
+
+- [x] **RAG-7.1 — Route focused and corpus questions without adding another agent framework.**
+  - Reward: focused questions retain the bounded multi-hop/graph path; explicit corpus language and CLI
+    overrides select a separate question-driven map path.
+  - Verify: planner tests cover automatic focused/corpus routing plus explicit exhaustive routing.
+- [x] **RAG-7.2 — Extract arbitrary question-shaped facts per document with fail-closed citations.**
+  - Reward: the mapper has no control-specific schema, accepts only citations from the current evidence
+    batch, preserves document conflicts, and deterministically deduplicates supported rows.
+  - Verify: retrieval tests compile reconciliation controls while rejecting an invented evidence ID.
+- [x] **RAG-7.3 — Make corpus completeness observable.**
+  - Reward: retrieval coverage searches every selected document independently; exhaustive coverage maps
+    every selected chunk and reports requested/scanned documents, examined/available chunks, failures,
+    matches, and truncation.
+  - Verify: the exhaustive unit fixture proves examined chunks equal available chunks across three runs.
+- [x] **RAG-7.4 — Expose the adaptive path through cited Rich ask/chat and deterministic JSON.**
+  - Reward: corpus answers render a coverage panel, generic attributes, run IDs, sources, and map trace;
+    focused CLI behavior and chat commands remain compatible.
+  - Evidence: focused retrieval suite -> `37 passed, 2 deselected`; formatting, lint, and typing clean.
+
 ## Final acceptance rewards
 
 - [x] **A1:** Two selected sealed bundles produce a validated FAISS index, FTS catalog, and traversable

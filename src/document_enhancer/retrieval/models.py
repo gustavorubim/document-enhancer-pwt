@@ -70,7 +70,7 @@ class GraphExpansion(BaseModel):
 class TraceEvent(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    tool: Literal["search_evidence", "expand_graph", "agent"]
+    tool: Literal["search_evidence", "expand_graph", "corpus_map", "agent"]
     input: dict[str, object]
     evidence_ids: tuple[str, ...] = ()
     graph_paths: tuple[GraphPath, ...] = ()
@@ -117,13 +117,81 @@ class AnswerResult(BaseModel):
     trace: tuple[TraceEvent, ...]
 
 
+class QueryPlan(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    intent: Literal["answer", "enumerate", "compare", "summarize"]
+    scope: Literal["focused", "corpus"]
+    coverage: Literal["retrieval", "exhaustive"]
+    reason: str
+
+
+class CorpusAttribute(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid", frozen=True, json_schema_extra=_gemini_compatible_schema
+    )
+
+    name: str = Field(min_length=1)
+    value: str = Field(min_length=1)
+
+
+class CorpusMapItem(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid", frozen=True, json_schema_extra=_gemini_compatible_schema
+    )
+
+    item_key: str = ""
+    statement: str = Field(min_length=1)
+    attributes: tuple[CorpusAttribute, ...] = ()
+    citation_ids: tuple[str, ...] = Field(min_length=1)
+
+
+class CorpusMapEnvelope(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid", frozen=True, json_schema_extra=_gemini_compatible_schema
+    )
+
+    items: tuple[CorpusMapItem, ...] = ()
+
+
+class CoverageReport(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    mode: Literal["retrieval", "exhaustive"]
+    documents_requested: int = Field(ge=0)
+    documents_scanned: int = Field(ge=0)
+    documents_with_matches: int = Field(ge=0)
+    chunks_available: int = Field(ge=0)
+    chunks_examined: int = Field(ge=0)
+    failed_run_ids: tuple[str, ...] = ()
+    truncated: bool = False
+
+
+class CorpusResult(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    status: Literal["answered", "insufficient"]
+    question: str
+    plan: QueryPlan
+    items: tuple[CorpusMapItem, ...]
+    sources: tuple[SourceCitation, ...]
+    coverage: CoverageReport
+    trace: tuple[TraceEvent, ...]
+
+
 __all__ = [
     "AnswerClaim",
     "AnswerEnvelope",
     "AnswerResult",
+    "CorpusAttribute",
+    "CorpusMapEnvelope",
+    "CorpusMapItem",
+    "CorpusResult",
+    "CoverageReport",
     "EmbeddingProfile",
     "GraphExpansion",
     "GraphPath",
+    "QueryPlan",
     "RagChunk",
     "RetrievalHit",
     "SourceCitation",

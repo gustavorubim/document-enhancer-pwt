@@ -205,6 +205,9 @@ uv run docenhance rag index --all-sealed
 
 uv run docenhance rag inspect
 uv run docenhance rag ask "Who owns the control and how often is it reviewed?" --show-trace
+uv run docenhance rag ask \
+  "List every control with a reconciliation step across all documents" \
+  --coverage exhaustive --show-trace
 uv run docenhance rag chat
 ```
 
@@ -234,6 +237,23 @@ only two read-only retrieval tools—no web, shell, arbitrary filesystem, author
 Visible claims must cite evidence actually retrieved for that question; unknown or missing citations,
 conflicting evidence, and absent evidence produce `insufficient` instead of an invented answer.
 
+Question routing stays deliberately small. Focused questions use the bounded multi-hop agent. Questions
+that explicitly say `all documents`, `each document`, `across the corpus`, or similar language use a
+question-driven corpus map: the model extracts only the requested facts from each selected document,
+then deterministic code validates citations and combines the rows. `--scope focused|corpus` overrides
+automatic routing. Corpus mode has two coverage levels:
+
+- `--coverage retrieval` searches each selected document independently, which is efficient but does not
+  prove that every chunk was examined;
+- `--coverage exhaustive` reads every chunk in every selected document, reports exact document/chunk
+  coverage and failures, and is the right mode for completeness-sensitive lists and comparisons. It can
+  require several model calls and cost more on large catalogs.
+
+The extraction schema is derived from each question rather than fixed to controls, so the same path can
+list owners, compare thresholds, collect exceptions, or extract other document-specific facts. Every row
+keeps its supporting run and chunk citations. Use repeated `--run RUN_ID` options to restrict either mode
+to explicit document versions.
+
 Rich chat is in-memory and bounded. `/sources`, `/trace`, `/clear`, `/help`, and `/exit` are supported;
 no session, hidden reasoning, or conversation is persisted. FAISS files are trusted only as generated
 local workspace artifacts whose paths and hashes match the catalog manifest. Rebuild the whole small
@@ -252,8 +272,8 @@ docenhance inspect RUN_ID
 docenhance audit RUN_ID
 docenhance rag index RUN_ID... [--all-sealed]
 docenhance rag inspect [--json]
-docenhance rag ask "QUESTION" [--run RUN_ID] [--show-trace] [--json]
-docenhance rag chat [--run RUN_ID] [--show-trace]
+docenhance rag ask "QUESTION" [--run RUN_ID] [--scope auto|focused|corpus] [--coverage retrieval|exhaustive] [--show-trace] [--json]
+docenhance rag chat [--run RUN_ID] [--scope auto|focused|corpus] [--coverage retrieval|exhaustive] [--show-trace]
 docenhance validate-recipe [--document-type TYPE]
 ```
 
