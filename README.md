@@ -187,7 +187,199 @@ continues live after human review.
 - Final auditing checks source retention, required sections, graph references, unresolved blockers,
   section assessments, and dual flow artifacts before sealing an approved bundle.
 - Semantic JSON and JSONL graph exports are portable for a future RAG/ontology consumer; no retrieval
-  runtime ships on the authoring path.
+  runtime is required on the authoring path.
+
+## Optional local RAG and GraphRAG CLI
+
+Install the optional retrieval dependencies, finish and seal the documents you want to query, then
+build an explicit local catalog:
+
+```bash
+uv sync --frozen
+
+# The listed runs replace the current catalog. Only passing, sealed bundles are accepted.
+uv run docenhance rag index RUN_ID_1 RUN_ID_2
+
+# Deliberately select every passing sealed run under the configured run directory instead.
+uv run docenhance rag index --all-sealed
+
+uv run docenhance rag inspect
+uv run docenhance rag ask "Who owns the control and how often is it reviewed?" --show-trace
+uv run docenhance rag ask \
+  "List every control with a reconciliation step across all documents" \
+  --coverage exhaustive --show-trace
+uv run docenhance rag chat
+```
+
+Published-package users install `document-enhancer[rag]`. Indexing uses Gemini Embeddings 2 by
+default and reads the same recognized, ignored `.env` credentials as live authoring. The explicit
+`--offline` indexing option uses deterministic feature-hash vectors only for tests and local CLI
+demonstrations; it is not a semantic embedding profile. Live indexing sends only canonical final
+chunks to the configured provider and may incur embedding charges; each `ask` or chat turn also
+uses the configured chat model.
+
+The RAG catalog is written under `.document-enhancer/rag/catalog/` unless `--catalog` or
+`DOCENHANCE_RAG_CATALOG` selects another path. A build stages and validates the SQLite FTS5 catalog,
+FAISS index, graph topology, row counts, embedding profile, and SHA-256 file digests before replacing
+the prior catalog. A failed or tampered input leaves the promoted catalog unchanged.
+
+Corpus selection is intentionally conservative:
+
+- only explicitly named runs are indexed unless `--all-sealed` is supplied;
+- only the approved `markdown/07-final-document.md` is embedded;
+- original sources, review reports, decisions, audits, and change explanations are not embedded;
+- `json/09-ontology.json` is loaded as namespaced graph nodes and edges rather than embedded as text;
+- every answer source displays its run ID, heading path, and stable chunk ID.
+
+`rag ask` and `rag chat` use hybrid FAISS/FTS retrieval and may search again when evidence points to
+another indexed document. They can also traverse one or two real `core.graph.v1` edges. The agent has
+only two read-only retrieval tools—no web, shell, arbitrary filesystem, authoring, or write tools.
+Visible claims must cite evidence actually retrieved for that question; unknown or missing citations,
+conflicting evidence, and absent evidence produce `insufficient` instead of an invented answer.
+
+Question routing stays deliberately small. Focused questions use the bounded multi-hop agent. Questions
+that explicitly say `all documents`, `each document`, `across the corpus`, or similar language use a
+question-driven corpus map: the model extracts only the requested facts from each selected document,
+then one bounded reducer removes cross-batch category mismatches and paraphrases using only those
+cited candidates. Deterministic code validates citations before and after reduction. `--scope
+focused|corpus` overrides automatic routing. Corpus mode has two coverage levels:
+
+- `--coverage retrieval` searches each selected document independently, which is efficient but does not
+  prove that every chunk was examined;
+- `--coverage exhaustive` reads every chunk in every selected document, reports exact document/chunk
+  coverage and failures, and is the right mode for completeness-sensitive lists and comparisons. It can
+  require several model calls and cost more on large catalogs.
+
+The extraction schema is derived from each question rather than fixed to controls, so the same path can
+list owners, compare thresholds, collect exceptions, or extract other document-specific facts. Every row
+keeps its supporting run and chunk citations. Use repeated `--run RUN_ID` options to restrict either mode
+to explicit document versions.
+
+Rich chat is in-memory and bounded. `/sources`, `/trace`, `/clear`, `/help`, and `/exit` are supported;
+no session, hidden reasoning, or conversation is persisted. FAISS files are trusted only as generated
+local workspace artifacts whose paths and hashes match the catalog manifest. Rebuild the whole small
+catalog when the selected sealed corpus or embedding profile changes.
+
+### RAG cookbook: five-document corpus
+
+The checked-in fictional sources and expected answers live under `fixtures/rag/corpus_demo/`. The
+commands below use the five sealed demonstration runs produced from those sources. If you reprocess
+the sources, substitute the new sealed run IDs printed by Stage 2.
+
+```text
+Payment settlement:  918108480c23-93606487d4
+Vendor invoice:      4a96f70178e8-77a788bd0c
+Privileged access:   bb21fd5c68a4-82889042c6
+Model monitoring:    cb5c3f51a738-672995c3c6
+Complaint quality:   9dc086ca1df9-b98b271f40
+```
+
+Build or replace the catalog with exactly those five document versions, then inspect it:
+
+```bash
+uv run docenhance rag index \
+  918108480c23-93606487d4 \
+  4a96f70178e8-77a788bd0c \
+  bb21fd5c68a4-82889042c6 \
+  cb5c3f51a738-672995c3c6 \
+  9dc086ca1df9-b98b271f40
+
+uv run docenhance rag inspect
+uv run docenhance rag inspect --json
+```
+
+Ask a focused question against one explicit document:
+
+```bash
+uv run docenhance rag ask \
+  "Who owns the Daily Payment Settlement Process?" \
+  --run 918108480c23-93606487d4 \
+  --show-trace
+
+uv run docenhance rag ask \
+  "What threshold stops settlement release?" \
+  --run 918108480c23-93606487d4 \
+  --json
+```
+
+Ask a corpus-wide list question. The wording `all documents` automatically selects corpus mode:
+
+```bash
+uv run docenhance rag ask \
+  "List all controls that have a reconciliation step from all documents." \
+  --show-trace
+```
+
+The expected control IDs are `CTRL-PAY-101`, `CTRL-AP-202`, `CTRL-MOD-404`, and
+`CTRL-CQA-505`. The privileged-access document is the deliberate negative case.
+
+Use exhaustive coverage when completeness matters. This reads every selected chunk and can require
+many model calls:
+
+```bash
+uv run docenhance rag ask \
+  "List all controls that have a reconciliation step from all documents." \
+  --coverage exhaustive \
+  --show-trace
+
+uv run docenhance rag ask \
+  "List all controls that have a reconciliation step from all documents." \
+  --coverage exhaustive \
+  --json | jq '{
+    status,
+    coverage,
+    item_keys: [.items[].item_key],
+    cited_runs: [.sources[].run_id] | unique
+  }'
+```
+
+For this fixture, exhaustive success means 5/5 documents and 215/215 chunks examined, no failed
+runs, `reduction_failed: false`, `truncated: false`, and exactly the four expected IDs.
+
+The corpus schema is derived from each question, so a different comparison uses the same path:
+
+```bash
+uv run docenhance rag ask \
+  "Compare the business owner and evidence retention period across all documents." \
+  --show-trace
+
+uv run docenhance rag ask \
+  "Which exception approvers are named?" \
+  --scope corpus \
+  --show-trace
+```
+
+Restrict a corpus comparison by repeating `--run`:
+
+```bash
+uv run docenhance rag ask \
+  "Compare the owners and operating thresholds in these documents." \
+  --scope corpus \
+  --run 918108480c23-93606487d4 \
+  --run 4a96f70178e8-77a788bd0c \
+  --run cb5c3f51a738-672995c3c6 \
+  --show-trace
+```
+
+Exercise real graph topology. The trace should include `expand_graph` and cited `contains` paths:
+
+```bash
+uv run docenhance rag ask \
+  "Using the graph topology, what evidence is connected to the Controls, thresholds, and evidence section in the Monthly Credit Model Monitoring Process?" \
+  --run cb5c3f51a738-672995c3c6 \
+  --show-trace
+```
+
+Open the Rich interactive conversation, optionally restricted to one document:
+
+```bash
+uv run docenhance rag chat
+
+uv run docenhance rag chat \
+  --run bb21fd5c68a4-82889042c6
+```
+
+Inside chat, use `/sources`, `/trace`, `/clear`, `/help`, and `/exit`.
 
 ## Supported commands
 
@@ -200,6 +392,10 @@ docenhance stage-two RUN_ID
 docenhance status RUN_ID
 docenhance inspect RUN_ID
 docenhance audit RUN_ID
+docenhance rag index RUN_ID... [--all-sealed]
+docenhance rag inspect [--json]
+docenhance rag ask "QUESTION" [--run RUN_ID] [--scope auto|focused|corpus] [--coverage retrieval|exhaustive] [--show-trace] [--json]
+docenhance rag chat [--run RUN_ID] [--scope auto|focused|corpus] [--coverage retrieval|exhaustive] [--show-trace]
 docenhance validate-recipe [--document-type TYPE]
 ```
 

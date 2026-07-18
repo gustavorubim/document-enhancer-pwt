@@ -24,6 +24,12 @@ dependencies = [
 live = [
   "langchain-google-genai>=4.0,<5",
 ]
+rag = [
+  "faiss-cpu>=1.12,<2",
+  "langchain>=1.2,<2",
+  "langchain-google-genai>=4.2,<5",
+  "langchain-text-splitters>=1.1,<2",
+]
 
 [dependency-groups]
 dev = [
@@ -36,6 +42,12 @@ dev = [
 ]
 live = [
   "langchain-google-genai>=4.0,<5",
+]
+rag = [
+  "faiss-cpu>=1.12,<2",
+  "langchain>=1.2,<2",
+  "langchain-google-genai>=4.2,<5",
+  "langchain-text-splitters>=1.1,<2",
 ]
 
 [project.scripts]
@@ -108,7 +120,7 @@ exclude_also = [
 ]
 
 [tool.uv]
-default-groups = ["dev", "live"]
+default-groups = ["dev", "live", "rag"]
 resolution = "highest"
 # Some macOS file providers mark editable-install `.pth` files as hidden. Python
 # deliberately skips those files, which can leave `uv run docenhance` loading a

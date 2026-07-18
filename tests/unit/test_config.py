@@ -34,3 +34,21 @@ def test_public_config_contains_no_credential_fields() -> None:
 def test_invalid_environment_value_has_configuration_exit_contract() -> None:
     with pytest.raises(ConfigurationError):
         load_config(environ={"DOCENHANCE_BACKEND": "not-a-backend"})
+
+
+def test_rag_configuration_is_non_secret_and_validates_numeric_overrides() -> None:
+    config = load_config(
+        environ={
+            "DOCENHANCE_RAG_CATALOG": "/tmp/catalog",
+            "DOCENHANCE_RAG_EMBEDDING_DIMENSIONS": "1536",
+            "DOCENHANCE_RAG_CHUNK_SIZE": "3000",
+            "DOCENHANCE_RAG_CHUNK_OVERLAP": "250",
+        }
+    )
+
+    assert config.rag.catalog_dir == Path("/tmp/catalog")
+    assert config.rag.embedding_dimensions == 1536
+    assert config.rag.chunk_size == 3000
+    assert config.rag.chunk_overlap == 250
+    with pytest.raises(ConfigurationError, match="integer"):
+        load_config(environ={"DOCENHANCE_RAG_CHUNK_SIZE": "large"})

@@ -31,11 +31,18 @@ from document_enhancer.core.models import (
     FlowEdge,
     Question,
     ReviewReport,
+    RewritePlan,
+    RewritePlanItem,
     RunRecord,
     Section,
 )
+from document_enhancer.core.recipes import load_recipe
 from document_enhancer.core.review import merge_provider_review
-from document_enhancer.core.rewrite import apply_reviewer_decisions, render_docx
+from document_enhancer.core.rewrite import (
+    apply_reviewer_decisions,
+    apply_template_stubs,
+    render_docx,
+)
 from document_enhancer.core.store import register_artifact
 from document_enhancer.ingest.pipeline import DocumentIngestor
 
@@ -121,6 +128,54 @@ def test_runner_accepts_a_canonical_generated_suggestion(tmp_path: Path) -> None
     assert decisions["decisions"][0]["disposition"] == "accept_suggestion"
     final = (run_path / FINAL_MARKDOWN).read_text(encoding="utf-8")
     assert "purpose, scope, responsibilities" in final
+
+
+@pytest.mark.unit
+def test_template_stubs_match_markdown_headings_not_body_prose() -> None:
+    recipe = load_recipe(
+        Path(__file__).parents[3] / "reference_packs/enterprise_core",
+        document_type="process",
+    )
+    plan = RewritePlan(
+        recipe_id=recipe.recipe_id,
+        source_digest="a" * 64,
+        items=[
+            RewritePlanItem(
+                section_id="missing-sec-proc-metadata",
+                title="Document metadata and governance",
+                missing_required=True,
+                requirement_id="SEC-PROC-METADATA",
+            ),
+            RewritePlanItem(
+                section_id="missing-sec-proc-metrics",
+                title="Metrics, service levels, and monitoring",
+                missing_required=True,
+                requirement_id="SEC-PROC-METRICS",
+            ),
+        ],
+    )
+    decisions = [
+        Decision(
+            question_id="question-required-sec-proc-metadata",
+            answer="Owner-approved governance metadata.",
+        ),
+        Decision(
+            question_id="question-required-sec-proc-metrics",
+            answer="Owner-approved metrics and monitoring.",
+        ),
+    ]
+
+    final, changes = apply_template_stubs(
+        "# Existing section\n\nThe process records governance decisions and metrics daily.\n",
+        plan=plan,
+        recipe=recipe,
+        decisions=decisions,
+        waived_requirement_ids=set(),
+    )
+
+    assert "## Document metadata and governance" in final
+    assert "## Metrics, service levels, and monitoring" in final
+    assert len(changes) == 2
 
 
 @pytest.mark.unit
