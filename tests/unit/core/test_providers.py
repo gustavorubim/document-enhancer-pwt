@@ -124,7 +124,7 @@ def test_gemini_audit_provider_returns_independent_audit() -> None:
 
 @pytest.mark.unit
 def test_provider_finding_promotion_recovers_rubric_and_disposition_mixups() -> None:
-    from document_enhancer.core.providers import _ProviderFinding, _promote_finding
+    from document_enhancer.core.providers import _promote_finding, _ProviderFinding
 
     promoted = _promote_finding(
         _ProviderFinding(

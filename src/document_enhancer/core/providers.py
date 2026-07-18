@@ -3,13 +3,24 @@
 from __future__ import annotations
 
 import hashlib
-from typing import Literal, Protocol
+from typing import Literal, Protocol, cast
 
 from pydantic import BaseModel, ConfigDict
 
 from document_enhancer.llm.models import GeminiModelGateway
 
-from .models import AuditReport, Finding, FlowEdge, Question, ReviewReport, RewritePlan, Section
+from .models import (
+    AssessmentStatus,
+    AuditReport,
+    Finding,
+    FindingScope,
+    FlowEdge,
+    Question,
+    ReviewReport,
+    RewritePlan,
+    Section,
+    Severity,
+)
 from .recipes import Recipe
 
 
@@ -67,15 +78,15 @@ def _promote_finding(item: _ProviderFinding) -> Finding | None:
     try:
         return Finding(
             finding_id=item.finding_id.strip(),
-            scope=scope,  # type: ignore[arg-type]
-            severity=severity,  # type: ignore[arg-type]
+            scope=cast(FindingScope, scope),
+            severity=cast(Severity, severity),
             title=item.title.strip(),
             detail=item.detail.strip(),
             rubric_id=rubric_id or "provider.unspecified",
             section_id=item.section_id,
             evidence_span_ids=list(item.evidence_span_ids),
             recommendation=item.recommendation,
-            disposition=disposition,  # type: ignore[arg-type]
+            disposition=cast(AssessmentStatus | None, disposition),
         )
     except Exception:
         return None
