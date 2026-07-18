@@ -240,8 +240,9 @@ conflicting evidence, and absent evidence produce `insufficient` instead of an i
 Question routing stays deliberately small. Focused questions use the bounded multi-hop agent. Questions
 that explicitly say `all documents`, `each document`, `across the corpus`, or similar language use a
 question-driven corpus map: the model extracts only the requested facts from each selected document,
-then deterministic code validates citations and combines the rows. `--scope focused|corpus` overrides
-automatic routing. Corpus mode has two coverage levels:
+then one bounded reducer removes cross-batch category mismatches and paraphrases using only those
+cited candidates. Deterministic code validates citations before and after reduction. `--scope
+focused|corpus` overrides automatic routing. Corpus mode has two coverage levels:
 
 - `--coverage retrieval` searches each selected document independently, which is efficient but does not
   prove that every chunk was examined;

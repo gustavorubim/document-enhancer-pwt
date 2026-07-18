@@ -1,0 +1,36 @@
+{
+  "documents": {
+    "payment_settlement_process.md": {
+      "owner": "Treasury Operations Manager",
+      "exception_approver": "Treasury Control Officer",
+      "reconciliation_control": "CTRL-PAY-101"
+    },
+    "vendor_invoice_process.md": {
+      "owner": "Accounts Payable Director",
+      "exception_approver": "AP Governance Committee",
+      "reconciliation_control": "CTRL-AP-202"
+    },
+    "privileged_access_process.md": {
+      "owner": "IAM Governance Lead",
+      "exception_approver": "Chief Information Security Officer",
+      "reconciliation_control": null
+    },
+    "model_monitoring_process.md": {
+      "owner": "Model Risk Analytics Manager",
+      "exception_approver": "Model Risk Committee Chair",
+      "reconciliation_control": "CTRL-MOD-404"
+    },
+    "complaint_quality_process.md": {
+      "owner": "Customer Advocacy QA Director",
+      "exception_approver": "Compliance Oversight Director",
+      "reconciliation_control": "CTRL-CQA-505"
+    }
+  },
+  "expected_reconciliation_controls": [
+    "CTRL-PAY-101",
+    "CTRL-AP-202",
+    "CTRL-MOD-404",
+    "CTRL-CQA-505"
+  ],
+  "expected_document_count": 5
+}

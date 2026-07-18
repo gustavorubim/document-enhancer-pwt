@@ -287,12 +287,13 @@ def apply_template_stubs(
     }
     changes: list[str] = []
     body = text.rstrip() + "\n"
+    headings = [line.lstrip("# ").strip() for line in body.splitlines() if line.startswith("#")]
     for item in plan.items:
         if not item.missing_required or not item.requirement_id:
             continue
         if item.requirement_id in waived_requirement_ids:
             continue
-        if title_matches(item.title, body):
+        if any(title_matches(item.title, heading) for heading in headings):
             continue
         expected = next(
             (
@@ -319,6 +320,7 @@ def apply_template_stubs(
         if expected:
             stub += f"\nExpected content: {expected}.\n"
         body += stub
+        headings.append(item.title)
         changes.append(f"Inserted governed stub for missing section {item.title!r}.")
     return body, changes
 

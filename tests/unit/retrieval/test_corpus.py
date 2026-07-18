@@ -46,9 +46,21 @@ class _QuestionDrivenMapAgent:
         return {"structured_response": CorpusMapEnvelope(items=tuple(items))}
 
 
-def _factory(**kwargs: Any) -> _QuestionDrivenMapAgent:
+class _CandidateReducer:
+    def invoke(self, state: dict[str, Any], config: object) -> dict[str, object]:
+        assert config
+        prompt = state["messages"][0]["content"]
+        candidates = json.loads(prompt.split("Candidate JSON:\n", 1)[1])
+        return {"structured_response": CorpusMapEnvelope.model_validate({"items": candidates})}
+
+
+def _factory(**kwargs: Any) -> _QuestionDrivenMapAgent | _CandidateReducer:
     assert kwargs["tools"] == []
-    return _QuestionDrivenMapAgent()
+    return (
+        _CandidateReducer()
+        if kwargs["name"] == "document_enhancer_corpus_reduce"
+        else _QuestionDrivenMapAgent()
+    )
 
 
 def _catalog(tmp_path: Path) -> tuple[Path, DeterministicEmbeddings]:
@@ -136,6 +148,7 @@ def test_corpus_map_applies_run_selection_and_fails_closed_on_invalid_citations(
             catalog,
             object(),
             agent_factory=lambda **_: InvalidAgent(),
+            reducer_factory=_factory,
         ).answer("List controls", run_ids=["run-a"], coverage="exhaustive")
 
     assert {source.run_id for source in selected.sources} == {"run-a"}
@@ -143,3 +156,56 @@ def test_corpus_map_applies_run_selection_and_fails_closed_on_invalid_citations(
     assert invalid.status == "insufficient"
     assert invalid.coverage.failed_run_ids == ("run-a",)
     assert not invalid.items and not invalid.sources
+
+
+@pytest.mark.unit
+def test_corpus_reduction_deduplicates_stable_keys_across_batches() -> None:
+    first = CorpusMapItem(
+        item_key="CTRL-PAY-001",
+        statement="CTRL-PAY-001 reconciles settlement totals.",
+        citation_ids=("E1",),
+    )
+    repeated = CorpusMapItem(
+        item_key="ctrl-pay-001",
+        statement="The payment reconciliation control is CTRL-PAY-001.",
+        citation_ids=("E9",),
+    )
+
+    assert CorpusAnswerer._deduplicate((first, repeated)) == [first]
+
+
+@pytest.mark.unit
+def test_corpus_reducer_fails_closed_on_new_citation(tmp_path: Path) -> None:
+    path, embeddings = _catalog(tmp_path)
+
+    class InvalidReducer:
+        def invoke(self, state: object, config: object) -> dict[str, object]:
+            return {
+                "structured_response": CorpusMapEnvelope(
+                    items=(
+                        CorpusMapItem(
+                            item_key="CTRL-PAY-001",
+                            statement="Unsupported reduced item.",
+                            citation_ids=("E999",),
+                        ),
+                    )
+                )
+            }
+
+    with RagCatalog.open(path, embeddings) as catalog:
+        result = CorpusAnswerer(
+            catalog,
+            object(),
+            agent_factory=_factory,
+            reducer_factory=lambda **_: InvalidReducer(),
+        ).answer(
+            "List controls with reconciliation steps",
+            run_ids=["run-a"],
+            coverage="exhaustive",
+        )
+
+    assert result.status == "insufficient"
+    assert result.coverage.reduction_failed
+    assert not result.coverage.truncated
+    assert result.trace[-1].tool == "corpus_reduce"
+    assert result.trace[-1].status == "failed:ValueError"

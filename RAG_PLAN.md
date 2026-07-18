@@ -362,7 +362,16 @@ line. Never check a live-provider reward from a fake, skipped, unavailable, or `
 - [x] **RAG-7.4 — Expose the adaptive path through cited Rich ask/chat and deterministic JSON.**
   - Reward: corpus answers render a coverage panel, generic attributes, run IDs, sources, and map trace;
     focused CLI behavior and chat commands remain compatible.
-  - Evidence: focused retrieval suite -> `37 passed, 2 deselected`; formatting, lint, and typing clean.
+  - Evidence: focused retrieval suite -> `38 passed, 2 deselected`; formatting, lint, and typing clean.
+- [x] **RAG-7.5 — Prove question-driven map-reduce on a fully authored five-document corpus.**
+  - Reward: five fictional sources pass Stage 1, explicit decisions, Stage 2, sealing, live indexing,
+    focused retrieval, arbitrary comparison, exhaustive list compilation, graph expansion, and Rich
+    chat; expected answers are recorded before querying.
+  - Evidence: `fixtures/rag/corpus_demo/README.md`; exhaustive live proof examined 215/215 chunks in
+    5/5 documents with 30 successful map batches, one successful reducer, zero failures, no
+    truncation, and exactly the four expected reconciliation control IDs; final repository gate ->
+    formatting, lint, and typing clean, `143 passed, 2 deselected`, reference pack OK, wheel and
+    source distribution built.
 
 ## Final acceptance rewards
 

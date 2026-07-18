@@ -70,7 +70,7 @@ class GraphExpansion(BaseModel):
 class TraceEvent(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    tool: Literal["search_evidence", "expand_graph", "corpus_map", "agent"]
+    tool: Literal["search_evidence", "expand_graph", "corpus_map", "corpus_reduce", "agent"]
     input: dict[str, object]
     evidence_ids: tuple[str, ...] = ()
     graph_paths: tuple[GraphPath, ...] = ()
@@ -164,6 +164,7 @@ class CoverageReport(BaseModel):
     chunks_available: int = Field(ge=0)
     chunks_examined: int = Field(ge=0)
     failed_run_ids: tuple[str, ...] = ()
+    reduction_failed: bool = False
     truncated: bool = False
 
 

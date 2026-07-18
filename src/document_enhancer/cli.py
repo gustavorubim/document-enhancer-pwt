@@ -324,7 +324,13 @@ def _render_corpus_answer(console: Console, result: object, *, show_trace: bool)
 
     answer = CorpusResult.model_validate(result)
     coverage = answer.coverage
-    color = "green" if answer.status == "answered" and not coverage.failed_run_ids else "yellow"
+    color = (
+        "green"
+        if answer.status == "answered"
+        and not coverage.failed_run_ids
+        and not coverage.reduction_failed
+        else "yellow"
+    )
     console.print(
         Panel(
             f"Scope: [bold]{answer.plan.scope}[/]  •  Intent: [bold]{answer.plan.intent}[/]  •  "
@@ -332,6 +338,7 @@ def _render_corpus_answer(console: Console, result: object, *, show_trace: bool)
             f"Documents: {coverage.documents_scanned}/{coverage.documents_requested}  •  "
             f"Chunks examined: {coverage.chunks_examined}/{coverage.chunks_available}  •  "
             f"Documents with matches: {coverage.documents_with_matches}  •  "
+            f"Reduction: {'failed' if coverage.reduction_failed else 'passed'}  •  "
             f"Truncated: {'yes' if coverage.truncated else 'no'}",
             title="Corpus coverage",
             border_style=color,
@@ -403,8 +410,8 @@ def _render_corpus_answer(console: Console, result: object, *, show_trace: bool)
         table.add_column("Time")
         for event in answer.trace:
             table.add_row(
-                str(event.input.get("run_id", "—")),
-                str(event.input.get("batch", "—")),
+                str(event.input.get("run_id", "corpus")),
+                str(event.input.get("batch", "reduce")),
                 event.status,
                 str(event.input.get("chunks", 0)),
                 f"{event.duration_ms:.1f} ms",
