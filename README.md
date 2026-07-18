@@ -211,7 +211,9 @@ uv run docenhance rag chat
 Published-package users install `document-enhancer[rag]`. Indexing uses Gemini Embeddings 2 by
 default and reads the same recognized, ignored `.env` credentials as live authoring. The explicit
 `--offline` indexing option uses deterministic feature-hash vectors only for tests and local CLI
-demonstrations; it is not a semantic embedding profile.
+demonstrations; it is not a semantic embedding profile. Live indexing sends only canonical final
+chunks to the configured provider and may incur embedding charges; each `ask` or chat turn also
+uses the configured chat model.
 
 The RAG catalog is written under `.document-enhancer/rag/catalog/` unless `--catalog` or
 `DOCENHANCE_RAG_CATALOG` selects another path. A build stages and validates the SQLite FTS5 catalog,
