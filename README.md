@@ -11,12 +11,11 @@ retrieval system, prompt-pack runtime, or compatibility mode is required on the 
 
 1. Drop one `.md`, `.txt`, `.docx`, or `.pdf` into an inbox (or pass the file path).
 2. Parse with heuristics and optional bounded LLM structure recovery.
-3. Read the macro report (document vs rubric).
-4. Read the section report (`correct` / `missing` / `improve` per section).
-5. Read the process-flow report with inferred and proposed Mermaid when a process is documented.
-6. Answer questions and steering in `review/decisions.yaml`.
-7. Continue so the runner rewrites, audits, and seals the bundle.
-8. Use portable `semantic.json` / `ontology.json` / `graph.jsonl` later for GraphRAG, RAG, or ontology.
+3. Open `report.html` and read the numbered macro, section, and process-flow reports in order.
+4. Compare the inferred and proposed Mermaid diagrams when a process is documented.
+5. Answer questions and steering in `review/decisions.yaml`.
+6. Continue so the runner rewrites, audits, and seals the bundle.
+7. Use the portable semantic, ontology, and graph exports later for GraphRAG, RAG, or ontology.
 
 ## Quick start
 
@@ -33,18 +32,24 @@ uv run docenhance watch-inbox
 Exit code `10` means the run is waiting for human decisions. Exit code `0` means it finished;
 non-zero other than `10` means failure.
 
-When waiting, open the run directory printed by the CLI and review:
+When waiting, open the run directory printed by the CLI. Start with `report.html`, which renders
+all currently available Markdown reports in one styled, navigable page and renders the Mermaid
+process diagrams as embedded SVG without an external web dependency. The same reports remain
+available as portable Markdown files:
 
 ```text
-review/macro.md              # verbose document-level rubric report
-review/sections.md           # correct / missing / improve with rationale
-review/flow.md               # inferred + proposed Mermaid embedded, plus adjustment reasoning
-review/flow.inferred.mmd     # standalone inferred diagram
-review/flow.proposed.mmd     # standalone proposed diagram
-review/decisions.yaml
+report.html                              # styled reviewer for every report
+markdown/01-source-normalized.md         # exact parsed evidence used by the run
+markdown/02-review-overview.md           # reading order and readiness snapshot
+markdown/03-macro-review.md              # document-level rubric report
+markdown/04-section-review.md            # correct / missing / improve with rationale
+markdown/05-process-flow-review.md       # inferred + proposed Mermaid and reasoning
+diagrams/01-inferred-flow.mmd            # standalone inferred diagram
+diagrams/02-proposed-flow.mmd            # standalone proposed diagram
+review/decisions.yaml                    # only file the reviewer edits
 ```
 
-`flow.md` is the human-readable flow report: both Mermaid diagrams are embedded as fenced
+`05-process-flow-review.md` is the human-readable flow report: both Mermaid diagrams are embedded as fenced
 `mermaid` blocks, followed by a section explaining why the proposed diagram differs from the
 inferred source diagram.
 
@@ -59,15 +64,62 @@ uv run docenhance audit RUN_ID
 
 ### Cookbook example
 
-The checked-in Aurora AI complaint triage process is a good end-to-end review sample:
+The checked-in Aurora AI complaint triage process is a complete two-stage example. It intentionally
+contains contradictory operating details so the workflow must stop for human decisions instead of
+silently inventing an answer.
+
+#### Stage 1: generate and review the analysis
 
 ```bash
 uv run docenhance run examples/cookbook/aurora_ai_complaint_triage_process.docx \
   --document-type process \
-  --execution-mode offline
+  --execution-mode live \
+  --until questions
 ```
 
-Runs are written under `.document-enhancer/runs/<RUN_ID>/`.
+Exit code `10` is expected. Copy the printed `RUN_ID`; runs are written under
+`.document-enhancer/runs/<RUN_ID>/`. Open the accompanying reviewer:
+
+```text
+.document-enhancer/runs/<RUN_ID>/report.html
+```
+
+Read reports `01` through `05` in order. The HTML navigation, readiness cards, rendered Markdown,
+and Mermaid diagrams present the same evidence stored under `markdown/` and `diagrams/`.
+
+#### Human gate: answer and save the decisions
+
+Open `.document-enhancer/runs/<RUN_ID>/review/decisions.yaml`. For every blocking question, replace
+the empty answer with the accountable owner's answer and choose a disposition:
+
+```yaml
+approve_rewrite: true
+steering: "Keep the final process concise and make every control owner explicit."
+waivers: []
+decisions:
+  - question_id: question-example
+    answer: "Use the documented 30-minute P1 acknowledgement target."
+    disposition: accept
+```
+
+Use `accept` for an answered decision, `reject` when the proposed interpretation should not be
+used, and `defer` only when the run should remain paused. Do not rename question IDs. Save the YAML
+before continuing.
+
+#### Stage 2: rewrite, verify, and seal the same run
+
+```bash
+uv run docenhance continue RUN_ID
+uv run docenhance inspect RUN_ID
+uv run docenhance audit RUN_ID
+```
+
+Reopen the same `report.html`. It is regenerated with reports `06` through `08`: the final
+document, detailed change explanation, and expanded final audit. A successful run reports
+`succeeded`, passes the audit, and writes `json/12-seal.json`.
+
+For a deterministic local demonstration without provider enrichment, replace `live` with
+`offline`; the same two-stage artifact and decision contracts apply.
 
 ## Execution modes
 
@@ -83,24 +135,18 @@ Only these `.env` keys are loaded: `GOOGLE_API_KEY`, `GEMINI_API_KEY`, `GOOGLE_C
 
 ```text
 runs/RUN_ID/
-├── run.json                    # compact, sole mutable run state
-├── source/                     # original bytes, normalized text, spans, parser quality
-├── recipe/compiled.json        # validated policy, rubric, and template fingerprint
-├── review/
-│   ├── review.md               # index of specialist reports
-│   ├── macro.md                # document-level rubric report
-│   ├── sections.md             # correct / missing / improve per section
-│   ├── flow.md                 # process-flow critique
-│   ├── flow.inferred.mmd       # inferred process
-│   ├── flow.proposed.mmd       # proposed/corrected process
-│   └── decisions.yaml          # questions, steering, waivers, approve_rewrite
-├── rewrite/plan.json           # source-backed approved rewrite plan
-├── output/                     # final.md, final.docx, semantic.json, ontology.json, graph.jsonl
-└── audit/                      # audit, change explanation, source-to-target map, optional seal
+├── report.html                 # styled, navigable rendering of all Markdown reports
+├── json/                       # 00-run.json through 12-seal.json; every JSON artifact
+├── markdown/                   # 01 source through 08 final audit; numbered reading order
+├── review/decisions.yaml       # questions, steering, waivers, approve_rewrite
+├── diagrams/                   # numbered inferred, proposed, and final Mermaid sources
+├── documents/                  # original source bytes and final.docx
+├── data/                       # graph.jsonl and source-to-target.csv
+└── debug/                      # optional provider call manifests in JSONL
 ```
 
 The five phases are extract, analyze, human review, rewrite, and verify. Large values live in named
-artifacts; `run.json` remains below 50 KB and records the selected execution mode so a live run
+artifacts; `json/00-run.json` remains below 50 KB and records the selected execution mode so a live run
 continues live after human review.
 
 ## Quality boundaries
@@ -139,5 +185,4 @@ uv run python scripts/verify_reference_pack.py reference_packs/enterprise_core
 uv build
 ```
 
-Active product objective: `AGENTS.md`. Architecture: `SIMPLIFICATION_PLAN.md`. Workflow quality
-status: `WORKFLOW_ENHANCEMENT_PLAN.md`.
+Active product objective and engineering guidance: `AGENTS.md`.
