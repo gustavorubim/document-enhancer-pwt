@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import io
 import json
 from pathlib import Path
 
 import pytest
+from docx import Document
+from docx.enum.section import WD_ORIENT
 
 from document_enhancer.core import CoreRunner, RunStore
 from document_enhancer.core.layout import (
@@ -15,6 +18,7 @@ from document_enhancer.core.layout import (
     FINAL_MARKDOWN,
     HTML_REPORT,
     ORIGINAL_DOCUMENT_PREFIX,
+    QUESTIONS_MARKDOWN,
     REVIEW,
     REVIEW_INDEX_MARKDOWN,
     REWRITE_PLAN,
@@ -31,7 +35,7 @@ from document_enhancer.core.models import (
     Section,
 )
 from document_enhancer.core.review import merge_provider_review
-from document_enhancer.core.rewrite import apply_reviewer_decisions
+from document_enhancer.core.rewrite import apply_reviewer_decisions, render_docx
 from document_enhancer.core.store import register_artifact
 from document_enhancer.ingest.pipeline import DocumentIngestor
 
@@ -51,6 +55,7 @@ def test_runner_pauses_for_questions_and_resumes_from_yaml(tmp_path: Path) -> No
     assert waiting.phase == "human_review"
     assert waiting.unresolved_question_ids == ["question-placeholder-001"]
     assert (tmp_path / "runs" / waiting.run_id / REVIEW_INDEX_MARKDOWN).is_file()
+    assert (tmp_path / "runs" / waiting.run_id / QUESTIONS_MARKDOWN).is_file()
     assert (tmp_path / "runs" / waiting.run_id / HTML_REPORT).is_file()
     decisions = tmp_path / "runs" / waiting.run_id / DECISIONS_YAML
     decisions.write_text(
@@ -88,6 +93,34 @@ def test_runner_pauses_for_questions_and_resumes_from_yaml(tmp_path: Path) -> No
     retry = runner.start(source)
     assert retry.run_id != complete.run_id
     assert (tmp_path / "runs" / complete.run_id / RUN_RECORD).is_file()
+
+
+@pytest.mark.unit
+def test_runner_accepts_a_canonical_generated_suggestion(tmp_path: Path) -> None:
+    source = tmp_path / "input.md"
+    source.write_text(
+        "The owner receives the request, reviews the evidence, and records the outcome.\n",
+        encoding="utf-8",
+    )
+    runner = CoreRunner(tmp_path / "runs")
+    waiting = runner.start(source)
+    run_path = tmp_path / "runs" / waiting.run_id
+    template = (run_path / DECISIONS_YAML).read_text(encoding="utf-8")
+
+    assert 'question: "What are the intended major sections for this document?"' in template
+    assert "suggestion:" in template
+    answered = template.replace("approve_rewrite: false", "approve_rewrite: true").replace(
+        "disposition: defer", "disposition: accept_suggestion"
+    )
+    (run_path / DECISIONS_YAML).write_text(answered, encoding="utf-8")
+
+    complete = runner.resume(waiting.run_id)
+
+    assert complete.phase == "verify"
+    decisions = json.loads((run_path / "json/06-decisions.json").read_text(encoding="utf-8"))
+    assert decisions["decisions"][0]["disposition"] == "accept_suggestion"
+    final = (run_path / FINAL_MARKDOWN).read_text(encoding="utf-8")
+    assert "purpose, scope, responsibilities" in final
 
 
 @pytest.mark.unit
@@ -165,6 +198,32 @@ def test_resume_rehydrates_an_interrupted_analyze_phase(tmp_path: Path) -> None:
 
 
 @pytest.mark.unit
+def test_resume_retries_a_failed_verification_with_current_rewrite_contract(
+    tmp_path: Path,
+) -> None:
+    class RewriteStub:
+        calls = 0
+
+        def rewrite(self, **_: object) -> tuple[str, list[str]]:
+            self.calls += 1
+            if self.calls == 1:
+                return "# Source\n\nTBD\n", ["introduced unresolved placeholder"]
+            return "# Source\n\nThe owner reviews the result.\n", ["resolved placeholder"]
+
+    source = tmp_path / "input.md"
+    source.write_text("# Source\n\nThe owner reviews the result.\n", encoding="utf-8")
+    runner = CoreRunner(tmp_path / "runs", rewrite_provider=RewriteStub())
+
+    failed = runner.start(source)
+    resumed = runner.resume(failed.run_id)
+
+    assert failed.status == "failed"
+    assert failed.phase == "verify"
+    assert resumed.status == "succeeded"
+    assert "audit.seal" in resumed.artifacts
+
+
+@pytest.mark.unit
 def test_provider_enrichment_and_rewrite_are_recorded_as_optional_artifacts(tmp_path: Path) -> None:
     class ReviewStub:
         def review(self, **_: object) -> ReviewReport:
@@ -237,6 +296,46 @@ def test_offline_rewrite_applies_natural_language_open_point_decisions() -> None
     assert "approval partner not stated" not in rewritten
     assert "independent Compliance concurrence is required" in rewritten
     assert len(changes) >= 7
+
+
+@pytest.mark.unit
+def test_docx_renderer_preserves_markdown_structure_and_native_tables() -> None:
+    markdown = (
+        "# Governed process\n\n"
+        "## Responsibilities\n\n"
+        "The **owner** reviews *evidence* and records `control-id`.\n\n"
+        "- Validate the request\n"
+        "- Record the outcome\n\n"
+        "| Step | Owner | Input | Action | Evidence | Timing |\n"
+        "| --- | --- | --- | --- | --- | --- |\n"
+        "| Intake | Analyst | Request | Validate | Checklist | 10 minutes |\n"
+    )
+
+    document = Document(io.BytesIO(render_docx(markdown)))
+
+    paragraphs = {paragraph.text: paragraph for paragraph in document.paragraphs}
+    title_style = paragraphs["Governed process"].style
+    section_style = paragraphs["Responsibilities"].style
+    list_style = paragraphs["Validate the request"].style
+    assert title_style is not None and title_style.name == "Heading 1"
+    assert section_style is not None and section_style.name == "Heading 2"
+    assert list_style is not None and list_style.name.startswith("List Bullet")
+    body = paragraphs["The owner reviews evidence and records control-id."]
+    assert any(run.text == "owner" and run.bold for run in body.runs)
+    assert any(run.text == "evidence" and run.italic for run in body.runs)
+    assert document.sections[0].orientation == WD_ORIENT.LANDSCAPE
+    assert len(document.tables) == 1
+    table = document.tables[0]
+    assert [cell.text for cell in table.rows[0].cells] == [
+        "Step",
+        "Owner",
+        "Input",
+        "Action",
+        "Evidence",
+        "Timing",
+    ]
+    assert all(cell.paragraphs[0].runs[0].bold for cell in table.rows[0].cells)
+    assert table.rows[1].cells[0].text == "Intake"
 
 
 @pytest.mark.unit
@@ -329,6 +428,31 @@ def test_provider_flow_edges_are_evidence_filtered_and_typed() -> None:
         ("one", "two", "branch")
     ]
     assert "branch" in merged.mermaid
+
+
+@pytest.mark.unit
+def test_provider_question_ids_remain_unique_across_section_batches() -> None:
+    base = ReviewReport(
+        summary="base",
+        questions=[Question(question_id="q-001", prompt="Base?", reason="base")],
+    )
+    first = ReviewReport(
+        summary="first",
+        questions=[Question(question_id="q-001", prompt="First?", reason="first")],
+    )
+    second = ReviewReport(
+        summary="second",
+        questions=[Question(question_id="q-001", prompt="Second?", reason="second")],
+    )
+
+    merged = merge_provider_review(base, first, allowed_span_ids=set())
+    merged = merge_provider_review(merged, second, allowed_span_ids=set())
+
+    assert [item.question_id for item in merged.questions] == [
+        "q-001",
+        "llm-q-001",
+        "llm-q-001-2",
+    ]
 
 
 @pytest.mark.unit

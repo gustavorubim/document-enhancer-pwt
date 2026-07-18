@@ -9,6 +9,13 @@ import re
 from typing import Any
 
 from docx import Document
+from docx.enum.section import WD_ORIENT
+from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT, WD_TABLE_ALIGNMENT
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
+from docx.shared import Inches, Pt, RGBColor
+from markdown_it import MarkdownIt
 
 from .export import public_graph_jsonl
 from .models import (
@@ -316,18 +323,281 @@ def apply_template_stubs(
     return body, changes
 
 
-def render_docx(markdown: str) -> bytes:
-    document = Document()
-    for line in markdown.splitlines():
-        if not line.strip():
+def _markdown_parser() -> MarkdownIt:
+    return MarkdownIt("commonmark", {"html": False, "typographer": True}).enable("table")
+
+
+def _inline_text(token: Any) -> str:
+    children = token.children or []
+    return "".join(
+        "\n" if item.type in {"softbreak", "hardbreak"} else str(item.content)
+        for item in children
+        if item.type in {"text", "code_inline", "softbreak", "hardbreak"}
+    ).strip()
+
+
+def _append_inline(paragraph: Any, token: Any, *, force_bold: bool = False) -> None:
+    """Translate Markdown inline tokens to native Word runs."""
+
+    bold = force_bold
+    italic = False
+    link: str | None = None
+    link_text = ""
+    for child in token.children or []:
+        if child.type == "strong_open":
+            bold = True
             continue
-        heading = re.match(r"^(#{1,6})\s+(.*)$", line)
-        if heading:
-            document.add_heading(heading.group(2).strip(), level=min(len(heading.group(1)), 6))
-        elif re.match(r"^\s*[-*]\s+", line):
-            document.add_paragraph(re.sub(r"^\s*[-*]\s+", "", line), style="List Bullet")
+        if child.type == "strong_close":
+            bold = force_bold
+            continue
+        if child.type == "em_open":
+            italic = True
+            continue
+        if child.type == "em_close":
+            italic = False
+            continue
+        if child.type == "link_open":
+            link = str(child.attrGet("href") or "")
+            link_text = ""
+            continue
+        if child.type == "link_close":
+            if link and link != link_text:
+                run = paragraph.add_run(f" ({link})")
+                run.font.size = Pt(9)
+                run.font.color.rgb = RGBColor(117, 105, 128)
+            link = None
+            link_text = ""
+            continue
+        if child.type in {"softbreak", "hardbreak"}:
+            paragraph.add_run().add_break()
+            continue
+        if child.type == "html_inline" and "br" in str(child.content).lower():
+            paragraph.add_run().add_break()
+            continue
+        if child.type == "image":
+            text = f"[Image: {child.content or child.attrGet('alt') or 'illustration'}]"
+        elif child.type in {"text", "code_inline"}:
+            text = str(child.content)
         else:
-            document.add_paragraph(line.strip())
+            continue
+        run = paragraph.add_run(text)
+        run.bold = bold
+        run.italic = italic
+        if child.type == "code_inline":
+            run.font.name = "Aptos Mono"
+            run.font.size = Pt(9)
+            run.font.color.rgb = RGBColor(101, 82, 124)
+        if link:
+            link_text += text
+            run.underline = True
+            run.font.color.rgb = RGBColor(110, 88, 143)
+
+
+def _set_cell_shading(cell: Any, fill: str) -> None:
+    properties = cell._tc.get_or_add_tcPr()
+    shading = properties.find(qn("w:shd"))
+    if shading is None:
+        shading = OxmlElement("w:shd")
+        properties.append(shading)
+    shading.set(qn("w:fill"), fill)
+
+
+def _set_repeat_table_header(row: Any) -> None:
+    properties = row._tr.get_or_add_trPr()
+    repeat = OxmlElement("w:tblHeader")
+    repeat.set(qn("w:val"), "true")
+    properties.append(repeat)
+
+
+def _set_row_no_split(row: Any) -> None:
+    properties = row._tr.get_or_add_trPr()
+    no_split = OxmlElement("w:cantSplit")
+    properties.append(no_split)
+
+
+def _table_tokens(tokens: list[Any], start: int) -> tuple[list[list[tuple[Any, bool, str]]], int]:
+    rows: list[list[tuple[Any, bool, str]]] = []
+    row: list[tuple[Any, bool, str]] = []
+    header = False
+    alignment = "left"
+    index = start + 1
+    while index < len(tokens) and tokens[index].type != "table_close":
+        token = tokens[index]
+        if token.type == "tr_open":
+            row = []
+        elif token.type in {"th_open", "td_open"}:
+            header = token.type == "th_open"
+            style = str(token.attrGet("style") or "")
+            alignment = "center" if "center" in style else "right" if "right" in style else "left"
+        elif token.type == "inline" and row is not None:
+            row.append((token, header, alignment))
+        elif token.type == "tr_close" and row:
+            rows.append(row)
+        index += 1
+    return rows, index
+
+
+def _configure_docx(document: Any, *, wide_tables: bool) -> None:
+    section = document.sections[0]
+    if wide_tables:
+        section.orientation = WD_ORIENT.LANDSCAPE
+        section.page_width, section.page_height = section.page_height, section.page_width
+        margin = Inches(0.55)
+    else:
+        margin = Inches(0.72)
+    section.top_margin = margin
+    section.bottom_margin = margin
+    section.left_margin = margin
+    section.right_margin = margin
+
+    normal = document.styles["Normal"]
+    normal.font.name = "Aptos"
+    normal.font.size = Pt(10.5)
+    normal.font.color.rgb = RGBColor(64, 58, 73)
+    normal.paragraph_format.space_after = Pt(6)
+    normal.paragraph_format.line_spacing = 1.08
+    heading_colors = (
+        RGBColor(83, 70, 96),
+        RGBColor(105, 84, 124),
+        RGBColor(93, 121, 115),
+    )
+    for level in range(1, 7):
+        style = document.styles[f"Heading {level}"]
+        style.font.name = "Aptos Display"
+        style.font.bold = True
+        style.font.color.rgb = heading_colors[min(level - 1, 2)]
+        style.font.size = Pt(max(11, 19 - (level - 1) * 1.7))
+        style.paragraph_format.space_before = Pt(15 if level == 1 else 10)
+        style.paragraph_format.space_after = Pt(5)
+        style.paragraph_format.keep_with_next = True
+    title = document.styles["Title"]
+    title.font.name = "Aptos Display"
+    title.font.size = Pt(25)
+    title.font.bold = True
+    title.font.color.rgb = RGBColor(83, 70, 96)
+    title.paragraph_format.space_after = Pt(15)
+    document.styles["Quote"].font.color.rgb = RGBColor(106, 85, 91)
+    document.styles["Quote"].font.italic = True
+
+
+def _add_markdown_table(document: Any, rows: list[list[tuple[Any, bool, str]]]) -> None:
+    if not rows:
+        return
+    columns = max(len(row) for row in rows)
+    table = document.add_table(rows=len(rows), cols=columns)
+    table.style = "Table Grid"
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    table.autofit = True
+    compact = columns > 5
+    for row_index, source_row in enumerate(rows):
+        target_row = table.rows[row_index]
+        _set_row_no_split(target_row)
+        if row_index == 0 and any(header for _, header, _ in source_row):
+            _set_repeat_table_header(target_row)
+        for column_index, (inline, header, alignment) in enumerate(source_row):
+            cell = target_row.cells[column_index]
+            cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+            if header:
+                _set_cell_shading(cell, "EDE7F4")
+            elif row_index % 2 == 0:
+                _set_cell_shading(cell, "FAF7FB")
+            paragraph = cell.paragraphs[0]
+            paragraph.paragraph_format.space_after = Pt(0)
+            paragraph.alignment = {
+                "center": WD_ALIGN_PARAGRAPH.CENTER,
+                "right": WD_ALIGN_PARAGRAPH.RIGHT,
+            }.get(alignment, WD_ALIGN_PARAGRAPH.LEFT)
+            _append_inline(paragraph, inline, force_bold=header)
+            for run in paragraph.runs:
+                run.font.name = "Aptos"
+                run.font.size = Pt(8 if compact else 9)
+    document.add_paragraph().paragraph_format.space_after = Pt(2)
+
+
+def render_docx(markdown: str) -> bytes:
+    """Render Markdown as a structured, styled Word document with native tables."""
+
+    tokens = _markdown_parser().parse(markdown)
+    table_widths = []
+    for index, token in enumerate(tokens):
+        if token.type == "table_open":
+            rows, _ = _table_tokens(tokens, index)
+            table_widths.append(max((len(row) for row in rows), default=0))
+    document = Document()
+    _configure_docx(document, wide_tables=max(table_widths, default=0) > 5)
+    list_stack: list[str] = []
+    quote_depth = 0
+    first_heading = True
+    index = 0
+    while index < len(tokens):
+        token = tokens[index]
+        if token.type == "heading_open" and index + 1 < len(tokens):
+            level = min(int(token.tag[1:]), 6)
+            inline = tokens[index + 1]
+            paragraph = document.add_paragraph(style=f"Heading {level}")
+            _append_inline(paragraph, inline)
+            if first_heading:
+                document.core_properties.title = _inline_text(inline)
+                first_heading = False
+            index += 3
+            continue
+        if token.type in {"bullet_list_open", "ordered_list_open"}:
+            list_stack.append("bullet" if token.type == "bullet_list_open" else "number")
+            index += 1
+            continue
+        if token.type in {"bullet_list_close", "ordered_list_close"}:
+            if list_stack:
+                list_stack.pop()
+            index += 1
+            continue
+        if token.type == "blockquote_open":
+            quote_depth += 1
+            index += 1
+            continue
+        if token.type == "blockquote_close":
+            quote_depth = max(0, quote_depth - 1)
+            index += 1
+            continue
+        if token.type == "paragraph_open" and index + 1 < len(tokens):
+            inline = tokens[index + 1]
+            if list_stack:
+                style = "List Bullet" if list_stack[-1] == "bullet" else "List Number"
+            elif quote_depth:
+                style = "Quote"
+            else:
+                style = None
+            paragraph = document.add_paragraph(style=style)
+            if len(list_stack) > 1:
+                paragraph.paragraph_format.left_indent = Inches(0.25 * (len(list_stack) - 1))
+            _append_inline(paragraph, inline)
+            index += 3
+            continue
+        if token.type == "table_open":
+            rows, closing_index = _table_tokens(tokens, index)
+            _add_markdown_table(document, rows)
+            index = closing_index + 1
+            continue
+        if token.type in {"fence", "code_block"}:
+            paragraph = document.add_paragraph()
+            paragraph.paragraph_format.left_indent = Inches(0.22)
+            paragraph.paragraph_format.right_indent = Inches(0.22)
+            run = paragraph.add_run(str(token.content).rstrip())
+            run.font.name = "Aptos Mono"
+            run.font.size = Pt(8.5)
+            run.font.color.rgb = RGBColor(75, 65, 85)
+            index += 1
+            continue
+        if token.type == "hr":
+            paragraph = document.add_paragraph()
+            properties = paragraph._p.get_or_add_pPr()
+            borders = OxmlElement("w:pBdr")
+            bottom = OxmlElement("w:bottom")
+            bottom.set(qn("w:val"), "single")
+            bottom.set(qn("w:sz"), "6")
+            bottom.set(qn("w:color"), "D9CFE2")
+            borders.append(bottom)
+            properties.append(borders)
+        index += 1
     stream = io.BytesIO()
     document.save(stream)
     return stream.getvalue()

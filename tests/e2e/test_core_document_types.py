@@ -148,7 +148,10 @@ def test_core_clean_synthetic_process_seals_ontology_graph_and_audit_bundle(
     assert (run_path / HTML_REPORT).is_file()
     html = (run_path / HTML_REPORT).read_text(encoding="utf-8")
     assert "Final audit: pass" in html
-    assert "Report 08" in html
+    assert "Report 09" in html
+    assert "Original Normalized Document" in html
+    assert "Enhanced Document" in html
+    assert 'role="tabpanel"' in html
     assert [path.name[:2] for path in sorted((run_path / "markdown").glob("*.md"))] == [
         "01",
         "02",
@@ -158,6 +161,7 @@ def test_core_clean_synthetic_process_seals_ontology_graph_and_audit_bundle(
         "06",
         "07",
         "08",
+        "09",
     ]
     assert seal["sealed"] is True
     assert seal["source_digest"] == result.source_digest

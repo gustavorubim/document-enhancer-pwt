@@ -55,6 +55,7 @@ from .layout import (
     ONTOLOGY,
     ORIGINAL_DOCUMENT_PREFIX,
     PROPOSED_FLOW,
+    QUESTIONS_MARKDOWN,
     RECIPE,
     REVIEW,
     REVIEW_INDEX_MARKDOWN,
@@ -88,6 +89,7 @@ from .review import (
     merge_provider_review,
     render_flow_markdown,
     render_macro_markdown,
+    render_questions_markdown,
     render_review_index_markdown,
     render_sections_markdown,
 )
@@ -206,6 +208,16 @@ class CoreRunner:
         """Continue a waiting run after the reviewer edits ``decisions.yaml``."""
 
         record = self.store.load_run(run_id)
+        if record.status == "failed" and record.phase == "verify":
+            return self._finish(
+                self._update(
+                    record,
+                    status="running",
+                    phase="rewrite",
+                    error=None,
+                    unresolved_question_ids=[],
+                )
+            )
         if record.status == "running" and record.phase == "analyze":
             source_path = self.store.run_path(run_id) / record.artifacts["source.original"].path
             if not source_path.is_file():
@@ -231,8 +243,9 @@ class CoreRunner:
         if not path.is_file():
             return record
         bundle = self._read_decision_bundle(path)
-        decisions = bundle.decisions
         review = self._load_review(record)
+        decisions = self._canonical_decisions(review, bundle.decisions)
+        bundle = bundle.model_copy(update={"decisions": decisions})
         answers = {item.question_id: item for item in decisions}
         unresolved = [
             question.question_id
@@ -244,6 +257,10 @@ class CoreRunner:
                 or (
                     answers[question.question_id].disposition == "accept"
                     and not answers[question.question_id].answer.strip()
+                )
+                or (
+                    answers[question.question_id].disposition == "accept_suggestion"
+                    and not question.suggestion
                 )
             )
         ]
@@ -531,6 +548,16 @@ class CoreRunner:
                 record.run_id,
                 FLOW_MARKDOWN,
                 render_flow_markdown(review),
+                media_type="text/markdown; charset=utf-8",
+            ),
+        )
+        record = register_artifact(
+            record,
+            "review.questions_markdown",
+            self.store.write_text(
+                record.run_id,
+                QUESTIONS_MARKDOWN,
+                render_questions_markdown(review),
                 media_type="text/markdown; charset=utf-8",
             ),
         )
@@ -900,6 +927,7 @@ class CoreRunner:
             MACRO_MARKDOWN,
             SECTIONS_MARKDOWN,
             FLOW_MARKDOWN,
+            QUESTIONS_MARKDOWN,
             FINAL_MARKDOWN,
             CHANGES_MARKDOWN,
             AUDIT_MARKDOWN,
@@ -945,7 +973,59 @@ class CoreRunner:
 
     def _read_decisions_file(self, run_id: str) -> list[Decision]:
         path = self.store.run_path(run_id) / DECISIONS_YAML
-        return self._read_decision_bundle(path).decisions if path.is_file() else []
+        if not path.is_file():
+            return []
+        decisions = self._read_decision_bundle(path).decisions
+        review = ReviewReport.model_validate(self.store.read_json(run_id, REVIEW))
+        return self._effective_decisions(review, decisions)
+
+    @staticmethod
+    def _canonical_decisions(review: ReviewReport, decisions: list[Decision]) -> list[Decision]:
+        """Validate editable choices against the immutable generated question context."""
+
+        questions = {item.question_id: item for item in review.questions}
+        canonical: list[Decision] = []
+        seen: set[str] = set()
+        for decision in decisions:
+            if decision.question_id in seen:
+                raise ValueError(f"duplicate decision for {decision.question_id}")
+            seen.add(decision.question_id)
+            question = questions.get(decision.question_id)
+            if question is None:
+                raise ValueError(f"unknown decision question_id: {decision.question_id}")
+            if decision.question and decision.question != question.prompt:
+                raise ValueError(
+                    f"question text for {decision.question_id} must not be changed; edit answer instead"
+                )
+            if decision.suggestion is not None and decision.suggestion != question.suggestion:
+                raise ValueError(
+                    f"suggestion for {decision.question_id} must not be changed; choose a disposition instead"
+                )
+            canonical.append(
+                decision.model_copy(
+                    update={"question": question.prompt, "suggestion": question.suggestion}
+                )
+            )
+        return canonical
+
+    @classmethod
+    def _effective_decisions(
+        cls, review: ReviewReport, decisions: list[Decision]
+    ) -> list[Decision]:
+        """Resolve accepted suggestions to the canonical text used during rewrite."""
+
+        effective: list[Decision] = []
+        for decision in cls._canonical_decisions(review, decisions):
+            if decision.disposition == "accept_suggestion":
+                if not decision.suggestion:
+                    raise ValueError(
+                        f"{decision.question_id} has no suggestion to accept; provide an answer instead"
+                    )
+                decision = decision.model_copy(
+                    update={"answer": decision.suggestion, "disposition": "accept"}
+                )
+            effective.append(decision)
+        return effective
 
     @staticmethod
     def _read_decision_bundle(path: Path) -> DecisionBundle:
@@ -1040,8 +1120,15 @@ class CoreRunner:
     @staticmethod
     def _questions_yaml(review: ReviewReport) -> str:
         lines = [
-            "# Edit answers and set approve_rewrite: true, then run `docenhance continue <run-id>`.",
-            "approve_rewrite: true",
+            "# Human decision gate. Read markdown/06-review-questions.md before editing.",
+            "# Edit answer, disposition, rationale, steering, waivers, and approve_rewrite only.",
+            "# Dispositions: accept | accept_suggestion | reject | defer",
+            "# - accept: apply the text in answer",
+            "# - accept_suggestion: apply the generated suggestion (when present)",
+            "# - reject: resolve without applying the answer or suggestion",
+            "# - defer: keep Stage 2 paused",
+            "schema_version: core.decisions.v1",
+            "approve_rewrite: false",
             'steering: ""',
             "waivers: []",
             "decisions:",
@@ -1052,8 +1139,15 @@ class CoreRunner:
             lines.extend(
                 [
                     f"  - question_id: {question.question_id}",
+                    f"    question: {json.dumps(question.prompt, ensure_ascii=False)}",
+                    (
+                        f"    suggestion: {json.dumps(question.suggestion, ensure_ascii=False)}"
+                        if question.suggestion
+                        else "    suggestion: null"
+                    ),
                     '    answer: ""',
-                    "    disposition: accept",
+                    "    disposition: defer",
+                    '    rationale: ""',
                 ]
             )
         return "\n".join(lines) + "\n"

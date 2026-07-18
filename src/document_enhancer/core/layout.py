@@ -21,9 +21,10 @@ REVIEW_INDEX_MARKDOWN = "markdown/02-review-overview.md"
 MACRO_MARKDOWN = "markdown/03-macro-review.md"
 SECTIONS_MARKDOWN = "markdown/04-section-review.md"
 FLOW_MARKDOWN = "markdown/05-process-flow-review.md"
-FINAL_MARKDOWN = "markdown/06-final-document.md"
-CHANGES_MARKDOWN = "markdown/07-change-explanation.md"
-AUDIT_MARKDOWN = "markdown/08-final-audit.md"
+QUESTIONS_MARKDOWN = "markdown/06-review-questions.md"
+FINAL_MARKDOWN = "markdown/07-final-document.md"
+CHANGES_MARKDOWN = "markdown/08-change-explanation.md"
+AUDIT_MARKDOWN = "markdown/09-final-audit.md"
 
 DECISIONS_YAML = "review/decisions.yaml"
 INFERRED_FLOW = "diagrams/01-inferred-flow.mmd"
@@ -54,6 +55,7 @@ __all__ = [
     "ONTOLOGY",
     "ORIGINAL_DOCUMENT_PREFIX",
     "PROPOSED_FLOW",
+    "QUESTIONS_MARKDOWN",
     "RECIPE",
     "REVIEW",
     "REVIEW_INDEX_MARKDOWN",

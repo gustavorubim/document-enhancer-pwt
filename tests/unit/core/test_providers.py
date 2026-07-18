@@ -1,5 +1,8 @@
 """Provider seam tests use the existing structured fake and never call the network."""
 
+from types import SimpleNamespace
+from typing import Any
+
 import pytest
 
 from document_enhancer.core.models import ReviewReport
@@ -59,6 +62,31 @@ def test_gemini_rewrite_provider_returns_text_and_change_ledger() -> None:
 
     assert text == "# Final\n\nApproved.\n"
     assert changes == ["clarified owner"]
+
+
+@pytest.mark.unit
+def test_gemini_rewrite_prompt_treats_the_template_as_structure_only() -> None:
+    class CapturingGateway:
+        prompt = ""
+
+        def structured(self, **kwargs: object) -> object:
+            self.prompt = str(kwargs["prompt"])
+            return SimpleNamespace(final_markdown="# Final", changes=[])
+
+    gateway: Any = CapturingGateway()
+
+    GeminiRewriteProvider(gateway).rewrite(
+        source_text="# Source\n\nSupported content.",
+        review=ReviewReport(summary="review"),
+        decisions=[],
+        source_digest="b" * 64,
+        template_text="# Template\n\nTBD",
+    )
+
+    prompt = gateway.prompt
+    assert "template as a structural guide" in prompt
+    assert "never copy template placeholders" in prompt
+    assert "Preserve all source sections" in prompt
 
 
 @pytest.mark.unit

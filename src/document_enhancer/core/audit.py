@@ -190,7 +190,7 @@ def render_audit_markdown(audit: AuditReport) -> str:
             "",
             "## Reviewer guidance",
             "",
-            "Read `06-final-document.md` alongside `07-change-explanation.md`. Confirm that the "
+            "Read `07-final-document.md` alongside `08-change-explanation.md`. Confirm that the "
             "accepted decisions were applied as intended and that no approved nuance was lost. "
             "Use this audit as the final technical control record for the run.",
             "",

@@ -92,6 +92,7 @@ class Question(StrictModel):
     reason: str = Field(min_length=1)
     blocking: bool = True
     section_id: str | None = None
+    suggestion: str | None = None
     answer: str | None = None
 
 
@@ -112,8 +113,10 @@ class FlowEdge(StrictModel):
 
 class Decision(StrictModel):
     question_id: str = Field(min_length=1)
+    question: str = ""
+    suggestion: str | None = None
     answer: str = ""
-    disposition: Literal["accept", "defer", "reject"] = "accept"
+    disposition: Literal["accept", "accept_suggestion", "defer", "reject"] = "accept"
     rationale: str | None = None
 
 

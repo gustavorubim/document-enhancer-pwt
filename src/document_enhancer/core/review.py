@@ -73,6 +73,20 @@ def bounded_batches(items: list[Section], *, size: int) -> list[list[Section]]:
     return [items[index : index + size] for index in range(0, len(items), size)]
 
 
+def _unique_provider_id(value: str, seen: set[str]) -> str:
+    """Return a stable provider-prefixed ID that remains unique across review batches."""
+
+    if value not in seen:
+        return value
+    prefixed = f"llm-{value}"
+    if prefixed not in seen:
+        return prefixed
+    suffix = 2
+    while f"{prefixed}-{suffix}" in seen:
+        suffix += 1
+    return f"{prefixed}-{suffix}"
+
+
 def _criteria_by_id(recipe: Recipe) -> dict[str, dict[str, Any]]:
     return {
         str(item.get("criterion_id")): item
@@ -157,6 +171,11 @@ def build_review(
                     question_id=f"question-required-{requirement_id.lower()}",
                     prompt=f"Should the final document include the required section {heading!r}?",
                     reason="The selected recipe requires this section for a complete governed document.",
+                    suggestion=(
+                        f"Include a clearly labeled {heading!r} section using only owner-approved, "
+                        "source-backed content; if that evidence is unavailable, keep the gap "
+                        "explicit or record a waiver instead of inventing detail."
+                    ),
                 )
             )
         if "conflicting draft statements" in source_text.lower():
@@ -170,6 +189,10 @@ def build_review(
                     reason=(
                         "The source explicitly identifies conflicting operational values that require "
                         "owner steering rather than automatic resolution."
+                    ),
+                    suggestion=(
+                        "Choose one authoritative value for each conflict, identify the accountable "
+                        "owner, and preserve superseded values in the change explanation."
                     ),
                 )
             )
@@ -195,6 +218,10 @@ def build_review(
                 question_id="question-structure-001",
                 prompt="What are the intended major sections for this document?",
                 reason="A section map is required for section-by-section review and graph export.",
+                suggestion=(
+                    "Use a small hierarchy of purpose, scope, responsibilities, process steps, "
+                    "controls, exceptions, and records where those concepts are supported."
+                ),
             )
         )
     for match_index, match in enumerate(_PLACEHOLDER_RE.finditer(source_text), start=1):
@@ -269,6 +296,10 @@ def build_review(
                             ),
                             reason="The selected rubric marks this criterion as a hard blocker.",
                             section_id=section.section_id,
+                            suggestion=(
+                                f"Add owner-approved evidence for {criterion_id} to {section.title!r}, "
+                                "or reject this suggestion and explain why the criterion does not apply."
+                            ),
                         )
                     )
         if recipe and requirement and not criterion_ids:
@@ -788,8 +819,92 @@ def render_macro_markdown(review: ReviewReport) -> str:
         [
             "## Next step",
             "",
-            "Edit `../review/decisions.yaml`, keep `approve_rewrite: true`, then run "
-            "`docenhance continue <run-id>`.",
+            "Read [`06-review-questions.md`](06-review-questions.md), edit "
+            "`../review/decisions.yaml`, and then run `docenhance stage-two <run-id>`.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def render_questions_markdown(review: ReviewReport) -> str:
+    """Render one complete, human-readable decision guide for every review question."""
+
+    blocking = sum(1 for item in review.questions if item.blocking)
+    lines = [
+        "# Review questions and decision guide",
+        "",
+        "## Purpose",
+        "",
+        "This report gathers every question that requires human judgment before the rewrite. "
+        "The matching editable fields live in `../review/decisions.yaml`. Read the question, why "
+        "it matters, and any safe suggestion here before choosing a disposition.",
+        "",
+        "## How to answer",
+        "",
+        "For each decision, use exactly one disposition:",
+        "",
+        "- `accept`: use the reviewer-written text in `answer`.",
+        "- `accept_suggestion`: use the generated suggestion; this is available only when the "
+        "question includes a suggestion.",
+        "- `reject`: resolve the question without applying either the answer or suggestion.",
+        "- `defer`: leave the question unresolved and keep Stage 2 paused.",
+        "",
+        "Question text and suggestions are generated context. Do not edit them in the YAML file; "
+        "edit only `answer`, `disposition`, optional `rationale`, top-level `steering`, waivers, and "
+        "`approve_rewrite`.",
+        "",
+        "## Decision snapshot",
+        "",
+        f"- Total questions: {len(review.questions)}",
+        f"- Blocking questions: {blocking}",
+        f"- Questions with a suggestion: {sum(1 for item in review.questions if item.suggestion)}",
+        "",
+    ]
+    if not review.questions:
+        lines.extend(
+            [
+                "## No questions generated",
+                "",
+                "The review did not identify a question requiring human judgment. Confirm the "
+                "top-level rewrite approval in the decisions file before Stage 2.",
+                "",
+            ]
+        )
+    for index, question in enumerate(review.questions, start=1):
+        lines.extend(
+            [
+                f"## {index}. {question.prompt}",
+                "",
+                f"- Question ID: `{question.question_id}`",
+                f"- Blocking: {'yes' if question.blocking else 'no'}",
+                f"- Section: `{question.section_id or 'document'}`",
+                "",
+                "### Why this needs a human decision",
+                "",
+                question.reason,
+                "",
+                "### Suggested approach",
+                "",
+                question.suggestion
+                or "No safe suggestion is available. Supply an accountable, source-backed answer.",
+                "",
+                "### Where to answer",
+                "",
+                f"Find `{question.question_id}` in `../review/decisions.yaml`, enter the answer "
+                "when needed, and choose the disposition that reflects the review decision.",
+                "",
+            ]
+        )
+    lines.extend(
+        [
+            "## Run Stage 2",
+            "",
+            "After every blocking item is resolved and `approve_rewrite: true` is saved, run:",
+            "",
+            "```bash",
+            "docenhance stage-two <run-id>",
+            "```",
             "",
         ]
     )
@@ -1016,7 +1131,8 @@ def render_review_index_markdown(review: ReviewReport) -> str:
         "2. [Macro report](03-macro-review.md) — document-level rubric readiness and questions.\n"
         "3. [Section report](04-section-review.md) — correct / missing / improve for every section.\n"
         "4. [Flow report](05-process-flow-review.md) — inferred Mermaid, proposed Mermaid, and adjustment reasoning.\n"
-        "5. Edit [`../review/decisions.yaml`](../review/decisions.yaml) only after reviewing the evidence.\n\n"
+        "5. [Questions](06-review-questions.md) — every decision, rationale, and safe suggestion.\n"
+        "6. Edit [`../review/decisions.yaml`](../review/decisions.yaml) only after reviewing the evidence.\n\n"
         "## Supporting machine artifacts\n\n"
         "- [Inferred Mermaid](../diagrams/01-inferred-flow.mmd)\n"
         "- [Proposed Mermaid](../diagrams/02-proposed-flow.mmd)\n"
@@ -1029,7 +1145,8 @@ def render_review_index_markdown(review: ReviewReport) -> str:
         f"- Blocking questions: {sum(1 for item in review.questions if item.blocking)}\n\n"
         "## What happens next\n\n"
         "Answer every blocking question, add optional steering or explicit waivers, keep "
-        "`approve_rewrite: true`, save the YAML file, and continue this same run. Stage 2 then "
+        "`approve_rewrite: true`, save the YAML file, and run `docenhance stage-two <run-id>`. "
+        "Stage 2 then "
         "adds the final document, change explanation, and detailed final audit to this sequence.\n"
     )
 
@@ -1049,15 +1166,17 @@ def merge_provider_review(
         if finding.evidence_span_ids and not evidence:
             continue
         finding = finding.model_copy(update={"evidence_span_ids": evidence})
-        if finding.finding_id in seen_findings:
-            finding = finding.model_copy(update={"finding_id": f"llm-{finding.finding_id}"})
+        finding = finding.model_copy(
+            update={"finding_id": _unique_provider_id(finding.finding_id, seen_findings)}
+        )
         seen_findings.add(finding.finding_id)
         findings.append(finding)
     seen_questions = {item.question_id for item in base.questions}
     questions = list(base.questions)
     for question in candidate.questions:
-        if question.question_id in seen_questions:
-            question = question.model_copy(update={"question_id": f"llm-{question.question_id}"})
+        question = question.model_copy(
+            update={"question_id": _unique_provider_id(question.question_id, seen_questions)}
+        )
         seen_questions.add(question.question_id)
         questions.append(question)
     section_ids = {item.section_id for item in base.sections}
@@ -1126,6 +1245,7 @@ __all__ = [
     "render_flow_markdown",
     "render_macro_markdown",
     "render_mermaid",
+    "render_questions_markdown",
     "render_review_index_markdown",
     "render_sections_markdown",
     "title_matches",

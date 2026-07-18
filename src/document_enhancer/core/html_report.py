@@ -48,6 +48,23 @@ def _title(markdown: str, path: str) -> str:
     return Path(path).stem.replace("-", " ").title()
 
 
+def _display_title(markdown: str, path: str) -> str:
+    """Use operator-oriented tab labels where the Markdown heading is document content."""
+
+    overrides = {
+        "01-source-normalized.md": "Original Normalized Document",
+        "02-review-overview.md": "Review Overview",
+        "03-macro-review.md": "Macro Review",
+        "04-section-review.md": "Section Review",
+        "05-process-flow-review.md": "Process Flow Review",
+        "06-review-questions.md": "Review Questions",
+        "07-final-document.md": "Enhanced Document",
+        "08-change-explanation.md": "Change Explanation",
+        "09-final-audit.md": "Final Audit",
+    }
+    return overrides.get(Path(path).name, _title(markdown, path))
+
+
 def _anchor(path: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", Path(path).stem.lower()).strip("-")
 
@@ -185,20 +202,29 @@ def render_html_report(
                 ),
             ]
         rendered.append(
-            (path, _title(content, path), _anchor(path), markdown.render(content, environment))
+            (
+                path,
+                _display_title(content, path),
+                _anchor(path),
+                markdown.render(content, environment),
+            )
         )
     navigation = "".join(
-        f'<a href="#{anchor}"><span>{index:02d}</span>{html.escape(title)}</a>'
+        f'<button class="report-tab" id="tab-{anchor}" role="tab" '
+        f'aria-controls="{anchor}" aria-selected="false" data-target="{anchor}">'
+        f'<span class="tab-number">{index:02d}</span>'
+        f'<span class="tab-name">{html.escape(title)}</span></button>'
         for index, (_, title, anchor, _) in enumerate(rendered, start=1)
     )
     articles = "".join(
-        f'<article id="{anchor}" class="report-card" data-report="{index}">'
+        f'<article id="{anchor}" class="report-card" data-report="{index}" role="tabpanel" '
+        f'aria-labelledby="tab-{anchor}" hidden>'
         '<div class="report-kicker">'
-        f"Report {index:02d} · {html.escape(path)}"
+        f"Report {index:02d} · {html.escape(title)} · {html.escape(path)}"
         "</div>"
         f'<div class="markdown-body">{body}</div>'
         "</article>"
-        for index, (path, _, anchor, body) in enumerate(rendered, start=1)
+        for index, (path, title, anchor, body) in enumerate(rendered, start=1)
     )
     status_class = re.sub(r"[^a-z]+", "-", record.status.lower()).strip("-")
     phase = record.phase.replace("_", " ").title()
@@ -206,8 +232,10 @@ def render_html_report(
         audit.summary
         if audit
         else "Stage 1 is ready for human review. Read the reports in order, answer the decision "
-        "file, and continue this exact run to produce the final document and audit."
+        "file, and run Stage 2 on this exact run to produce the final document and audit."
     )
+    document_label = re.sub(r"[_-]+", " ", Path(record.source_name).stem).title()
+    document_label = re.sub(r"\bAi\b", "AI", document_label)
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -217,78 +245,91 @@ def render_html_report(
   <title>Document Enhancer · {html.escape(record.source_name)}</title>
   <style>
     :root {{
-      --ink: #17202a; --muted: #667085; --line: #dce3e9; --paper: #ffffff;
-      --canvas: #f3f6f4; --nav: #102a2e; --nav-soft: #173b40; --accent: #d46b3c;
-      --teal: #167d75; --gold: #a56a08; --danger: #b42318; --shadow: 0 18px 48px rgba(16,42,46,.10);
+      --ink: #403a49; --muted: #766f80; --line: #e7dfeb; --paper: #fffdf9;
+      --canvas: #f7f4fa; --lavender: #8c7baa; --lavender-soft: #eee8f5;
+      --sage: #7faaa0; --sage-soft: #e7f1ed; --rose: #c98f96; --rose-soft: #f7e8e8;
+      --peach: #d6a178; --peach-soft: #faeee3; --butter: #eadcae; --danger: #a85e69;
+      --shadow: 0 18px 48px rgba(73, 57, 87, .09);
     }}
     * {{ box-sizing: border-box; }}
     html {{ scroll-behavior: smooth; }}
-    body {{ margin: 0; background: var(--canvas); color: var(--ink); font: 16px/1.68 Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }}
-    .shell {{ display: grid; grid-template-columns: 290px minmax(0, 1fr); min-height: 100vh; }}
-    aside {{ position: sticky; top: 0; height: 100vh; overflow-y: auto; padding: 32px 24px; background: var(--nav); color: white; }}
-    .brand {{ display: flex; gap: 12px; align-items: center; margin-bottom: 32px; }}
-    .brand-mark {{ width: 42px; height: 42px; display: grid; place-items: center; border-radius: 13px; background: var(--accent); font-weight: 800; }}
+    body {{ margin: 0; background: radial-gradient(circle at top left, #fbf1f3 0, transparent 32rem), var(--canvas); color: var(--ink); font: 16px/1.68 Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }}
+    .shell {{ min-height: 100vh; }}
+    .workspace-bar {{ position: sticky; top: 0; z-index: 20; padding: 14px clamp(18px, 4vw, 54px) 13px; border-bottom: 1px solid var(--line); background: rgba(255, 253, 249, .94); box-shadow: 0 8px 28px rgba(74, 58, 87, .07); backdrop-filter: blur(18px); }}
+    .workspace-head {{ max-width: 1240px; margin: 0 auto 12px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }}
+    .brand {{ display: flex; gap: 11px; align-items: center; color: var(--ink); }}
+    .brand-mark {{ width: 40px; height: 40px; display: grid; place-items: center; border-radius: 14px; background: linear-gradient(145deg, var(--lavender-soft), #dfd4ec); color: #66557f; font-weight: 850; box-shadow: inset 0 0 0 1px #d5c9e2; }}
     .brand strong {{ display: block; letter-spacing: -.02em; }}
-    .brand small {{ color: #afc7c9; }}
-    nav p {{ margin: 0 0 10px; color: #86a9ad; font-size: 11px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }}
-    nav a {{ display: grid; grid-template-columns: 28px 1fr; gap: 9px; align-items: start; padding: 10px 8px; border-radius: 10px; color: #d9e7e8; text-decoration: none; font-size: 13px; line-height: 1.35; }}
-    nav a:hover {{ background: var(--nav-soft); color: white; }}
-    nav a span {{ color: #f3a17c; font: 700 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }}
-    .aside-note {{ margin-top: 28px; padding: 16px; border: 1px solid #2b5054; border-radius: 12px; color: #b9cdcf; font-size: 12px; }}
-    main {{ min-width: 0; padding: 42px clamp(22px, 5vw, 76px) 96px; }}
-    .hero {{ max-width: 1100px; margin: 0 auto 28px; padding: clamp(28px, 5vw, 56px); overflow: hidden; position: relative; border-radius: 24px; color: white; background: linear-gradient(130deg, #123b3e 0%, #17675f 67%, #21867a 100%); box-shadow: var(--shadow); }}
-    .hero:after {{ content: ""; position: absolute; width: 300px; height: 300px; right: -120px; top: -150px; border: 52px solid rgba(255,255,255,.08); border-radius: 50%; }}
-    .eyebrow {{ margin: 0 0 10px; color: #9dd8d0; font-weight: 800; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; }}
-    .hero h1 {{ position: relative; margin: 0; max-width: 780px; font: 750 clamp(32px, 5vw, 55px)/1.05 Georgia, "Times New Roman", serif; letter-spacing: -.035em; }}
-    .hero-summary {{ max-width: 820px; margin: 20px 0 0; color: #d8ece9; font-size: 17px; }}
+    .brand small {{ display: block; color: var(--muted); font-size: 12px; }}
+    .tab-intro {{ color: var(--muted); font-size: 12px; text-align: right; }}
+    .tabs {{ max-width: 1240px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(112px, 1fr)); gap: 8px; padding: 2px 2px 7px; }}
+    .report-tab {{ min-width: 0; min-height: 64px; display: grid; grid-template-columns: 25px minmax(0, 1fr); gap: 6px; align-items: center; padding: 8px 9px; border: 1px solid #ddd3e6; border-radius: 13px; background: var(--lavender-soft); color: #665b72; cursor: pointer; font: inherit; text-align: left; transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }}
+    .report-tab:nth-child(3n+2) {{ background: var(--sage-soft); border-color: #d0e2dc; }}
+    .report-tab:nth-child(3n) {{ background: var(--rose-soft); border-color: #ead3d5; }}
+    .report-tab:hover {{ transform: translateY(-2px); box-shadow: 0 7px 18px rgba(87, 68, 100, .09); }}
+    .report-tab[aria-selected="true"] {{ border-color: var(--lavender); background: #fff; color: #564663; box-shadow: 0 0 0 2px #ded4e8, 0 8px 20px rgba(87, 68, 100, .12); }}
+    .tab-number {{ color: var(--lavender); font: 800 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }}
+    .tab-name {{ display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 3; font-size: 10.5px; font-weight: 750; line-height: 1.2; }}
+    main {{ min-width: 0; padding: 32px clamp(18px, 5vw, 64px) 96px; }}
+    .hero {{ max-width: 1120px; margin: 0 auto 24px; padding: clamp(28px, 5vw, 52px); overflow: hidden; position: relative; border: 1px solid #dfd4e6; border-radius: 27px; color: #4f4559; background: linear-gradient(135deg, #eee7f5 0%, #f6e7e7 50%, #e7f1ed 100%); box-shadow: var(--shadow); }}
+    .hero:after {{ content: ""; position: absolute; width: 310px; height: 310px; right: -125px; top: -165px; border: 48px solid rgba(255,255,255,.42); border-radius: 50%; }}
+    .eyebrow {{ margin: 0 0 10px; color: #7d6a96; font-weight: 800; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; }}
+    .hero h1 {{ position: relative; margin: 0; max-width: 820px; overflow-wrap: anywhere; color: #493f52; font: 750 clamp(32px, 5vw, 55px)/1.05 Georgia, "Times New Roman", serif; letter-spacing: -.035em; }}
+    .hero-summary {{ max-width: 850px; margin: 20px 0 0; color: #6d6474; font-size: 17px; }}
     .meta {{ display: flex; flex-wrap: wrap; gap: 9px; margin-top: 24px; }}
-    .pill {{ padding: 7px 11px; border: 1px solid rgba(255,255,255,.24); border-radius: 999px; background: rgba(255,255,255,.08); font-size: 12px; }}
-    .pill.status-succeeded {{ background: rgba(134,239,172,.18); border-color: rgba(134,239,172,.5); }}
-    .pill.status-waiting {{ background: rgba(253,230,138,.16); border-color: rgba(253,230,138,.48); }}
-    .stats {{ max-width: 1100px; margin: 0 auto 28px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }}
-    .stat {{ min-width: 0; padding: 20px; border: 1px solid var(--line); border-radius: 16px; background: var(--paper); box-shadow: 0 8px 24px rgba(16,42,46,.05); }}
+    .pill {{ padding: 7px 11px; border: 1px solid rgba(119,101,132,.18); border-radius: 999px; background: rgba(255,255,255,.5); color: #675c70; font-size: 12px; }}
+    .pill.status-succeeded {{ background: #dcece5; border-color: #b8d4ca; color: #476f65; }}
+    .pill.status-waiting {{ background: #f5eac6; border-color: #e4d39a; color: #7d6b33; }}
+    .stats {{ max-width: 1120px; margin: 0 auto 24px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }}
+    .stat {{ min-width: 0; padding: 20px; border: 1px solid var(--line); border-radius: 17px; background: rgba(255,253,249,.88); box-shadow: 0 8px 24px rgba(74,58,87,.05); }}
+    .stat:nth-child(2) {{ background: var(--sage-soft); }} .stat:nth-child(3) {{ background: var(--rose-soft); }}
     .stat span {{ display: block; color: var(--muted); font-size: 12px; font-weight: 750; text-transform: uppercase; letter-spacing: .07em; }}
-    .stat strong {{ display: block; margin: 4px 0; color: var(--teal); font: 750 30px/1.15 Georgia, serif; }}
+    .stat strong {{ display: block; margin: 4px 0; color: #74628e; font: 750 30px/1.15 Georgia, serif; }}
     .stat small {{ display: block; color: var(--muted); line-height: 1.35; }}
-    .report-card {{ max-width: 1100px; margin: 0 auto 24px; padding: clamp(25px, 4vw, 55px); border: 1px solid var(--line); border-radius: 20px; background: var(--paper); box-shadow: var(--shadow); scroll-margin-top: 20px; }}
-    .report-kicker {{ margin-bottom: 28px; padding-bottom: 13px; border-bottom: 1px solid var(--line); color: var(--accent); font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }}
-    .markdown-body {{ max-width: 860px; margin: 0 auto; }}
-    .markdown-body h1, .markdown-body h2, .markdown-body h3 {{ color: #163b3e; font-family: Georgia, "Times New Roman", serif; letter-spacing: -.022em; line-height: 1.2; }}
+    .report-card {{ max-width: 1120px; margin: 0 auto 24px; padding: clamp(25px, 4vw, 56px); border: 1px solid var(--line); border-radius: 23px; background: var(--paper); box-shadow: var(--shadow); scroll-margin-top: 150px; }}
+    .report-card[hidden] {{ display: none; }}
+    .report-kicker {{ margin-bottom: 28px; padding-bottom: 13px; border-bottom: 1px solid var(--line); color: var(--rose); font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }}
+    .markdown-body {{ max-width: 900px; margin: 0 auto; }}
+    .markdown-body h1, .markdown-body h2, .markdown-body h3 {{ color: #554760; font-family: Georgia, "Times New Roman", serif; letter-spacing: -.022em; line-height: 1.2; }}
     .markdown-body h1 {{ margin: 0 0 26px; font-size: clamp(32px, 4vw, 46px); }}
     .markdown-body h2 {{ margin: 42px 0 16px; padding-top: 10px; font-size: 28px; }}
     .markdown-body h3 {{ margin: 30px 0 12px; font-size: 21px; }}
     .markdown-body p {{ margin: 0 0 17px; }}
-    .markdown-body a {{ color: var(--teal); text-decoration-thickness: 1px; text-underline-offset: 3px; }}
+    .markdown-body a {{ color: #74628e; text-decoration-thickness: 1px; text-underline-offset: 3px; }}
     .markdown-body ul, .markdown-body ol {{ padding-left: 24px; }}
     .markdown-body li {{ margin: 6px 0; }}
-    .markdown-body code {{ padding: 2px 6px; border-radius: 6px; background: #edf3f2; color: #1b5a55; font-size: .88em; }}
-    pre {{ overflow-x: auto; padding: 18px; border-radius: 12px; background: #132d31; color: #e8f1ef; }}
+    .markdown-body code {{ padding: 2px 6px; border-radius: 6px; background: var(--lavender-soft); color: #65527c; font-size: .88em; }}
+    pre {{ overflow-x: auto; padding: 18px; border-radius: 12px; background: #4c4355; color: #fffaf5; }}
     pre code {{ padding: 0 !important; background: transparent !important; color: inherit !important; }}
     table {{ width: 100%; margin: 22px 0; border-collapse: collapse; font-size: 14px; }}
-    th {{ background: #eaf2f1; color: #174b48; text-align: left; }}
-    th, td {{ padding: 11px 13px; border: 1px solid #d5e0df; vertical-align: top; }}
-    blockquote {{ margin: 22px 0; padding: 13px 19px; border-left: 4px solid var(--accent); background: #fff7f1; color: #5d4c42; }}
-    .diagram-shell {{ margin: 24px 0; padding: 18px; overflow-x: auto; border: 1px solid #cddcda; border-radius: 16px; background: linear-gradient(180deg, #fbfdfd, #eef5f4); }}
+    th {{ background: var(--lavender-soft); color: #554760; text-align: left; }}
+    th, td {{ padding: 11px 13px; border: 1px solid #ded5e4; vertical-align: top; }}
+    tr:nth-child(even) td {{ background: #fcf8fb; }}
+    blockquote {{ margin: 22px 0; padding: 13px 19px; border-left: 4px solid var(--rose); background: var(--rose-soft); color: #6a555b; }}
+    .diagram-shell {{ margin: 24px 0; padding: 18px; overflow-x: auto; border: 1px solid #d8d0e0; border-radius: 16px; background: linear-gradient(180deg, #fffdfb, var(--sage-soft)); }}
     .diagram-label {{ margin-bottom: 12px; color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }}
     .flow-svg {{ display: block; width: 100%; min-width: 620px; height: auto; }}
     .mermaid-source {{ margin-top: 12px; text-align: left; }}
-    details {{ margin-top: 12px; }} details summary {{ cursor: pointer; color: var(--teal); font-size: 12px; font-weight: 750; }}
-    @media (max-width: 900px) {{ .shell {{ display: block; }} aside {{ position: relative; width: auto; height: auto; }} nav {{ columns: 2; }} nav p {{ column-span: all; }} main {{ padding: 24px 14px 64px; }} .stats {{ grid-template-columns: repeat(2, 1fr); }} }}
-    @media (max-width: 560px) {{ nav {{ columns: 1; }} .stats {{ grid-template-columns: 1fr; }} .report-card {{ padding: 24px 18px; }} }}
-    @media print {{ aside {{ display: none; }} .shell {{ display: block; }} main {{ padding: 0; }} .hero, .report-card, .stat {{ box-shadow: none; break-inside: avoid; }} .report-card {{ border: 0; border-radius: 0; page-break-before: always; }} }}
+    details {{ margin-top: 12px; }} details summary {{ cursor: pointer; color: #74628e; font-size: 12px; font-weight: 750; }}
+    @media (max-width: 900px) {{ .tabs {{ display: flex; overflow-x: auto; scrollbar-color: #cfc3da transparent; }} .report-tab {{ flex: 0 0 145px; }} }}
+    @media (max-width: 760px) {{ .workspace-head {{ align-items: flex-start; }} .tab-intro {{ display: none; }} main {{ padding: 22px 12px 64px; }} .stats {{ grid-template-columns: 1fr 1fr; }} }}
+    @media (max-width: 520px) {{ .stats {{ grid-template-columns: 1fr; }} .report-card {{ padding: 24px 18px; }} .brand small {{ display: none; }} }}
+    @media print {{ .workspace-bar {{ display: none; }} main {{ padding: 0; }} .hero, .report-card, .stat {{ box-shadow: none; }} .report-card, .report-card[hidden] {{ display: block !important; border: 0; border-radius: 0; page-break-before: always; }} }}
   </style>
 </head>
 <body>
   <div class="shell">
-    <aside>
-      <div class="brand"><div class="brand-mark">DE</div><div><strong>Document Enhancer</strong><small>Review bundle</small></div></div>
-      <nav><p>Read in order</p>{navigation}</nav>
-      <div class="aside-note">This viewer is generated from the numbered Markdown files. The YAML decision file remains the only human-editable input between stages.</div>
-    </aside>
+    <header class="workspace-bar">
+      <div class="workspace-head">
+        <div class="brand"><div class="brand-mark">DE</div><div><strong>Document Enhancer</strong><small>Review workspace</small></div></div>
+        <div class="tab-intro">Choose a report tab · read left to right</div>
+      </div>
+      <nav class="tabs" role="tablist" aria-label="Numbered document reports">{navigation}</nav>
+    </header>
     <main>
       <header class="hero">
         <p class="eyebrow">Governed document review</p>
-        <h1>{html.escape(record.source_name)}</h1>
+        <h1>{html.escape(document_label)}</h1>
         <p class="hero-summary">{html.escape(audit_summary)}</p>
         <div class="meta">
           <span class="pill status-{status_class}">{html.escape(record.status.upper())}</span>
@@ -301,6 +342,35 @@ def render_html_report(
       {articles}
     </main>
   </div>
+  <script>
+    (() => {{
+      const tabs = Array.from(document.querySelectorAll('.report-tab'));
+      const panels = Array.from(document.querySelectorAll('.report-card'));
+      function selectTab(target, updateHash = true) {{
+        const chosen = tabs.find((tab) => tab.dataset.target === target) || tabs[0];
+        if (!chosen) return;
+        tabs.forEach((tab) => tab.setAttribute('aria-selected', String(tab === chosen)));
+        panels.forEach((panel) => {{ panel.hidden = panel.id !== chosen.dataset.target; }});
+        if (updateHash) window.history.replaceState(null, '', '#' + chosen.dataset.target);
+      }}
+      tabs.forEach((tab, index) => {{
+        tab.addEventListener('click', () => selectTab(tab.dataset.target));
+        tab.addEventListener('keydown', (event) => {{
+          if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+          event.preventDefault();
+          let next = index;
+          if (event.key === 'ArrowLeft') next = (index - 1 + tabs.length) % tabs.length;
+          if (event.key === 'ArrowRight') next = (index + 1) % tabs.length;
+          if (event.key === 'Home') next = 0;
+          if (event.key === 'End') next = tabs.length - 1;
+          tabs[next].focus();
+          selectTab(tabs[next].dataset.target);
+        }});
+      }});
+      selectTab(window.location.hash.slice(1), false);
+      window.addEventListener('hashchange', () => selectTab(window.location.hash.slice(1), false));
+    }})();
+  </script>
 </body>
 </html>
 """

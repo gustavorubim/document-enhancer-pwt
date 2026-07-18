@@ -15,6 +15,7 @@ from document_enhancer.core.layout import (
     MACRO_MARKDOWN,
     ORIGINAL_DOCUMENT_PREFIX,
     PROPOSED_FLOW,
+    QUESTIONS_MARKDOWN,
     REVIEW,
     RUN_RECORD,
     SECTIONS_MARKDOWN,
@@ -57,6 +58,9 @@ def test_core_process_docx_characterization_pauses_with_review_bundle(tmp_path: 
     assert "```mermaid" in flow_md and flow_md.count("```mermaid") >= 2
     assert (run_path / INFERRED_FLOW).is_file()
     assert (run_path / PROPOSED_FLOW).is_file()
+    questions_md = (run_path / QUESTIONS_MARKDOWN).read_text(encoding="utf-8")
+    assert "# Review questions and decision guide" in questions_md
+    assert "accept_suggestion" in questions_md
     assert "Executive summary" in (run_path / MACRO_MARKDOWN).read_text(encoding="utf-8")
     assert "What is correct" in (run_path / SECTIONS_MARKDOWN).read_text(encoding="utf-8")
     assert review["recipe_id"] == "enterprise_core@2.0.0/process"
@@ -72,17 +76,23 @@ def test_core_process_docx_characterization_pauses_with_review_bundle(tmp_path: 
     assert result.unresolved_question_ids
     assert (run_path / RUN_RECORD).stat().st_size < 50_000
     html = (run_path / HTML_REPORT).read_text(encoding="utf-8")
-    assert "Read in order" in html
+    assert "Original Normalized Document" in html
+    assert 'role="tablist"' in html
+    assert 'class="report-tab"' in html
     assert 'class="flow-svg"' in html
     assert "cdn.jsdelivr.net" not in html
     assert all(path.parent.name == "json" for path in run_path.rglob("*.json"))
     assert all(path.parent.name == "markdown" for path in run_path.rglob("*.md"))
+    decisions_yaml = (run_path / "review/decisions.yaml").read_text(encoding="utf-8")
+    assert "question:" in decisions_yaml
+    assert "suggestion:" in decisions_yaml
     assert [path.name[:2] for path in sorted((run_path / "markdown").glob("*.md"))] == [
         "01",
         "02",
         "03",
         "04",
         "05",
+        "06",
     ]
 
 
