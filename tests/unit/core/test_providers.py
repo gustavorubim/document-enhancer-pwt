@@ -120,3 +120,27 @@ def test_gemini_audit_provider_returns_independent_audit() -> None:
 
     assert result.status == "pass"
     assert result.checks == {"owner_supported": True}
+
+
+@pytest.mark.unit
+def test_provider_finding_promotion_recovers_rubric_and_disposition_mixups() -> None:
+    from document_enhancer.core.providers import _ProviderFinding, _promote_finding
+
+    promoted = _promote_finding(
+        _ProviderFinding(
+            finding_id="f-1",
+            scope="PROC-TRIGGER-001",
+            severity="correct",
+            title="Triggers look complete",
+            detail="Entry criteria are present in the source.",
+            rubric_id="ignored",
+            section_id="section-007",
+            evidence_span_ids=["span-1"],
+        )
+    )
+
+    assert promoted is not None
+    assert promoted.scope == "section"
+    assert promoted.severity == "warning"
+    assert promoted.disposition == "correct"
+    assert promoted.rubric_id == "PROC-TRIGGER-001"

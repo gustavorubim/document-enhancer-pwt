@@ -11,14 +11,12 @@ requires-python = ">=3.12,<3.14"
 license = { text = "MIT" }
 authors = [{ name = "Document Enhancer contributors" }]
 dependencies = [
-  "markdown-it-py>=3.0,<5",
   "pydantic>=2.10,<3",
   "pypdf>=5.0,<7",
   "python-docx>=1.1,<2",
   "rich>=13.9,<15",
   "ruamel.yaml>=0.18,<0.19",
   "typer>=0.16,<1",
-  "typing-extensions>=4.12,<5",
 ]
 
 [project.optional-dependencies]
@@ -80,7 +78,7 @@ python-version = "3.12"
 root = ["."]
 
 [tool.ty.src]
-include = ["src", "tests", "scripts", "evals"]
+include = ["src", "tests", "scripts"]
 exclude = ["plan.md"]
 
 [tool.pytest.ini_options]

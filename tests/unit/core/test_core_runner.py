@@ -38,6 +38,9 @@ def test_runner_pauses_for_questions_and_resumes_from_yaml(tmp_path: Path) -> No
     assert (tmp_path / "runs" / waiting.run_id / "review/review.md").is_file()
     decisions = tmp_path / "runs" / waiting.run_id / "review/decisions.yaml"
     decisions.write_text(
+        "approve_rewrite: true\n"
+        'steering: ""\n'
+        "waivers: []\n"
         "decisions:\n"
         "  - question_id: question-placeholder-001\n"
         "    answer: approved\n"
@@ -248,6 +251,7 @@ def test_flow_graph_requires_evidence_for_relationships(tmp_path: Path) -> None:
 def test_provider_flow_edges_are_evidence_filtered_and_typed() -> None:
     base = ReviewReport(
         summary="base",
+        process_applicable=True,
         sections=[
             Section(section_id="one", title="One", level=1, span_ids=["span-1"]),
             Section(section_id="two", title="Two", level=1, span_ids=["span-2"]),

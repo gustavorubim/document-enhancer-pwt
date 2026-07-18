@@ -25,8 +25,13 @@ from document_enhancer.ingest.normalize import normalize_document
 from document_enhancer.ingest.pipeline import DocumentIngestor
 
 from .audit import (
+    deferred_decisions_resolved,
+    dual_flow_artifacts_present,
+    graph_types_valid,
+    no_unresolved_placeholders,
     render_audit_markdown,
     required_sections_present,
+    section_assessments_present,
     semantic_references_valid,
     source_anchor_retained,
     source_sections_retained,
@@ -41,6 +46,7 @@ from .models import (
     Section,
     SourceDocument,
     SourceSpan,
+    Waiver,
 )
 from .providers import AuditProvider, ReviewProvider, RewriteProvider, StructureProvider
 from .recipes import Recipe, load_recipe
@@ -48,9 +54,14 @@ from .review import (
     bounded_batches,
     build_review,
     merge_provider_review,
+    render_flow_markdown,
+    render_macro_markdown,
+    render_review_index_markdown,
+    render_sections_markdown,
 )
 from .rewrite import (
-    apply_deterministic_answers,
+    apply_reviewer_decisions,
+    apply_template_stubs,
     compile_rewrite_plan,
     graph_json_lines,
     render_docx,
@@ -189,7 +200,8 @@ class CoreRunner:
         path = decisions_path or (self.store.run_path(run_id) / "review/decisions.yaml")
         if not path.is_file():
             return record
-        decisions = self._read_decisions(path)
+        bundle = self._read_decision_bundle(path)
+        decisions = bundle.decisions
         review = self._load_review(record)
         answers = {item.question_id: item for item in decisions}
         unresolved = [
@@ -205,10 +217,12 @@ class CoreRunner:
                 )
             )
         ]
+        if not bundle.approve_rewrite:
+            unresolved = [*unresolved, "approve_rewrite"]
         self.store.write_json(
             run_id,
             "review/decisions.json",
-            DecisionBundle(decisions=decisions).model_dump(mode="json"),
+            bundle.model_dump(mode="json"),
         )
         if unresolved:
             return self._update(record, unresolved_question_ids=unresolved)
@@ -460,7 +474,37 @@ class CoreRunner:
             self.store.write_text(
                 record.run_id,
                 "review/review.md",
-                self._review_markdown(review),
+                render_review_index_markdown(review),
+                media_type="text/markdown; charset=utf-8",
+            ),
+        )
+        record = register_artifact(
+            record,
+            "review.macro_markdown",
+            self.store.write_text(
+                record.run_id,
+                "review/macro.md",
+                render_macro_markdown(review),
+                media_type="text/markdown; charset=utf-8",
+            ),
+        )
+        record = register_artifact(
+            record,
+            "review.sections_markdown",
+            self.store.write_text(
+                record.run_id,
+                "review/sections.md",
+                render_sections_markdown(review),
+                media_type="text/markdown; charset=utf-8",
+            ),
+        )
+        record = register_artifact(
+            record,
+            "review.flow_markdown",
+            self.store.write_text(
+                record.run_id,
+                "review/flow.md",
+                render_flow_markdown(review),
                 media_type="text/markdown; charset=utf-8",
             ),
         )
@@ -484,7 +528,27 @@ class CoreRunner:
             self.store.write_text(
                 record.run_id,
                 "review/flow.mmd",
-                review.mermaid,
+                review.inferred_mermaid,
+                media_type="text/vnd.mermaid; charset=utf-8",
+            ),
+        )
+        record = register_artifact(
+            record,
+            "review.flow_inferred",
+            self.store.write_text(
+                record.run_id,
+                "review/flow.inferred.mmd",
+                review.inferred_mermaid,
+                media_type="text/vnd.mermaid; charset=utf-8",
+            ),
+        )
+        record = register_artifact(
+            record,
+            "review.flow_proposed",
+            self.store.write_text(
+                record.run_id,
+                "review/flow.proposed.mmd",
+                review.proposed_mermaid,
                 media_type="text/vnd.mermaid; charset=utf-8",
             ),
         )
@@ -523,6 +587,10 @@ class CoreRunner:
                 plan.model_dump(mode="json"),
             ),
         )
+        decision_bundle = self._read_decision_bundle(
+            self.store.run_path(record.run_id) / "review/decisions.yaml"
+        )
+        waived = {item.requirement_id for item in decision_bundle.waivers}
         final_text = normalized
         changes: list[str] = []
         rewrite_manifest: Any | None = None
@@ -533,12 +601,26 @@ class CoreRunner:
                 decisions=[item.model_dump(mode="json") for item in decisions],
                 source_digest=record.source_digest,
                 plan=plan,
+                template_text=self.recipe.template_text if self.recipe else "",
+                steering=decision_bundle.steering,
             )
             rewrite_manifest = getattr(
                 getattr(self.rewrite_provider, "gateway", None), "last_manifest", None
             )
         else:
-            final_text, changes = apply_deterministic_answers(final_text, decisions)
+            final_text, changes = apply_reviewer_decisions(
+                final_text,
+                decisions=decisions,
+                steering=decision_bundle.steering,
+            )
+            final_text, stub_changes = apply_template_stubs(
+                final_text,
+                plan=plan,
+                recipe=self.recipe,
+                decisions=decisions,
+                waived_requirement_ids=waived,
+            )
+            changes.extend(stub_changes)
         record = self._update(record, status="running", phase="rewrite", unresolved_question_ids=[])
         record = register_artifact(
             record,
@@ -560,7 +642,7 @@ class CoreRunner:
                 media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             ),
         )
-        semantic = semantic_graph(review, final_text)
+        semantic = semantic_graph(review, final_text, recipe=self.recipe)
         record = register_artifact(
             record,
             "output.semantic",
@@ -575,7 +657,7 @@ class CoreRunner:
                 public_graph(semantic),
             ),
         )
-        semantic_before = semantic_graph(review, normalized)
+        semantic_before = semantic_graph(review, normalized, recipe=self.recipe)
         semantic_diff_payload = semantic_diff(semantic_before, semantic)
         record = register_artifact(
             record,
@@ -600,7 +682,7 @@ class CoreRunner:
             self.store.write_text(
                 record.run_id,
                 "output/flow.mmd",
-                review.mermaid,
+                review.proposed_mermaid or review.inferred_mermaid,
                 media_type="text/vnd.mermaid; charset=utf-8",
             ),
         )
@@ -660,11 +742,19 @@ class CoreRunner:
                 "final_markdown_nonempty": bool(final_text.strip()),
                 "source_digest_preserved": record.source_digest == self._source_digest(record),
                 "questions_resolved": not record.unresolved_question_ids,
-                "no_unresolved_placeholders": not _PLACEHOLDER_RE.search(final_text),
+                "no_unresolved_placeholders": no_unresolved_placeholders(final_text),
+                "deferred_decisions_resolved": deferred_decisions_resolved(
+                    plan.deferred_decision_ids
+                ),
                 "source_anchor_retained": source_anchor_retained(normalized, final_text),
                 "source_sections_accounted_for": source_sections_retained(review, final_text),
-                "required_sections_present": required_sections_present(self.recipe, final_text),
+                "required_sections_present": required_sections_present(
+                    self.recipe, final_text, waived_requirement_ids=waived
+                ),
+                "section_assessments_present": section_assessments_present(review),
+                "dual_flow_artifacts_present": dual_flow_artifacts_present(review),
                 "semantic_references_valid": semantic_references_valid(semantic),
+                "graph_types_valid": graph_types_valid(semantic, self.recipe),
             },
             summary="Final document was rendered and passed the deterministic bundle checks.",
         )
@@ -784,10 +874,10 @@ class CoreRunner:
 
     def _read_decisions_file(self, run_id: str) -> list[Decision]:
         path = self.store.run_path(run_id) / "review/decisions.yaml"
-        return self._read_decisions(path) if path.is_file() else []
+        return self._read_decision_bundle(path).decisions if path.is_file() else []
 
     @staticmethod
-    def _read_decisions(path: Path) -> list[Decision]:
+    def _read_decision_bundle(path: Path) -> DecisionBundle:
         yaml = YAML(typ="safe")
         data = yaml.load(path.read_text(encoding="utf-8")) or {}
         if not isinstance(data, Mapping):
@@ -795,7 +885,16 @@ class CoreRunner:
         values = data.get("decisions") or []
         if not isinstance(values, list):
             raise ValueError("decisions.yaml decisions must be a list")
-        return [Decision.model_validate(item) for item in values]
+        waivers_raw = data.get("waivers") or []
+        if not isinstance(waivers_raw, list):
+            raise ValueError("decisions.yaml waivers must be a list")
+        approve = data.get("approve_rewrite", True)
+        return DecisionBundle(
+            decisions=[Decision.model_validate(item) for item in values],
+            steering=str(data.get("steering") or ""),
+            waivers=[Waiver.model_validate(item) for item in waivers_raw],
+            approve_rewrite=bool(approve),
+        )
 
     def _update(self, record: RunRecord, **changes: Any) -> RunRecord:
         updated = record.model_copy(update={**changes, "updated_at": _now()})
@@ -868,30 +967,16 @@ class CoreRunner:
         return "\n\n".join(block.text.strip() for block in blocks if block.text.strip()) + "\n"
 
     @staticmethod
-    def _review_markdown(review: ReviewReport) -> str:
-        lines = ["# Review", "", review.summary, "", "## Findings", ""]
-        if not review.findings:
-            lines.append("No findings.")
-        for finding in review.findings:
-            lines.extend(
-                [
-                    f"- **{finding.severity}** `{finding.finding_id}`: {finding.title} — {finding.detail}"
-                ]
-            )
-        lines.extend(["", "## Questions", ""])
-        if not review.questions:
-            lines.append("No blocking questions.")
-        for question in review.questions:
-            lines.append(f"- `{question.question_id}`: {question.prompt} ({question.reason})")
-        lines.append("")
-        return "\n".join(lines)
-
-    @staticmethod
     def _questions_yaml(review: ReviewReport) -> str:
         lines = [
-            "# Edit answers, then run `docenhance continue <run-id>`.",
+            "# Edit answers and set approve_rewrite: true, then run `docenhance continue <run-id>`.",
+            "approve_rewrite: true",
+            'steering: ""',
+            "waivers: []",
             "decisions:",
         ]
+        if not review.questions:
+            lines.append("  []")
         for question in review.questions:
             lines.extend(
                 [

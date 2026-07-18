@@ -71,7 +71,7 @@ def test_default_cli_runs_and_continues_the_core_bundle(tmp_path: Path) -> None:
 
     review_path = run_root / run_id / "review" / "review.json"
     review = json.loads(review_path.read_text(encoding="utf-8"))
-    decisions = "decisions:\n" + "".join(
+    decisions = 'approve_rewrite: true\nsteering: ""\nwaivers: []\ndecisions:\n' + "".join(
         "  - question_id: {question_id}\n    answer: approved\n    disposition: accept\n".format(
             question_id=item["question_id"]
         )

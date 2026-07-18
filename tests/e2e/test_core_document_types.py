@@ -19,27 +19,22 @@ ROOT = Path(__file__).resolve().parents[2]
 REFERENCE_PACK = ROOT / "reference_packs" / "enterprise_core"
 
 DOCUMENT_TYPES = (
-    ("process", "PROC-STEP-001", "question-rubric-proc-step-001"),
-    ("methodology", "METH-MODEL-001", "question-rubric-meth-model-001"),
-    ("standard", "STD-NORMATIVE-001", "question-rubric-std-normative-001"),
-    (
-        "desktop_procedure",
-        "DESK-ACTION-001",
-        "question-rubric-desk-action-001",
-    ),
+    ("process", "PROC-STEP-001"),
+    ("methodology", "METH-MODEL-001"),
+    ("standard", "STD-NORMATIVE-001"),
+    ("desktop_procedure", "DESK-ACTION-001"),
 )
 
 
 @pytest.mark.e2e
 @pytest.mark.parametrize(
-    ("document_type", "expected_rubric_id", "expected_question_id"),
+    ("document_type", "expected_rubric_id"),
     DOCUMENT_TYPES,
 )
 def test_core_reference_examples_preserve_review_contract_for_all_document_types(
     tmp_path: Path,
     document_type: str,
     expected_rubric_id: str,
-    expected_question_id: str,
 ) -> None:
     source = REFERENCE_PACK / "templates" / document_type / "example.md"
     result = CoreRunner(
@@ -53,19 +48,42 @@ def test_core_reference_examples_preserve_review_contract_for_all_document_types
 
     assert result.status == "waiting"
     assert result.phase == "human_review"
-    assert result.unresolved_question_ids == [expected_question_id]
+    assert result.unresolved_question_ids
     assert review["recipe_id"] == f"enterprise_core@2.0.0/{document_type}"
     assert review["rubric_ids"]
     assert review["sections"]
+    assert review["section_assessments"]
+    assert {item["status"] for item in review["section_assessments"]} <= {
+        "correct",
+        "missing",
+        "improve",
+    }
     assert review["findings"]
     assert review["questions"]
     assert expected_rubric_id in review["rubric_ids"]
     assert any(item["rubric_id"] == expected_rubric_id for item in review["findings"])
-    assert any(item["question_id"] == expected_question_id for item in review["questions"])
-    assert (run_path / "source" / "source.json").is_file()
-    assert (run_path / "source" / "normalized.md").is_file()
-    assert (run_path / "review" / "review.md").is_file()
-    assert (run_path / "review" / "flow.mmd").read_text(encoding="utf-8").startswith("flowchart TD")
+    assert (run_path / "review" / "macro.md").is_file()
+    assert (run_path / "review" / "sections.md").is_file()
+    assert (run_path / "review" / "flow.md").is_file()
+    assert (
+        (run_path / "review" / "flow.inferred.mmd")
+        .read_text(encoding="utf-8")
+        .startswith("flowchart TD")
+    )
+    assert (
+        (run_path / "review" / "flow.proposed.mmd")
+        .read_text(encoding="utf-8")
+        .startswith("flowchart TD")
+    )
+    if document_type in {"process", "desktop_procedure"}:
+        assert review["process_applicable"] is True
+        assert (
+            review["inferred_mermaid"] != review["proposed_mermaid"]
+            or review["proposed_flow_edges"]
+        )
+    else:
+        assert review["process_applicable"] is False
+        assert "No process flow applicable" in review["inferred_mermaid"]
     assert (run_path / "review" / "decisions.yaml").is_file()
 
 
@@ -107,14 +125,20 @@ def test_core_clean_synthetic_process_seals_ontology_graph_and_audit_bundle(
     ontology = json.loads((run_path / "output" / "ontology.json").read_text(encoding="utf-8"))
     graph_lines = (run_path / "output" / "graph.jsonl").read_text(encoding="utf-8").splitlines()
     seal = json.loads((run_path / "audit" / "seal.json").read_text(encoding="utf-8"))
+    review = json.loads((run_path / "review" / "review.json").read_text(encoding="utf-8"))
 
     assert audit["status"] == "pass"
     assert all(audit["checks"].values())
     assert ontology["schema_version"] == "core.graph.v1"
     assert ontology["nodes"]
+    assert any(node["node_type"] != "section" for node in ontology["nodes"])
     assert ontology["edges"]
     assert graph_lines
     assert all(json.loads(line)["kind"] in {"node", "edge"} for line in graph_lines)
+    assert review["section_assessments"]
+    assert review["process_applicable"] is True
+    assert (run_path / "review" / "flow.inferred.mmd").is_file()
+    assert (run_path / "review" / "flow.proposed.mmd").is_file()
     assert seal["sealed"] is True
     assert seal["source_digest"] == result.source_digest
     assert "output/ontology.json" in seal["artifact_paths"]

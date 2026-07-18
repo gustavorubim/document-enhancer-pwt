@@ -167,7 +167,7 @@ def version() -> None:
 def run_document(
     source: Annotated[Path, typer.Argument(help="Source file or single-document inbox directory.")],
     document_type: Annotated[str, typer.Option("--document-type")] = "process",
-    structure_mode: Annotated[str, typer.Option("--structure-mode")] = "parser",
+    structure_mode: Annotated[str, typer.Option("--structure-mode")] = "auto",
     execution_mode: Annotated[str, typer.Option("--execution-mode")] = "offline",
     run_dir: Annotated[Path | None, typer.Option("--run-dir")] = None,
     reference_pack: Annotated[Path | None, typer.Option("--reference-pack")] = None,
@@ -222,7 +222,7 @@ def continue_document(
             root=root,
             reference_pack=_reference_pack(reference_pack),
             document_type=document_type,
-            structure_mode="parser",
+            structure_mode="auto",
             execution_mode=record.execution_mode,
         ).resume(run_id)
     except (DocumentEnhancerError, FileNotFoundError, RuntimeError, ValueError) as error:
@@ -359,6 +359,35 @@ def validate_recipe(
     except (FileNotFoundError, ValueError) as error:
         _fail(error)
         raise typer.Exit(20) from error
+
+
+@app.command("watch-inbox")
+def watch_inbox(
+    inbox: Annotated[
+        Path | None,
+        typer.Argument(help="Inbox directory containing exactly one supported source."),
+    ] = None,
+    document_type: Annotated[str, typer.Option("--document-type")] = "process",
+    structure_mode: Annotated[str, typer.Option("--structure-mode")] = "auto",
+    execution_mode: Annotated[str, typer.Option("--execution-mode")] = "offline",
+    run_dir: Annotated[Path | None, typer.Option("--run-dir")] = None,
+    reference_pack: Annotated[Path | None, typer.Option("--reference-pack")] = None,
+    json_output: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    """Thin wrapper: run the single document currently in the inbox directory."""
+
+    config = load_config()
+    target = (inbox or config.workspace.inbox_dir).expanduser()
+    run_document(
+        source=target,
+        document_type=document_type,
+        structure_mode=structure_mode,
+        execution_mode=execution_mode,
+        run_dir=run_dir,
+        reference_pack=reference_pack,
+        until="complete",
+        json_output=json_output,
+    )
 
 
 def main() -> None:

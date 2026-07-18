@@ -6,6 +6,10 @@ Document Enhancer is one file-backed authoring workflow. The repository contains
 prompt-pack runtime, graph framework, RAG/catalog runtime, migration layer, or compatibility CLI.
 The product creates a portable semantic graph as an output, not as a retrieval service.
 
+Engineering shell: complete. Workflow quality enhancements: see
+[WORKFLOW_ENHANCEMENT_PLAN.md](WORKFLOW_ENHANCEMENT_PLAN.md) and the product objective in
+[AGENTS.md](AGENTS.md).
+
 ## Product contract
 
 1. Drop one `.md`, `.txt`, `.docx`, or `.pdf` source in an inbox or pass it directly to `run`.
@@ -41,7 +45,7 @@ flowchart LR
 ## Completion checklist
 
 - [x] File-backed five-phase runner with one human decision pause.
-- [x] Core-only CLI: run, continue, status, inspect, audit, validate-recipe, version.
+- [x] Core-only CLI: run, continue, status, inspect, audit, validate-recipe, version, watch-inbox.
 - [x] Heuristic parsing plus optional bounded structure recovery.
 - [x] Macro, section, flow, rubric, Mermaid, ambiguity, rewrite, audit, and graph outputs.
 - [x] Four document-type characterization coverage.
@@ -49,10 +53,9 @@ flowchart LR
 - [x] Legacy graph, checkpoint, prompt-pack, RAG/catalog, Deep Agents, domain duplicates, generated
   schemas, compatibility mode, and their tests/scripts removed.
 - [x] Finish source-tree cleanup, documentation synchronization, and full reduced gate.
+- [x] Workflow quality enhancements tracked in WORKFLOW_ENHANCEMENT_PLAN.md.
 
 ## Acceptance evidence
-
-The final gate must show:
 
 ```bash
 uv sync --frozen
@@ -63,7 +66,3 @@ uv run pytest -m "not live_model and not public_download"
 uv run python scripts/verify_reference_pack.py reference_packs/enterprise_core
 uv build
 ```
-
-An opt-in live Gemini run must also reach review, continue after decisions, rewrite, audit, and emit
-the final bundle when credentials are available. Live-provider verification is skipped rather than
-fabricated when credentials are absent.

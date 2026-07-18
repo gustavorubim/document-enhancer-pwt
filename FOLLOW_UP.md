@@ -9,3 +9,4 @@
   policies.
 - Run the opt-in Gemini end-to-end verification in a credentialed non-production environment.
 - Add a future external graph or RAG consumer only through the sealed `core.graph.v1` export.
+- Recreate a clean `.venv` if the editable install becomes polluted by sync-duplicated files.

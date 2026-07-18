@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from document_enhancer.core.rag import CoreBundleIndex, load_sealed_bundle
+from document_enhancer.core.indexing import CoreBundleIndex, load_sealed_bundle
 
 
 def _write_sealed_bundle(root: Path, *, audit_status: str = "pass") -> Path:

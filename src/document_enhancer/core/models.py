@@ -16,6 +16,7 @@ RunStatus = Literal["created", "running", "waiting", "succeeded", "failed"]
 PhaseName = Literal["extract", "analyze", "human_review", "rewrite", "verify"]
 Severity = Literal["info", "warning", "error", "blocker"]
 FindingScope = Literal["macro", "section", "flow", "rewrite", "verify"]
+AssessmentStatus = Literal["correct", "missing", "improve"]
 
 
 def utc_now() -> datetime:
@@ -68,6 +69,21 @@ class Finding(StrictModel):
     section_id: str | None = None
     evidence_span_ids: list[str] = Field(default_factory=list)
     recommendation: str | None = None
+    disposition: AssessmentStatus | None = None
+
+
+class SectionAssessment(StrictModel):
+    """Per-section rubric outcome used by the human section report."""
+
+    section_id: str = Field(min_length=1)
+    title: str = Field(min_length=1)
+    requirement_id: str | None = None
+    status: AssessmentStatus
+    criterion_ids: list[str] = Field(default_factory=list)
+    evidence_span_ids: list[str] = Field(default_factory=list)
+    what_is_correct: str = ""
+    what_is_missing: str = ""
+    what_to_improve: str = ""
 
 
 class Question(StrictModel):
@@ -101,6 +117,11 @@ class Decision(StrictModel):
     rationale: str | None = None
 
 
+class Waiver(StrictModel):
+    requirement_id: str = Field(min_length=1)
+    rationale: str = Field(min_length=1)
+
+
 class SourceDocument(StrictModel):
     """Canonical extracted source metadata; source text remains an artifact."""
 
@@ -126,16 +147,25 @@ class ReviewBundle(StrictModel):
     recipe_id: str = "heuristic-default"
     rubric_ids: list[str] = Field(default_factory=list)
     sections: list[Section] = Field(default_factory=list)
+    section_assessments: list[SectionAssessment] = Field(default_factory=list)
     flow_nodes: list[FlowNode] = Field(default_factory=list)
     flow_edges: list[FlowEdge] = Field(default_factory=list)
+    proposed_flow_nodes: list[FlowNode] = Field(default_factory=list)
+    proposed_flow_edges: list[FlowEdge] = Field(default_factory=list)
     findings: list[Finding] = Field(default_factory=list)
     questions: list[Question] = Field(default_factory=list)
+    process_applicable: bool = False
     mermaid: str = "flowchart TD\n"
+    inferred_mermaid: str = "flowchart TD\n"
+    proposed_mermaid: str = "flowchart TD\n"
 
 
 class DecisionBundle(StrictModel):
     schema_version: Literal["core.decisions.v1"] = "core.decisions.v1"
     decisions: list[Decision] = Field(default_factory=list)
+    steering: str = ""
+    waivers: list[Waiver] = Field(default_factory=list)
+    approve_rewrite: bool = False
 
 
 class RewritePlanItem(StrictModel):
@@ -146,6 +176,8 @@ class RewritePlanItem(StrictModel):
     source_span_ids: list[str] = Field(default_factory=list)
     finding_ids: list[str] = Field(default_factory=list)
     recommendations: list[str] = Field(default_factory=list)
+    missing_required: bool = False
+    requirement_id: str | None = None
 
 
 class RewritePlan(StrictModel):

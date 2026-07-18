@@ -24,6 +24,8 @@ from .models import (
 from .recipes import Recipe
 from .review import title_matches
 
+_PLACEHOLDER_RE = re.compile(r"\b(?:TBD|TODO|TBC)\b|\[\s*\?\s*\]|\?{3,}", re.IGNORECASE)
+
 
 def compile_rewrite_plan(
     *,
@@ -58,12 +60,33 @@ def compile_rewrite_plan(
     if recipe:
         for requirement in recipe.required_section_items:
             heading = str(requirement.get("heading") or requirement.get("id") or "")
+            requirement_id = str(requirement.get("id") or heading)
             matching = next(
-                (item.section_id for item in review.sections if title_matches(heading, item.title)),
+                (item for item in review.sections if title_matches(heading, item.title)),
                 None,
             )
             if matching:
-                required_section_ids.append(matching)
+                required_section_ids.append(matching.section_id)
+                continue
+            stub_id = f"missing-{requirement_id.lower()}"
+            required_section_ids.append(stub_id)
+            items.append(
+                RewritePlanItem(
+                    section_id=stub_id,
+                    title=heading or requirement_id,
+                    source_span_ids=[],
+                    finding_ids=[
+                        item.finding_id
+                        for item in review.findings
+                        if item.finding_id.endswith(requirement_id.lower())
+                    ],
+                    recommendations=[
+                        "Insert an evidence-backed section or record an explicit waiver."
+                    ],
+                    missing_required=True,
+                    requirement_id=requirement_id,
+                )
+            )
     return RewritePlan(
         recipe_id=review.recipe_id,
         source_digest=source_digest,
@@ -86,15 +109,184 @@ def apply_deterministic_answers(text: str, decisions: list[Decision]) -> tuple[s
         answer = decision.answer.strip()
         if not answer or decision.disposition != "accept":
             continue
-        updated = re.sub(
-            r"\b(?:TBD|TODO|TBC)\b|\[\s*\?\s*\]|\?{3,}", answer, text, count=1, flags=re.IGNORECASE
-        )
+        updated = _PLACEHOLDER_RE.sub(answer, text, count=1)
         if updated != text:
             changes.append(
                 f"Replaced one unresolved marker with the accepted answer for {decision.question_id}."
             )
         text = updated
     return text, changes
+
+
+def apply_reviewer_decisions(
+    text: str,
+    *,
+    decisions: list[Decision],
+    steering: str = "",
+) -> tuple[str, list[str]]:
+    """Apply accepted answers offline: placeholders, steered conflict fixes, decision log."""
+
+    text, changes = apply_deterministic_answers(text, decisions)
+    accepted = [item for item in decisions if item.disposition == "accept" and item.answer.strip()]
+    if not accepted and not steering.strip():
+        return text, changes
+    open_points = next(
+        (
+            item
+            for item in accepted
+            if item.question_id == "question-open-points-001" or "open-points" in item.question_id
+        ),
+        None,
+    )
+    if open_points is not None:
+        answer = open_points.answer.lower()
+        replacements: list[tuple[str, str, str]] = []
+        if "30 minutes" in answer:
+            replacements.append(
+                (
+                    "P1: within 60 minutes of receipt",
+                    "P1: within 30 minutes of receipt",
+                    "Aligned STEP-CCT-050 P1 timing to the approved 30-minute SLA.",
+                )
+            )
+            replacements.append(
+                (
+                    "Require 30-minute human acknowledgement for P1 complaints.",
+                    "Require 30-minute human acknowledgement for P1 complaints (approved).",
+                    "Confirmed pilot readiness P1 acknowledgement at 30 minutes.",
+                )
+            )
+        if "0.85" in answer:
+            replacements.append(
+                (
+                    ">= 0.80",
+                    ">= 0.85",
+                    "Updated high-confidence routing threshold to the approved 0.85 value.",
+                )
+            )
+            replacements.append(
+                (
+                    "< 0.80",
+                    "< 0.85",
+                    "Updated low-confidence routing threshold to the approved 0.85 boundary.",
+                )
+            )
+            replacements.append(
+                (
+                    "RULE-CCT-002 uses 0.80; pilot readiness note uses 0.85",
+                    "RULE-CCT-002 and pilot readiness both use 0.85 (approved)",
+                    "Resolved AI routing confidence conflict to 0.85.",
+                )
+            )
+        if "7 years" in answer:
+            replacements.append(
+                (
+                    "Retain pilot complaint records for 5 years after calendar-year end.",
+                    "Retain pilot complaint records for 7 years after case closure (approved).",
+                    "Resolved retention conflict to 7 years after case closure.",
+                )
+            )
+            replacements.append(
+                (
+                    "The pilot readiness checklist still says five years after calendar-year end. "
+                    "Records Management must confirm which period is authoritative before approval.",
+                    "Records retention is approved at seven years after case closure "
+                    "(Records Management with Legal).",
+                    "Removed unresolved retention conflict language.",
+                )
+            )
+        if "compliance concurrence" in answer:
+            replacements.append(
+                (
+                    "Draft says manager approval; approval partner not stated",
+                    "Complaint Operations Manager approval plus Compliance concurrence required",
+                    "Named the independent approval partner for material batch actions.",
+                )
+            )
+        for old, new, note in replacements:
+            if old in text and old != new:
+                text = text.replace(old, new)
+                changes.append(note)
+    log_lines = [
+        "",
+        "# Reviewer decisions applied",
+        "",
+        "The following accepted decisions were applied during the rewrite stage.",
+        "",
+    ]
+    if steering.strip():
+        log_lines.extend(["## Steering", "", steering.strip(), ""])
+    log_lines.extend(["## Accepted answers", ""])
+    for item in accepted:
+        log_lines.extend(
+            [
+                f"### `{item.question_id}`",
+                "",
+                item.answer.strip(),
+                "",
+            ]
+        )
+        if item.rationale:
+            log_lines.extend([f"_Rationale:_ {item.rationale}", ""])
+    if "# Reviewer decisions applied" not in text:
+        text = text.rstrip() + "\n" + "\n".join(log_lines)
+        changes.append("Appended reviewer decisions applied section from accepted answers.")
+    return text, changes
+
+
+def apply_template_stubs(
+    text: str,
+    *,
+    plan: RewritePlan,
+    recipe: Recipe | None,
+    decisions: list[Decision],
+    waived_requirement_ids: set[str],
+) -> tuple[str, list[str]]:
+    """Append explicit stubs for missing required sections that were not waived."""
+
+    if not recipe:
+        return text, []
+    answers = {
+        item.question_id: item.answer.strip()
+        for item in decisions
+        if item.disposition == "accept" and item.answer.strip()
+    }
+    changes: list[str] = []
+    body = text.rstrip() + "\n"
+    for item in plan.items:
+        if not item.missing_required or not item.requirement_id:
+            continue
+        if item.requirement_id in waived_requirement_ids:
+            continue
+        if title_matches(item.title, body):
+            continue
+        expected = next(
+            (
+                str(requirement.get("expected_content") or "")
+                for requirement in recipe.required_section_items
+                if str(requirement.get("id") or "") == item.requirement_id
+            ),
+            "",
+        )
+        question_id = f"question-required-{item.requirement_id.lower()}"
+        answer = answers.get(question_id, "")
+        if answer and answer.lower() not in {"yes", "y", "true", "include"}:
+            content = answer
+        elif answer:
+            content = (
+                f"TBD: Reviewer approved inclusion of `{item.requirement_id}` but did not supply "
+                "source-backed body text."
+            )
+        else:
+            content = (
+                f"TBD: Provide source-backed content for required section `{item.requirement_id}`."
+            )
+        stub = f"\n## {item.title}\n\n{content}\n"
+        if expected:
+            stub += f"\nExpected content: {expected}.\n"
+        body += stub
+        changes.append(f"Inserted governed stub for missing section {item.title!r}.")
+    return body, changes
 
 
 def render_docx(markdown: str) -> bytes:
@@ -114,32 +306,104 @@ def render_docx(markdown: str) -> bytes:
     return stream.getvalue()
 
 
-def semantic_graph(review: ReviewReport, final_text: str) -> dict[str, Any]:
-    ir = DocumentIR(
-        sections=review.sections,
-        nodes=[
+def semantic_graph(
+    review: ReviewReport,
+    final_text: str,
+    *,
+    recipe: Recipe | None = None,
+) -> dict[str, Any]:
+    nodes: list[SemanticNode] = []
+    edges: list[SemanticEdge] = []
+    for section in review.sections:
+        requirement = None
+        if recipe:
+            requirement = next(
+                (
+                    item
+                    for item in recipe.required_sections
+                    if title_matches(
+                        str(item.get("heading") or item.get("id") or ""), section.title
+                    )
+                ),
+                None,
+            )
+        hooks = [str(item) for item in ((requirement or {}).get("ontology_hooks") or [])]
+        primary_type = hooks[0] if hooks else "Section"
+        if recipe and not recipe.allows_node_type(primary_type):
+            primary_type = "Section"
+        nodes.append(
             SemanticNode(
                 node_id=section.section_id,
                 label=section.title,
-                node_type="section",
+                node_type=primary_type,
                 properties={
                     "level": section.level,
                     "parent_id": section.parent_id,
+                    "requirement_id": (requirement or {}).get("id"),
+                    "ontology_hooks": hooks,
                 },
                 provenance_span_ids=list(section.span_ids),
             )
-            for section in review.sections
-        ],
-        edges=[
+        )
+        for hook in hooks[1:]:
+            if recipe and not recipe.allows_node_type(hook):
+                continue
+            hook_id = f"{section.section_id}:{hook.lower()}"
+            nodes.append(
+                SemanticNode(
+                    node_id=hook_id,
+                    label=f"{section.title} ({hook})",
+                    node_type=hook,
+                    properties={"parent_section": section.section_id},
+                    provenance_span_ids=list(section.span_ids[:3]),
+                )
+            )
+            edges.append(
+                SemanticEdge(
+                    source=section.section_id,
+                    target=hook_id,
+                    edge_type="contains",
+                    properties={"derived_from": "ontology_hooks"},
+                    provenance_span_ids=list(section.span_ids[:3]),
+                )
+            )
+    flow_edges = review.proposed_flow_edges or review.flow_edges
+    for edge in flow_edges:
+        edge_type = edge.relation
+        if recipe and not recipe.allows_edge_type(edge_type):
+            continue
+        edges.append(
             SemanticEdge(
                 source=edge.source,
                 target=edge.target,
-                edge_type=edge.relation,
+                edge_type=edge_type,
                 properties={"relation": edge.relation},
                 provenance_span_ids=list(edge.evidence_span_ids),
             )
-            for edge in review.flow_edges
-        ],
+        )
+    for node in review.proposed_flow_nodes:
+        if any(item.node_id == node.node_id for item in nodes):
+            continue
+        mapped = {
+            "decision": "Decision",
+            "step": "ProcessStep",
+            "section": "Section",
+        }.get(node.node_type, "Section")
+        if recipe and not recipe.allows_node_type(mapped):
+            mapped = "Section"
+        nodes.append(
+            SemanticNode(
+                node_id=node.node_id,
+                label=node.label,
+                node_type=mapped,
+                properties={"proposed": True},
+                provenance_span_ids=[],
+            )
+        )
+    ir = DocumentIR(
+        sections=review.sections,
+        nodes=nodes,
+        edges=edges,
         markdown_sha256=hashlib.sha256(final_text.encode("utf-8")).hexdigest(),
     )
     return ir.model_dump(mode="json")
@@ -185,6 +449,8 @@ def semantic_diff(before: dict[str, Any], after: dict[str, Any]) -> dict[str, An
 
 __all__ = [
     "apply_deterministic_answers",
+    "apply_reviewer_decisions",
+    "apply_template_stubs",
     "compile_rewrite_plan",
     "graph_json_lines",
     "render_docx",

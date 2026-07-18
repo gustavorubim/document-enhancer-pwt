@@ -5,6 +5,7 @@ analyze, human review, rewrite, and verify.
 """
 
 from .export import public_graph, public_graph_jsonl
+from .indexing import CoreBundleIndex, SealedBundle, load_sealed_bundle
 from .models import (
     ArtifactRef,
     AuditReport,
@@ -20,7 +21,9 @@ from .models import (
     RewritePlan,
     RewritePlanItem,
     RunRecord,
+    SectionAssessment,
     SourceDocument,
+    Waiver,
 )
 from .providers import (
     AuditProvider,
@@ -32,7 +35,6 @@ from .providers import (
     RewriteProvider,
     StructureProvider,
 )
-from .rag import CoreBundleIndex, SealedBundle, load_sealed_bundle
 from .runner import CoreRunner
 from .store import RunStore
 
@@ -64,7 +66,9 @@ __all__ = [
     "RunStore",
     "ReviewProvider",
     "RewriteProvider",
+    "SectionAssessment",
     "StructureProvider",
     "SourceDocument",
+    "Waiver",
     "load_sealed_bundle",
 ]

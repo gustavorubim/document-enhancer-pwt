@@ -16,6 +16,7 @@ class WorkspaceConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     run_dir: Path = Path(".document-enhancer/runs")
+    inbox_dir: Path = Path(".document-enhancer/inbox")
 
 
 class ReferenceConfig(BaseModel):

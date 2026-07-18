@@ -1,16 +1,52 @@
 # Document Enhancer agent guidance
 
+## Product objective
+
+Build a file-backed document enhancement workflow that turns one dropped source into a
+reviewed, steered, rewritten, audited, and graph-ready document bundle.
+
+The intended operator journey is:
+
+1. Drop one `.md`, `.txt`, `.docx`, or `.pdf` into an inbox folder (or pass the file) and trigger a
+   run.
+2. Parse the document with heuristics and, when needed, bounded LLM structure recovery. Produce a
+   canonical breakup: ordered spans, sections, quality signals, and warnings.
+3. Run a macro analysis against the selected recipe rubric and produce a clear macro report.
+4. Run section-by-section analysis against the rubric and produce a section report that states, for
+   each section, what is correct, what is missing, and what should be improved.
+5. Run process-flow analysis when a process is being documented. Produce a flow report with:
+   - the inferred process as Mermaid
+   - the proposed/corrected process as Mermaid
+   - what is incorrect, missing, or ambiguous in the documented flow
+6. Separate genuine questions, ambiguities, and steering decisions into one editable
+   `review/decisions.yaml` for the human.
+7. After decisions are answered, rewrite the document from approved decisions, source evidence, and
+   the recipe/template requirements.
+8. Deliver the final document, audit, and change explanation. Seal only when deterministic checks
+   pass.
+9. Emit portable semantic/graph/ontology-ready exports so a later GraphRAG, RAG, or ontology system
+   can consume the bundle. Retrieval services are consumers of sealed outputs, not part of the
+   authoring critical path.
+
+Engineering simplification is in service of this workflow: one five-phase runner, one decision
+gate, one recipe/reference pack, compact `run.json` state, and no legacy graph/checkpoint/RAG
+runtime on the authoring path. Do not reintroduce platform machinery that does not advance the
+operator journey above.
+
+Active architecture and acceptance criteria live in `SIMPLIFICATION_PLAN.md`. Residual product and
+quality work lives in `FOLLOW_UP.md`.
+
 ## Mission
 
-Deliver `plan.md` through verified milestone completion. Optimize for forward progress on the
-critical path while preserving correctness, security, traceability, and the explicit acceptance
-criteria. Do not let optional hardening prevent the next milestone from starting.
+Deliver the product objective through verified increments. Optimize for forward progress on the
+critical path while preserving correctness, security, traceability, provenance, and no-invention
+gates. Do not let optional hardening prevent the next workflow-quality milestone from starting.
 
 ## Progress-first orchestration
 
-- Keep one critical-path milestone as the primary work in progress.
+- Keep one critical-path workflow gap as the primary work in progress.
 - Limit parallel write-heavy lanes to work with genuinely independent ownership boundaries.
-- Complete, integrate, and formally close the current milestone before expanding into optional
+- Complete, integrate, and formally close the current increment before expanding into optional
   hardening or unrelated follow-on work.
 - Do not interrupt an implementation worker with non-blocking review comments. Collect those
   comments and perform one bounded review after the worker produces a coherent commit.
@@ -24,8 +60,8 @@ criteria. Do not let optional hardening prevent the next milestone from starting
 
 A finding blocks progress only when it demonstrates at least one of the following:
 
-- A required test, release gate, or milestone acceptance criterion fails.
-- Required behavior in `plan.md` is missing or incorrect.
+- A required test, release gate, or product-objective acceptance criterion fails.
+- Required workflow behavior above is missing or incorrect.
 - Data can be lost, silently changed, invented, corrupted, or promoted without validation.
 - A security, privacy, credential, provenance, or tool-boundary requirement is violated.
 - A public or shared contract is incompatible with its required consumer.
@@ -58,30 +94,31 @@ uv run python scripts/verify_reference_pack.py reference_packs/enterprise_core
 uv build
 ```
 
-Run opt-in live-provider or public-download checks only when the milestone requires them and the
-required credentials or network policy are explicitly available.
+Prefer `PYTHONPATH=src` when diagnosing install/import issues. Recreate `.venv` if the editable
+install is polluted. Run opt-in live-provider checks only when the increment requires them and
+credentials are explicitly available.
 
-## Milestone closure
+## Increment closure
 
-After a milestone passes its acceptance criteria, the integrator must:
+After an increment passes its acceptance criteria, the integrator must:
 
 1. Merge the verified implementation.
-2. Update `plan.md` with evidence-backed task status.
+2. Update `SIMPLIFICATION_PLAN.md` / `plan.md` with evidence-backed status when the contract changed.
 3. Update `README.md` when the supported product surface or user workflow changed.
 4. Record remaining non-blocking work in `FOLLOW_UP.md`.
 5. Archive or close completed threads and remove completed worktrees when safe.
 6. Push the integrated branch when a remote is configured and pushing is in scope.
-7. Begin the next unblocked critical-path milestone immediately.
+7. Begin the next unblocked critical-path workflow gap immediately.
 
-Workers should not edit `plan.md`, the root `README.md`, shared configuration, or another lane's
+Workers should not edit shared plans, the root `README.md`, shared configuration, or another lane's
 files unless their task explicitly grants that ownership. They must return the evidence the
-integrator needs to close the milestone.
+integrator needs to close the increment.
 
 ## Status reporting
 
 Every orchestration update should state:
 
-- Current milestone and task IDs.
+- Current workflow gap or task IDs.
 - The single current blocker, or `none`.
 - The exact next implementation or integration action.
 - Verification completed since the prior update.

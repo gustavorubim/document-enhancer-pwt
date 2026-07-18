@@ -1,10 +1,8 @@
-"""Optional read-only consumer boundary for sealed core bundles.
+"""Optional sealed-bundle indexing consumer (stdlib SQLite FTS).
 
-The authoring runtime does not import this module.  A caller can opt in after a run has
-passed its deterministic audit and has been sealed, then index or query the resulting
-bundle with the standard-library SQLite runtime. Keeping bundle loading separate from
-the SQLite adapter makes the boundary useful to another indexer without coupling it to
-``CoreRunner``.
+Not part of the authoring critical path. Callers may index a sealed run after audit
+passes; GraphRAG/RAG services should consume ``core.graph.v1`` exports instead of
+importing ``CoreRunner``.
 """
 
 from __future__ import annotations
