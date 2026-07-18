@@ -260,6 +260,127 @@ no session, hidden reasoning, or conversation is persisted. FAISS files are trus
 local workspace artifacts whose paths and hashes match the catalog manifest. Rebuild the whole small
 catalog when the selected sealed corpus or embedding profile changes.
 
+### RAG cookbook: five-document corpus
+
+The checked-in fictional sources and expected answers live under `fixtures/rag/corpus_demo/`. The
+commands below use the five sealed demonstration runs produced from those sources. If you reprocess
+the sources, substitute the new sealed run IDs printed by Stage 2.
+
+```text
+Payment settlement:  918108480c23-93606487d4
+Vendor invoice:      4a96f70178e8-77a788bd0c
+Privileged access:   bb21fd5c68a4-82889042c6
+Model monitoring:    cb5c3f51a738-672995c3c6
+Complaint quality:   9dc086ca1df9-b98b271f40
+```
+
+Build or replace the catalog with exactly those five document versions, then inspect it:
+
+```bash
+uv run docenhance rag index \
+  918108480c23-93606487d4 \
+  4a96f70178e8-77a788bd0c \
+  bb21fd5c68a4-82889042c6 \
+  cb5c3f51a738-672995c3c6 \
+  9dc086ca1df9-b98b271f40
+
+uv run docenhance rag inspect
+uv run docenhance rag inspect --json
+```
+
+Ask a focused question against one explicit document:
+
+```bash
+uv run docenhance rag ask \
+  "Who owns the Daily Payment Settlement Process?" \
+  --run 918108480c23-93606487d4 \
+  --show-trace
+
+uv run docenhance rag ask \
+  "What threshold stops settlement release?" \
+  --run 918108480c23-93606487d4 \
+  --json
+```
+
+Ask a corpus-wide list question. The wording `all documents` automatically selects corpus mode:
+
+```bash
+uv run docenhance rag ask \
+  "List all controls that have a reconciliation step from all documents." \
+  --show-trace
+```
+
+The expected control IDs are `CTRL-PAY-101`, `CTRL-AP-202`, `CTRL-MOD-404`, and
+`CTRL-CQA-505`. The privileged-access document is the deliberate negative case.
+
+Use exhaustive coverage when completeness matters. This reads every selected chunk and can require
+many model calls:
+
+```bash
+uv run docenhance rag ask \
+  "List all controls that have a reconciliation step from all documents." \
+  --coverage exhaustive \
+  --show-trace
+
+uv run docenhance rag ask \
+  "List all controls that have a reconciliation step from all documents." \
+  --coverage exhaustive \
+  --json | jq '{
+    status,
+    coverage,
+    item_keys: [.items[].item_key],
+    cited_runs: [.sources[].run_id] | unique
+  }'
+```
+
+For this fixture, exhaustive success means 5/5 documents and 215/215 chunks examined, no failed
+runs, `reduction_failed: false`, `truncated: false`, and exactly the four expected IDs.
+
+The corpus schema is derived from each question, so a different comparison uses the same path:
+
+```bash
+uv run docenhance rag ask \
+  "Compare the business owner and evidence retention period across all documents." \
+  --show-trace
+
+uv run docenhance rag ask \
+  "Which exception approvers are named?" \
+  --scope corpus \
+  --show-trace
+```
+
+Restrict a corpus comparison by repeating `--run`:
+
+```bash
+uv run docenhance rag ask \
+  "Compare the owners and operating thresholds in these documents." \
+  --scope corpus \
+  --run 918108480c23-93606487d4 \
+  --run 4a96f70178e8-77a788bd0c \
+  --run cb5c3f51a738-672995c3c6 \
+  --show-trace
+```
+
+Exercise real graph topology. The trace should include `expand_graph` and cited `contains` paths:
+
+```bash
+uv run docenhance rag ask \
+  "Using the graph topology, what evidence is connected to the Controls, thresholds, and evidence section in the Monthly Credit Model Monitoring Process?" \
+  --run cb5c3f51a738-672995c3c6 \
+  --show-trace
+```
+
+Open the Rich interactive conversation, optionally restricted to one document:
+
+```bash
+uv run docenhance rag chat
+
+uv run docenhance rag chat \
+  --run bb21fd5c68a4-82889042c6
+```
+
+Inside chat, use `/sources`, `/trace`, `/clear`, `/help`, and `/exit`.
+
 ## Supported commands
 
 ```text
