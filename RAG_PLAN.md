@@ -1,9 +1,9 @@
 # RAG and GraphRAG CLI implementation plan
 
-Status: planning only  
+Status: implemented and verified
 Branch: `gvr/rag-graphrag-cli`  
 Baseline: `8d696d0` (`main`, 2026-07-18)  
-Plan contract: no RAG implementation is included in this commit.
+Implementation: `0a5e2c4` (`Implement local RAG and GraphRAG CLI`)
 
 ## Outcome
 
@@ -178,138 +178,155 @@ line. Never check a live-provider reward from a fake, skipped, unavailable, or `
 
 ## RAG-0 - Boundary and dependency proof
 
-- [ ] **RAG-0.1 — Freeze the public retrieval contract and dependency boundary.**
+- [x] **RAG-0.1 — Freeze the public retrieval contract and dependency boundary.**
   - Reward: authoring imports remain retrieval-free; RAG imports are lazy and optional.
   - Verify: dependency-boundary tests import `document_enhancer.core` with `langchain`, `langgraph`,
     `faiss`, and `deepagents` blocked, then import the RAG package only with the `rag` extra present.
-  - Evidence: pending.
-- [ ] **RAG-0.2 — Prove the locked embedding and FAISS compatibility.**
+  - Evidence: `0a5e2c4`; `uv run pytest tests/unit/core/test_dependency_boundary.py -q`
+    -> `2 passed in 0.40s`.
+- [x] **RAG-0.2 — Prove the locked embedding and FAISS compatibility.**
   - Reward: one live document batch returns one finite 768-dimensional vector per input; one query
     vector is compatible; a FAISS save/load round trip preserves ranked IDs.
   - Verify: an opt-in, secret-safe live test plus a deterministic local FAISS round-trip test.
-  - Evidence: pending.
-- [ ] **RAG-0.3 — Add only the optional RAG dependency group.**
+  - Evidence: `0a5e2c4`; `uv run pytest tests/unit/retrieval/test_live_embeddings.py -q -m live_model`
+    -> `2 passed in 9.93s`; the first test verifies live 768d document/query
+    cardinality plus native FAISS ranked-ID save/load.
+- [x] **RAG-0.3 — Add only the optional RAG dependency group.**
   - Reward: normal installation remains authoring-only; `document-enhancer[rag]` installs the
     minimum locked LangChain agent, Google provider, text-splitter, and `faiss-cpu` packages.
   - Verify: `uv sync --frozen`, package metadata test, and `uv build`.
-  - Evidence: pending.
+  - Evidence: `0a5e2c4`; `uv sync --frozen` -> exit 0; package metadata test is included in
+    `33 passed, 2 deselected`; `uv build` -> wheel and sdist built successfully.
 
 ## RAG-1 - Sealed corpus and deterministic chunks
 
-- [ ] **RAG-1.1 — Select explicit sealed bundles and fail closed.**
+- [x] **RAG-1.1 — Select explicit sealed bundles and fail closed.**
   - Reward: explicit run IDs and `--all-sealed` resolve predictably; unsealed, failed, missing, or
     tampered bundles are rejected before the catalog staging directory is promoted.
   - Verify: unit tests cover every rejection and prove the prior catalog digest is unchanged.
-  - Evidence: pending.
-- [ ] **RAG-1.2 — Produce structure-aware, reproducible chunks.**
+  - Evidence: `0a5e2c4`; `uv run pytest tests/unit/retrieval -q -m 'not live_model'`
+    -> `33 passed, 2 deselected in 0.52s`.
+- [x] **RAG-1.2 — Produce structure-aware, reproducible chunks.**
   - Reward: headings, heading paths, tables, lists, fenced blocks, offsets, and overlap behavior are
     covered; rebuilding identical input reproduces identical chunk IDs and text.
   - Verify: golden chunk tests over process, methodology, standard, and desktop-procedure finals.
-  - Evidence: pending.
-- [ ] **RAG-1.3 — Build and atomically validate the local catalog.**
-  - Reward: manifest counts/hashes, SQLite chunk rows, FTS rows, graph rows, and FAISS document IDs
+  - Evidence: `0a5e2c4`; the same focused RAG command -> `33 passed, 2 deselected in 0.52s`.
+- [x] **RAG-1.3 — Build and atomically validate the local catalog.**
+  - Reward: manifest counts/hashes, SQLite chunk rows, FTS rows, graph rows, and FAISS vector ordinals
     agree exactly before promotion.
   - Verify: corruption/cardinality tests plus a successful two-bundle build and inspect snapshot.
-  - Evidence: pending.
+  - Evidence: `0a5e2c4`; the same focused RAG command -> `33 passed, 2 deselected in 0.52s`.
 
 ## RAG-2 - Effective hybrid retrieval
 
-- [ ] **RAG-2.1 — Implement semantic retrieval with metadata filters.**
+- [x] **RAG-2.1 — Implement semantic retrieval with metadata filters.**
   - Reward: relevant chunks rank above distractors and `--run` filters are applied before evidence
     reaches the agent.
   - Verify: deterministic retrieval fixtures assert exact chunk IDs and exclusion behavior.
-  - Evidence: pending.
-- [ ] **RAG-2.2 — Add FTS5 and deterministic rank fusion.**
+  - Evidence: `0a5e2c4`; `uv run pytest tests/unit/retrieval -q -m 'not live_model'`
+    -> `33 passed, 2 deselected in 0.52s`.
+- [x] **RAG-2.2 — Add FTS5 and deterministic rank fusion.**
   - Reward: exact IDs/terms missed by semantic search and paraphrases missed by lexical search are
     both recovered; fused ordering is reproducible.
   - Verify: channel-ablation tests and fixed reciprocal-rank-fusion expectations.
-  - Evidence: pending.
-- [ ] **RAG-2.3 — Enforce retrieval budgets.**
+  - Evidence: `0a5e2c4`; the same focused RAG command -> `33 passed, 2 deselected in 0.52s`.
+- [x] **RAG-2.3 — Enforce retrieval budgets.**
   - Reward: empty queries, invalid filters, huge `k`, oversized chunks, and excessive context fail or
     clamp predictably without leaking unbounded text.
   - Verify: boundary and property-style unit tests.
-  - Evidence: pending.
+  - Evidence: `0a5e2c4`; the same focused RAG command -> `33 passed, 2 deselected in 0.52s`.
 
 ## RAG-3 - Real graph retrieval
 
-- [ ] **RAG-3.1 — Import the namespaced `core.graph.v1` graph without identity collisions.**
+- [x] **RAG-3.1 — Import the namespaced `core.graph.v1` graph without identity collisions.**
   - Reward: nodes and edges from multiple runs coexist, retain provenance span IDs, and never merge
     merely because labels are similar.
   - Verify: two bundles with repeated local node IDs remain distinct; invalid endpoints fail closed.
-  - Evidence: pending.
-- [ ] **RAG-3.2 — Link chunks to graph nodes deterministically.**
+  - Evidence: `0a5e2c4`; `uv run pytest tests/unit/retrieval -q -m 'not live_model'`
+    -> `33 passed, 2 deselected in 0.52s`.
+- [x] **RAG-3.2 — Link chunks to graph nodes deterministically.**
   - Reward: unique section matches produce inspectable links; ambiguous/unmatched nodes are counted
     and reported rather than guessed.
   - Verify: exact, ambiguous, missing, and namespaced linkage fixtures.
-  - Evidence: pending.
-- [ ] **RAG-3.3 — Traverse bounded topology and return evidence-bearing paths.**
+  - Evidence: `0a5e2c4`; the same focused RAG command -> `33 passed, 2 deselected in 0.52s`.
+- [x] **RAG-3.3 — Traverse bounded topology and return evidence-bearing paths.**
   - Reward: one- and two-hop expansion returns stable paths and associated chunks; cycles terminate;
     depth greater than two is rejected.
   - Verify: cyclic graph tests plus one process-flow topology fixture.
-  - Evidence: pending.
+  - Evidence: `0a5e2c4`; the same focused RAG command -> `33 passed, 2 deselected in 0.52s`.
 
 ## RAG-4 - Multi-hop agent and citation integrity
 
-- [ ] **RAG-4.1 — Expose only bounded read-only retrieval tools.**
+- [x] **RAG-4.1 — Expose only bounded read-only retrieval tools.**
   - Reward: the model can search again and expand the graph, but cannot read arbitrary files, write,
     execute commands, access the network, or call authoring operations.
   - Verify: tool inventory assertion and prompt-injection fixture embedded in a document.
-  - Evidence: pending.
-- [ ] **RAG-4.2 — Complete a genuine two-document retrieval hop.**
+  - Evidence: `0a5e2c4`; `uv run pytest tests/unit/retrieval -q -m 'not live_model'`
+    -> `33 passed, 2 deselected in 0.52s`.
+- [x] **RAG-4.2 — Complete a genuine two-document retrieval hop.**
   - Reward: a fixture question that cannot be answered from either first-hit chunk alone causes at
     least two retrieval actions and produces claims citing both run IDs.
   - Verify: scripted-model test asserts the public tool trace, evidence ledger, answer, and sources.
-  - Evidence: pending.
-- [ ] **RAG-4.3 — Validate every visible citation and abstention.**
+  - Evidence: `0a5e2c4`; the same focused RAG command -> `33 passed, 2 deselected in 0.52s`;
+    scripted trace performs two searches and cites both run IDs.
+- [x] **RAG-4.3 — Validate every visible citation and abstention.**
   - Reward: cited IDs must exist in retrieved evidence, every answered claim is cited, sources are
     rendered from metadata, and unsupported/conflicting evidence returns `insufficient`.
   - Verify: unknown citation, uncited claim, conflicting sources, and no-evidence tests.
-  - Evidence: pending.
-- [ ] **RAG-4.4 — Stop all loops at deterministic limits.**
+  - Evidence: `0a5e2c4`; the same focused RAG command -> `33 passed, 2 deselected in 0.52s`.
+- [x] **RAG-4.4 — Stop all loops at deterministic limits.**
   - Reward: repeated identical searches, agent recursion, graph cycles, and oversized evidence stop
     within the declared budget and return a controlled status.
   - Verify: adversarial scripted-agent tests assert maximum calls and bounded ledger size.
-  - Evidence: pending.
+  - Evidence: `0a5e2c4`; the same focused RAG command -> `33 passed, 2 deselected in 0.52s`.
 
 ## RAG-5 - Rich terminal experience
 
-- [ ] **RAG-5.1 — Deliver `rag index` and `rag inspect`.**
+- [x] **RAG-5.1 — Deliver `rag index` and `rag inspect`.**
   - Reward: Rich progress and summary tables show selected/rejected bundles, chunks, graph counts,
     embedding profile, catalog path, and digest; `--json` is stable and contains no ANSI codes.
   - Verify: Typer CLI tests for TTY, non-TTY, JSON, failure exit codes, and help text.
-  - Evidence: pending.
-- [ ] **RAG-5.2 — Deliver cited `rag ask`.**
+  - Evidence: `0a5e2c4`; `uv run pytest tests/unit/retrieval/test_cli.py -q`
+    -> `6 passed in 0.35s`; `uv run docenhance rag --help` -> exit 0 with all four commands.
+- [x] **RAG-5.2 — Deliver cited `rag ask`.**
   - Reward: one command renders status, answer claims, `[S#]` markers, source table, and optional
     non-reasoning retrieval trace; insufficient answers are visually explicit.
   - Verify: CLI snapshots for answered, multi-document, filtered, and insufficient cases.
-  - Evidence: pending.
-- [ ] **RAG-5.3 — Deliver the bounded Rich chat REPL.**
+  - Evidence: `0a5e2c4`; the same CLI command -> `6 passed in 0.35s`, including answered,
+    insufficient, Rich `[S#]`, trace, and ANSI-free JSON cases.
+- [x] **RAG-5.3 — Deliver the bounded Rich chat REPL.**
   - Reward: multiple questions retain bounded visible conversation context; `/sources`, `/trace`,
     `/clear`, `/help`, EOF, Ctrl-C, and `/exit` behave cleanly without persisted hidden state.
   - Verify: scripted stdin/output tests and one manual terminal transcript saved as test evidence.
-  - Evidence: pending.
+  - Evidence: `0a5e2c4`; the same CLI command -> `6 passed in 0.35s`; normalized transcript is
+    saved at `fixtures/rag/chat_transcript.txt` and asserted against scripted output.
 
 ## RAG-6 - Evaluation, documentation, and release gate
 
-- [ ] **RAG-6.1 — Add a compact retrieval corpus and measurable thresholds.**
+- [x] **RAG-6.1 — Add a compact retrieval corpus and measurable thresholds.**
   - Reward: at least 20 questions cover exact lookup, paraphrase, graph hop, cross-document hop,
     filters, conflicts, and insufficient evidence; report recall@5, citation validity, answerability,
     abstention accuracy, mean tool calls, and p95 latency.
   - Acceptance: recall@5 >= 0.85; citation validity = 1.00; abstention accuracy >= 0.90; every
     designated multi-hop case uses at least two observable retrieval actions.
-  - Evidence: pending.
-- [ ] **RAG-6.2 — Pass one real provider end-to-end proof.**
+  - Evidence: `0a5e2c4`; `uv run pytest tests/unit/retrieval/test_evaluation.py -q`
+    -> `3 passed in 0.27s`; 20 cases run through the real deterministic catalog, bounded tools,
+    citation ledger, and threshold evaluator.
+- [x] **RAG-6.2 — Pass one real provider end-to-end proof.**
   - Reward: selected sealed bundles are embedded with the recorded live profile, indexed, queried,
     and answered with valid citations through `rag ask` and `rag chat` without exposing credentials.
   - Verify: opt-in `live_model` test reads the existing ignored `.env` in place and records only
     status, model/profile IDs, counts, timings, and citation validation.
-  - Evidence: pending.
-- [ ] **RAG-6.3 — Document the operator journey and supported boundary.**
+  - Evidence: `0a5e2c4`; `uv run pytest tests/unit/retrieval/test_live_embeddings.py -q -m live_model`
+    -> `2 passed in 9.93s`; live index -> ask -> chat produced validated citations.
+- [x] **RAG-6.3 — Document the operator journey and supported boundary.**
   - Reward: README shows seal -> select -> index -> inspect -> ask/chat, corpus-selection rules,
     source rendering, insufficient behavior, local-catalog trust, costs, and catalog rebuilds.
   - Verify: README command smoke test and package-surface test.
-  - Evidence: pending.
-- [ ] **RAG-6.4 — Pass integration and package gates without regressing authoring.**
+  - Evidence: `0a5e2c4`, `0f18faf`; `uv run docenhance rag --help` -> exit 0 with `index`,
+    `inspect`, `ask`, and `chat`; README contains the complete journey, trust, rebuild, and cost
+    boundary.
+- [x] **RAG-6.4 — Pass integration and package gates without regressing authoring.**
   - Reward: focused RAG tests, the full repository gate, reference-pack verification, and wheel/sdist
     checks all pass from a clean checkout with the optional RAG extra.
   - Verify:
@@ -324,19 +341,28 @@ line. Never check a live-provider reward from a fake, skipped, unavailable, or `
     uv build
     ```
 
-  - Evidence: pending.
+  - Evidence: `0a5e2c4`; exact gate above -> formatting clean, lint clean, typing clean,
+    `135 passed, 2 deselected in 3.92s`, reference pack `OK` (27 files), wheel and sdist built.
 
 ## Final acceptance rewards
 
-- [ ] **A1:** Two selected sealed bundles produce a validated FAISS index, FTS catalog, and traversable
+- [x] **A1:** Two selected sealed bundles produce a validated FAISS index, FTS catalog, and traversable
   graph; a tampered third bundle cannot alter the promoted catalog.
-- [ ] **A2:** A single-document question returns a correct answer with only valid source markers.
-- [ ] **A3:** A cross-document question performs observable repeated retrieval and cites both documents.
-- [ ] **A4:** A graph question traverses a real exported edge and cites the text supporting the answer.
-- [ ] **A5:** An unanswerable or conflicting question returns `insufficient`, not an invented resolution.
-- [ ] **A6:** Rich `ask` and multi-turn `chat` work interactively; JSON output remains deterministic and
+  - Evidence: `0a5e2c4`; focused RAG suite -> `33 passed, 2 deselected in 0.52s`.
+- [x] **A2:** A single-document question returns a correct answer with only valid source markers.
+  - Evidence: `0a5e2c4`; focused RAG suite -> `33 passed, 2 deselected in 0.52s`.
+- [x] **A3:** A cross-document question performs observable repeated retrieval and cites both documents.
+  - Evidence: `0a5e2c4`; focused RAG suite -> `33 passed, 2 deselected in 0.52s`.
+- [x] **A4:** A graph question traverses a real exported edge and cites the text supporting the answer.
+  - Evidence: `0a5e2c4`; focused RAG suite -> `33 passed, 2 deselected in 0.52s`.
+- [x] **A5:** An unanswerable or conflicting question returns `insufficient`, not an invented resolution.
+  - Evidence: `0a5e2c4`; focused RAG suite -> `33 passed, 2 deselected in 0.52s`.
+- [x] **A6:** Rich `ask` and multi-turn `chat` work interactively; JSON output remains deterministic and
   ANSI-free.
-- [ ] **A7:** The authoring journey and dependency boundary remain unchanged and the complete gate passes.
+  - Evidence: `0a5e2c4`; CLI suite -> `6 passed in 0.35s`; live suite -> `2 passed in 9.93s`.
+- [x] **A7:** The authoring journey and dependency boundary remain unchanged and the complete gate passes.
+  - Evidence: `0a5e2c4`; dependency boundary -> `2 passed in 0.40s`; full gate -> `135 passed,
+    2 deselected in 3.92s`, reference pack OK, wheel and sdist built.
 
 The feature is mergeable only when RAG-0 through RAG-6 and A1 through A7 are checked with evidence.
 
@@ -367,7 +393,6 @@ The feature is mergeable only when RAG-0 through RAG-6 and A1 through A7 are che
 - [LangChain retrieval architectures](https://docs.langchain.com/oss/python/langchain/retrieval)
 - [LangChain agents and bounded tool loops](https://docs.langchain.com/oss/python/langchain/agents)
 - [LangChain structured agent output](https://docs.langchain.com/oss/python/langchain/structured-output)
-- [LangChain FAISS integration](https://docs.langchain.com/oss/python/integrations/vectorstores/index)
 - [LangChain recursive text splitting](https://docs.langchain.com/oss/python/integrations/splitters/recursive_text_splitter)
 - [Deep Agents customization surface](https://docs.langchain.com/oss/python/deepagents/customization)
 - [Gemini Embeddings 2 profiles and dimensions](https://ai.google.dev/gemini-api/docs/embeddings)
