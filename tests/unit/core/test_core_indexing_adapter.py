@@ -97,6 +97,20 @@ def test_loader_rejects_tampered_or_failed_bundles_before_indexing(tmp_path: Pat
 
 
 @pytest.mark.unit
+def test_loader_distinguishes_missing_and_malformed_seals(tmp_path: Path) -> None:
+    missing = tmp_path / "missing"
+    missing.mkdir()
+    with pytest.raises(FileNotFoundError, match="seal artifact is missing"):
+        load_sealed_bundle(missing)
+
+    malformed = tmp_path / "malformed"
+    (malformed / SEAL).parent.mkdir(parents=True)
+    (malformed / SEAL).write_text("not json", encoding="utf-8")
+    with pytest.raises(ValueError, match="seal artifact is not valid JSON"):
+        load_sealed_bundle(malformed)
+
+
+@pytest.mark.unit
 def test_loader_rejects_unknown_graph_edge(tmp_path: Path) -> None:
     bundle = _write_sealed_bundle(tmp_path)
     ontology_path = bundle / ONTOLOGY

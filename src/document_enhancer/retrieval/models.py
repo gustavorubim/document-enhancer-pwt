@@ -7,6 +7,12 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 
+def _gemini_compatible_schema(schema: dict[str, object]) -> None:
+    """Keep strict runtime validation without sending Gemini an unsupported keyword."""
+
+    schema.pop("additionalProperties", None)
+
+
 class EmbeddingProfile(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -73,14 +79,18 @@ class TraceEvent(BaseModel):
 
 
 class AnswerClaim(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = ConfigDict(
+        extra="forbid", frozen=True, json_schema_extra=_gemini_compatible_schema
+    )
 
     text: str = Field(min_length=1)
     citation_ids: tuple[str, ...] = Field(min_length=1)
 
 
 class AnswerEnvelope(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = ConfigDict(
+        extra="forbid", frozen=True, json_schema_extra=_gemini_compatible_schema
+    )
 
     status: Literal["answered", "insufficient"]
     claims: tuple[AnswerClaim, ...] = ()

@@ -767,8 +767,8 @@ def rag_index(
         if console:
             console.rule("[bold bright_cyan]Document Enhancer · RAG index[/]")
             console.print(
-                f"Selected [bold]{len(bundles)}[/] sealed bundle(s). Building a new local catalog "
-                "in staging; the current catalog remains available unless validation passes."
+                f"Selected [bold]{len(bundles)}[/] candidate bundle(s). Each must pass sealed-bundle "
+                "validation before a new local catalog can replace the current one."
             )
             if offline:
                 console.print(

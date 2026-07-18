@@ -214,8 +214,16 @@ class CoreBundleIndex:
 
 def _read_object(path: Path, label: str) -> dict[str, Any]:
     try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raw = path.read_text(encoding="utf-8")
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(f"{label} artifact is missing: {path}") from exc
+    except UnicodeDecodeError as exc:
+        raise ValueError(f"{label} artifact is not valid JSON") from exc
+    except OSError as exc:
+        raise ValueError(f"{label} artifact cannot be read: {path}") from exc
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError as exc:
         raise ValueError(f"{label} artifact is not valid JSON") from exc
     if not isinstance(value, dict):
         raise ValueError(f"{label} artifact must be a JSON object")

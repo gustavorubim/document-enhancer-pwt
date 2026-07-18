@@ -125,6 +125,26 @@ def test_citation_validator_rejects_unknown_uncited_and_insufficient_answers(
 
 
 @pytest.mark.unit
+def test_structured_answer_schema_is_strict_but_gemini_compatible() -> None:
+    schema = AnswerEnvelope.model_json_schema()
+
+    def keys(value: object) -> set[str]:
+        found: set[str] = set()
+        if isinstance(value, dict):
+            for key, item in value.items():
+                found.add(str(key))
+                found.update(keys(item))
+        if isinstance(value, list):
+            for item in value:
+                found.update(keys(item))
+        return found
+
+    assert "additionalProperties" not in keys(schema)
+    with pytest.raises(ValueError, match="Extra inputs"):
+        AnswerEnvelope.model_validate({"status": "insufficient", "unexpected": True})
+
+
+@pytest.mark.unit
 def test_tool_budget_stops_repeated_agent_searches(tmp_path: Path) -> None:
     catalog, _ = _catalog(tmp_path)
 
