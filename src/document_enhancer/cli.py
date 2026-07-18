@@ -20,6 +20,7 @@ from .core import (
     RunRecord,
     RunStore,
 )
+from .core.layout import AUDIT, AUDIT_MARKDOWN, DECISIONS_YAML, HTML_REPORT
 from .core.recipes import load_recipe
 from .errors import DocumentEnhancerError
 from .llm.models import GeminiGatewayConfig, GeminiModelGateway
@@ -152,8 +153,9 @@ def _print_record(record: RunRecord, *, root: Path, json_output: bool) -> None:
     typer.echo(f"status: {value['status']}")
     typer.echo(f"phase: {value['phase']}")
     typer.echo(f"artifacts: {root / str(value['run_id'])}")
+    typer.echo(f"report: {root / str(value['run_id']) / HTML_REPORT}")
     if value["status"] == "waiting":
-        typer.echo(f"next: edit {root / str(value['run_id']) / 'review/decisions.yaml'}")
+        typer.echo(f"next: edit {root / str(value['run_id']) / DECISIONS_YAML}")
 
 
 @app.command()
@@ -211,7 +213,7 @@ def continue_document(
     reference_pack: Annotated[Path | None, typer.Option("--reference-pack")] = None,
     json_output: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
-    """Continue a run after editing `review/decisions.yaml`."""
+    """Continue a run after editing the generated decisions YAML file."""
 
     try:
         config = load_config()
@@ -252,7 +254,7 @@ def status(
             "run_id": record.run_id,
             "status": record.status,
             "phase": record.phase,
-            "next_action": "edit review/decisions.yaml and continue"
+            "next_action": f"edit {DECISIONS_YAML} and continue"
             if record.status == "waiting"
             else "none",
             "artifacts": {
@@ -286,9 +288,7 @@ def inspect(
             "schema_version": "core.cli.v1",
             "command": "inspect",
             "run": record.model_dump(mode="json"),
-            "audit": store.read_json(run_id, "audit/audit.json")
-            if store.exists(run_id, "audit/audit.json")
-            else None,
+            "audit": store.read_json(run_id, AUDIT) if store.exists(run_id, AUDIT) else None,
         }
         if json_output:
             _emit_json(payload)
@@ -311,13 +311,13 @@ def audit(
 
     try:
         root = (run_dir or load_config().workspace.run_dir).expanduser()
-        path = root / run_id / "audit" / "audit.json"
+        path = root / run_id / AUDIT
         result = json.loads(path.read_text(encoding="utf-8"))
         payload = {
             **result,
             "schema_version": "core.cli.audit.v1",
             "run_id": run_id,
-            "report": str(root / run_id / "audit" / "audit.md"),
+            "report": str(root / run_id / AUDIT_MARKDOWN),
         }
         if json_output:
             _emit_json(payload)

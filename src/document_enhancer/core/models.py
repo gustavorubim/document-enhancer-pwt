@@ -1,7 +1,7 @@
 """Canonical v2 contracts for a document enhancement run.
 
 These contracts are deliberately small.  Large intermediate payloads belong in
-named artifacts, while ``run.json`` contains only metadata, references, and
+named artifacts, while ``json/00-run.json`` contains only metadata, references, and
 digests needed to resume or audit a run.
 """
 

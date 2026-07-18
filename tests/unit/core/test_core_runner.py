@@ -8,8 +8,22 @@ from pathlib import Path
 import pytest
 
 from document_enhancer.core import CoreRunner, RunStore
+from document_enhancer.core.layout import (
+    AUDIT,
+    DECISIONS_YAML,
+    FINAL_DOCX,
+    FINAL_MARKDOWN,
+    HTML_REPORT,
+    ORIGINAL_DOCUMENT_PREFIX,
+    REVIEW,
+    REVIEW_INDEX_MARKDOWN,
+    REWRITE_PLAN,
+    RUN_RECORD,
+    SOURCE_MARKDOWN,
+)
 from document_enhancer.core.models import (
     AuditReport,
+    Decision,
     FlowEdge,
     Question,
     ReviewReport,
@@ -17,6 +31,7 @@ from document_enhancer.core.models import (
     Section,
 )
 from document_enhancer.core.review import merge_provider_review
+from document_enhancer.core.rewrite import apply_reviewer_decisions
 from document_enhancer.core.store import register_artifact
 from document_enhancer.ingest.pipeline import DocumentIngestor
 
@@ -35,8 +50,9 @@ def test_runner_pauses_for_questions_and_resumes_from_yaml(tmp_path: Path) -> No
     assert waiting.status == "waiting"
     assert waiting.phase == "human_review"
     assert waiting.unresolved_question_ids == ["question-placeholder-001"]
-    assert (tmp_path / "runs" / waiting.run_id / "review/review.md").is_file()
-    decisions = tmp_path / "runs" / waiting.run_id / "review/decisions.yaml"
+    assert (tmp_path / "runs" / waiting.run_id / REVIEW_INDEX_MARKDOWN).is_file()
+    assert (tmp_path / "runs" / waiting.run_id / HTML_REPORT).is_file()
+    decisions = tmp_path / "runs" / waiting.run_id / DECISIONS_YAML
     decisions.write_text(
         "approve_rewrite: true\n"
         'steering: ""\n'
@@ -52,10 +68,10 @@ def test_runner_pauses_for_questions_and_resumes_from_yaml(tmp_path: Path) -> No
 
     assert complete.status == "succeeded"
     assert complete.phase == "verify"
-    assert (tmp_path / "runs" / complete.run_id / "run.json").stat().st_size < 50_000
-    final = (tmp_path / "runs" / complete.run_id / "output/final.md").read_text(encoding="utf-8")
+    assert (tmp_path / "runs" / complete.run_id / RUN_RECORD).stat().st_size < 50_000
+    final = (tmp_path / "runs" / complete.run_id / FINAL_MARKDOWN).read_text(encoding="utf-8")
     assert "Status: approved" in final
-    audit = json.loads((tmp_path / "runs" / complete.run_id / "audit/audit.json").read_text())
+    audit = json.loads((tmp_path / "runs" / complete.run_id / AUDIT).read_text())
     assert audit["status"] == "pass"
     assert set(complete.artifacts) >= {
         "source.original",
@@ -71,7 +87,7 @@ def test_runner_pauses_for_questions_and_resumes_from_yaml(tmp_path: Path) -> No
     }
     retry = runner.start(source)
     assert retry.run_id != complete.run_id
-    assert (tmp_path / "runs" / complete.run_id / "run.json").is_file()
+    assert (tmp_path / "runs" / complete.run_id / RUN_RECORD).is_file()
 
 
 @pytest.mark.unit
@@ -88,10 +104,10 @@ def test_runner_completes_clean_structured_document(tmp_path: Path) -> None:
     assert result.status == "succeeded"
     assert result.unresolved_question_ids == []
     assert result.artifacts["source.original"].sha256 == result.source_digest
-    assert (tmp_path / "runs" / result.run_id / "output/final.docx").stat().st_size > 0
+    assert (tmp_path / "runs" / result.run_id / FINAL_DOCX).stat().st_size > 0
     assert "audit.seal" in result.artifacts
     with pytest.raises(RuntimeError, match="sealed"):
-        RunStore(tmp_path / "runs").write_text(result.run_id, "output/final.md", "tampered")
+        RunStore(tmp_path / "runs").write_text(result.run_id, FINAL_MARKDOWN, "tampered")
 
 
 @pytest.mark.unit
@@ -130,10 +146,13 @@ def test_resume_rehydrates_an_interrupted_analyze_phase(tmp_path: Path) -> None:
     )
     store.save_run(record)
     original_artifact = store.write_bytes(
-        "interrupted", "source/original.md", source.read_bytes(), media_type=raw.media_type
+        "interrupted",
+        f"{ORIGINAL_DOCUMENT_PREFIX}.md",
+        source.read_bytes(),
+        media_type=raw.media_type,
     )
     normalized_artifact = store.write_text(
-        "interrupted", "source/normalized.md", source.read_text(encoding="utf-8")
+        "interrupted", SOURCE_MARKDOWN, source.read_text(encoding="utf-8")
     )
     record = register_artifact(record, "source.original", original_artifact)
     record = register_artifact(record, "source.normalized", normalized_artifact)
@@ -163,8 +182,8 @@ def test_provider_enrichment_and_rewrite_are_recorded_as_optional_artifacts(tmp_
     ).start(source)
 
     assert result.status == "succeeded"
-    assert "Owner approved." in (tmp_path / "runs" / result.run_id / "output/final.md").read_text()
-    assert (tmp_path / "runs" / result.run_id / "rewrite/plan.json").is_file()
+    assert "Owner approved." in (tmp_path / "runs" / result.run_id / FINAL_MARKDOWN).read_text()
+    assert (tmp_path / "runs" / result.run_id / REWRITE_PLAN).is_file()
 
 
 @pytest.mark.unit
@@ -189,6 +208,35 @@ def test_provider_questions_are_part_of_the_human_gate(tmp_path: Path) -> None:
 
     assert result.status == "waiting"
     assert result.unresolved_question_ids == ["provider-q-1"]
+
+
+@pytest.mark.unit
+def test_offline_rewrite_applies_natural_language_open_point_decisions() -> None:
+    source = (
+        "P1: within 60 minutes of receipt\n"
+        "STEP-CCT-050 says 60 minutes; CTRL-CCT-002 says 30 minutes\n"
+        "Draft says manager approval; approval partner not stated\n"
+        "RULE-CCT-004 names manager approval but does not identify required independent approval\n"
+        "The pilot readiness checklist still says five years after calendar-year end. "
+        "Records Management must confirm which period is authoritative before approval.\n"
+        "Retain pilot complaint records for 5 years after calendar-year end.\n"
+        "Section 15 says 7 years after closure; readiness checklist says 5 years after year end\n"
+    )
+    decision = Decision(
+        question_id="question-open-points-001",
+        answer=(
+            "Use 30 minutes, retain records for seven years after case closure, and require an "
+            "independent Compliance approver for every material batch action."
+        ),
+    )
+
+    rewritten, changes = apply_reviewer_decisions(source, decisions=[decision])
+
+    assert "60 minutes" not in rewritten
+    assert "5 years" not in rewritten
+    assert "approval partner not stated" not in rewritten
+    assert "independent Compliance concurrence is required" in rewritten
+    assert len(changes) >= 7
 
 
 @pytest.mark.unit
@@ -230,9 +278,7 @@ def test_flow_graph_requires_evidence_for_relationships(tmp_path: Path) -> None:
 
     result = CoreRunner(tmp_path / "runs").start(source)
     review = ReviewReport.model_validate(
-        json.loads(
-            (tmp_path / "runs" / result.run_id / "review/review.json").read_text(encoding="utf-8")
-        )
+        json.loads((tmp_path / "runs" / result.run_id / REVIEW).read_text(encoding="utf-8"))
     )
 
     assert [node.node_id for node in review.flow_nodes] == [
@@ -303,7 +349,5 @@ def test_independent_audit_provider_is_recorded_without_changing_offline_contrac
     result = CoreRunner(tmp_path / "runs", audit_provider=AuditStub()).start(source)
 
     assert result.status == "succeeded"
-    audit = json.loads(
-        (tmp_path / "runs" / result.run_id / "audit/audit.json").read_text(encoding="utf-8")
-    )
+    audit = json.loads((tmp_path / "runs" / result.run_id / AUDIT).read_text(encoding="utf-8"))
     assert audit["checks"]["independent_content_audit"] is True

@@ -156,6 +156,13 @@ def apply_reviewer_decisions(
                     "Confirmed pilot readiness P1 acknowledgement at 30 minutes.",
                 )
             )
+            replacements.append(
+                (
+                    "STEP-CCT-050 says 60 minutes; CTRL-CCT-002 says 30 minutes",
+                    "STEP-CCT-050 and CTRL-CCT-002 both require 30 minutes (approved)",
+                    "Removed the resolved P1 timing conflict from the open-points table.",
+                )
+            )
         if "0.85" in answer:
             replacements.append(
                 (
@@ -178,7 +185,7 @@ def apply_reviewer_decisions(
                     "Resolved AI routing confidence conflict to 0.85.",
                 )
             )
-        if "7 years" in answer:
+        if re.search(r"\b(?:7|seven)[ -]?years?\b", answer):
             replacements.append(
                 (
                     "Retain pilot complaint records for 5 years after calendar-year end.",
@@ -195,12 +202,32 @@ def apply_reviewer_decisions(
                     "Removed unresolved retention conflict language.",
                 )
             )
-        if "compliance concurrence" in answer:
+            replacements.append(
+                (
+                    "Section 15 says 7 years after closure; readiness checklist says 5 years "
+                    "after year end",
+                    "Section 15 and the readiness checklist both require 7 years after closure "
+                    "(approved)",
+                    "Removed the resolved retention conflict from the open-points table.",
+                )
+            )
+        if "compliance" in answer and any(
+            term in answer for term in ("batch", "independent", "approval", "concurrence")
+        ):
             replacements.append(
                 (
                     "Draft says manager approval; approval partner not stated",
                     "Complaint Operations Manager approval plus Compliance concurrence required",
                     "Named the independent approval partner for material batch actions.",
+                )
+            )
+            replacements.append(
+                (
+                    "RULE-CCT-004 names manager approval but does not identify required "
+                    "independent approval",
+                    "Complaint Operations Manager approval plus independent Compliance "
+                    "concurrence is required (approved)",
+                    "Removed the resolved batch-approval conflict from the open-points table.",
                 )
             )
         for old, new, note in replacements:

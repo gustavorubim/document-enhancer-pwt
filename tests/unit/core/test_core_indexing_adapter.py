@@ -9,13 +9,14 @@ from pathlib import Path
 import pytest
 
 from document_enhancer.core.indexing import CoreBundleIndex, load_sealed_bundle
+from document_enhancer.core.layout import AUDIT, FINAL_MARKDOWN, ONTOLOGY, SEAL
 
 
 def _write_sealed_bundle(root: Path, *, audit_status: str = "pass") -> Path:
     bundle = root / "run-1"
-    (bundle / "audit").mkdir(parents=True)
-    (bundle / "output").mkdir()
-    (bundle / "source").mkdir()
+    (bundle / AUDIT).parent.mkdir(parents=True)
+    (bundle / FINAL_MARKDOWN).parent.mkdir(parents=True)
+    (bundle / "documents").mkdir(parents=True)
     source = b"# Intake\n\nThe owner reviews the request.\n"
     final = "# Intake\n\nThe owner reviews the request.\n"
     audit = {"schema_version": "core.audit.v1", "status": audit_status, "checks": {}}
@@ -32,21 +33,19 @@ def _write_sealed_bundle(root: Path, *, audit_status: str = "pass") -> Path:
         ],
         "edges": [],
     }
-    (bundle / "source/original").write_bytes(source)
-    (bundle / "output/final.md").write_text(final, encoding="utf-8")
-    (bundle / "output/ontology.json").write_text(
-        json.dumps(ontology, sort_keys=True), encoding="utf-8"
-    )
-    (bundle / "audit/audit.json").write_text(json.dumps(audit, sort_keys=True), encoding="utf-8")
+    (bundle / "documents/original").write_bytes(source)
+    (bundle / FINAL_MARKDOWN).write_text(final, encoding="utf-8")
+    (bundle / ONTOLOGY).write_text(json.dumps(ontology, sort_keys=True), encoding="utf-8")
+    (bundle / AUDIT).write_text(json.dumps(audit, sort_keys=True), encoding="utf-8")
     seal = {
         "run_id": "run-1",
         "source_digest": hashlib.sha256(source).hexdigest(),
         "final_digest": hashlib.sha256(final.encode()).hexdigest(),
-        "audit_digest": hashlib.sha256((bundle / "audit/audit.json").read_bytes()).hexdigest(),
-        "artifact_paths": ["audit/audit.json", "output/final.md", "output/ontology.json"],
+        "audit_digest": hashlib.sha256((bundle / AUDIT).read_bytes()).hexdigest(),
+        "artifact_paths": [AUDIT, FINAL_MARKDOWN, ONTOLOGY],
         "sealed": True,
     }
-    (bundle / "audit/seal.json").write_text(json.dumps(seal, sort_keys=True), encoding="utf-8")
+    (bundle / SEAL).write_text(json.dumps(seal, sort_keys=True), encoding="utf-8")
     return bundle
 
 
@@ -87,7 +86,7 @@ def test_index_is_opt_in_and_search_is_read_only_when_no_catalog_exists(tmp_path
 @pytest.mark.unit
 def test_loader_rejects_tampered_or_failed_bundles_before_indexing(tmp_path: Path) -> None:
     bundle = _write_sealed_bundle(tmp_path)
-    (bundle / "output/final.md").write_text("# Tampered\n", encoding="utf-8")
+    (bundle / FINAL_MARKDOWN).write_text("# Tampered\n", encoding="utf-8")
 
     with pytest.raises(ValueError, match="final document digest"):
         load_sealed_bundle(bundle)
@@ -100,7 +99,7 @@ def test_loader_rejects_tampered_or_failed_bundles_before_indexing(tmp_path: Pat
 @pytest.mark.unit
 def test_loader_rejects_unknown_graph_edge(tmp_path: Path) -> None:
     bundle = _write_sealed_bundle(tmp_path)
-    ontology_path = bundle / "output/ontology.json"
+    ontology_path = bundle / ONTOLOGY
     ontology = json.loads(ontology_path.read_text(encoding="utf-8"))
     ontology["edges"] = [{"source": "missing", "target": "section-intake", "edge_type": "uses"}]
     ontology_path.write_text(json.dumps(ontology, sort_keys=True), encoding="utf-8")

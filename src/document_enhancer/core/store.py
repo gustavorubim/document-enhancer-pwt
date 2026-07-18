@@ -10,6 +10,7 @@ from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
+from .layout import RUN_RECORD, SEAL
 from .models import ArtifactRef, RunRecord
 
 
@@ -18,7 +19,7 @@ def sha256_bytes(data: bytes) -> str:
 
 
 class RunStore:
-    """Persist a run as named files and one compact ``run.json`` manifest."""
+    """Persist a run as named files and one compact JSON state manifest."""
 
     def __init__(self, root: Path) -> None:
         self.root = root.expanduser()
@@ -35,11 +36,11 @@ class RunStore:
         return path
 
     def save_run(self, record: RunRecord) -> None:
-        path = self._safe_path(record.run_id, "run.json")
+        path = self._safe_path(record.run_id, RUN_RECORD)
         self._atomic_write(path, (record.model_dump_json(indent=2) + "\n").encode("utf-8"))
 
     def load_run(self, run_id: str) -> RunRecord:
-        path = self.run_path(run_id) / "run.json"
+        path = self.run_path(run_id) / RUN_RECORD
         if not path.is_file():
             raise FileNotFoundError(f"run record not found: {run_id}")
         return RunRecord.model_validate_json(path.read_text(encoding="utf-8"))
@@ -53,8 +54,8 @@ class RunStore:
         media_type: str = "application/octet-stream",
     ) -> ArtifactRef:
         path = self._safe_path(run_id, relative_path)
-        seal = self.run_path(run_id) / "audit" / "seal.json"
-        if seal.is_file() and relative_path != "audit/seal.json":
+        seal = self.run_path(run_id) / SEAL
+        if seal.is_file() and relative_path != SEAL:
             raise RuntimeError(f"run {run_id} is sealed; artifacts are immutable")
         self._atomic_write(path, data)
         return ArtifactRef(

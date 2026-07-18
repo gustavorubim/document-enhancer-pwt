@@ -708,8 +708,13 @@ def render_macro_markdown(review: ReviewReport) -> str:
         f"Recipe: `{review.recipe_id}`",
         "",
         "This macro report explains document-level readiness against the selected rubric and "
-        "template. Section-level detail lives in `sections.md`; process-flow analysis lives in "
-        "`flow.md`.",
+        "template. It is intended to answer whether the document works as a governed whole, not "
+        "only whether individual passages are well written. Section-level evidence lives in "
+        "`04-section-review.md`; process-flow analysis lives in `05-process-flow-review.md`.",
+        "",
+        "Use the readiness snapshot as orientation, then read each finding for its evidence and "
+        "recommended response. A high finding count does not automatically mean the source is "
+        "poor; it means the reviewer has more explicit items to confirm before rewrite.",
         "",
         "## Readiness snapshot",
         "",
@@ -754,6 +759,10 @@ def render_macro_markdown(review: ReviewReport) -> str:
                 "",
                 finding.detail,
                 "",
+                "**Why this matters:** This finding affects document-level clarity, governance, "
+                "or alignment with the selected recipe and should be understood before the "
+                "rewrite is approved.",
+                "",
             ]
         )
         if finding.recommendation:
@@ -779,7 +788,7 @@ def render_macro_markdown(review: ReviewReport) -> str:
         [
             "## Next step",
             "",
-            "Edit `decisions.yaml`, keep `approve_rewrite: true`, then run "
+            "Edit `../review/decisions.yaml`, keep `approve_rewrite: true`, then run "
             "`docenhance continue <run-id>`.",
             "",
         ]
@@ -804,6 +813,10 @@ def render_sections_markdown(review: ReviewReport) -> str:
         "Improve means the section exists but needs clearer ownership, transitions, or "
         "completeness before rewrite.",
         "",
+        "Treat the labels as routing signals rather than grades. Start with missing sections, "
+        "then review improve sections for business meaning, and finally scan correct sections "
+        "to confirm the evidence was interpreted as intended.",
+        "",
         "## Snapshot",
         "",
         f"- Correct: {counts.get('correct', 0)}",
@@ -824,6 +837,21 @@ def render_sections_markdown(review: ReviewReport) -> str:
                 f"- Recipe requirement: `{item.requirement_id or 'unmapped'}`",
                 f"- Linked criteria: {', '.join(f'`{cid}`' for cid in item.criterion_ids) or 'none'}",
                 f"- Evidence spans reviewed: {', '.join(item.evidence_span_ids) or 'none'}",
+                "",
+                "### Assessment interpretation",
+                "",
+                (
+                    "This section is sufficiently supported for the mapped requirement. Review "
+                    "the affirmative evidence below and confirm it reflects the intended policy."
+                    if item.status == "correct"
+                    else "This section exists, but its evidence or explanation is not yet strong "
+                    "enough for the mapped requirement. The rewrite should clarify it without "
+                    "inventing unsupported facts."
+                    if item.status == "improve"
+                    else "The mapped requirement is not adequately represented in the source. "
+                    "A reviewer decision, waiver, or source-backed addition is needed before it "
+                    "can be treated as complete."
+                ),
                 "",
                 "### What is correct",
                 "",
@@ -873,8 +901,13 @@ def render_flow_markdown(review: ReviewReport) -> str:
         "",
         "Standalone Mermaid sources are also written to:",
         "",
-        "- `review/flow.inferred.mmd`",
-        "- `review/flow.proposed.mmd`",
+        "- `../diagrams/01-inferred-flow.mmd`",
+        "- `../diagrams/02-proposed-flow.mmd`",
+        "",
+        "Read the inferred diagram first as a faithful model of what the source currently says. "
+        "Then compare it with the proposed diagram, which shows the clearer executable sequence "
+        "supported by the recipe and the identified gaps. Differences are proposals for review, "
+        "not automatically approved business facts.",
         "",
         "## Inferred process (from source)",
         "",
@@ -973,23 +1006,31 @@ def render_flow_markdown(review: ReviewReport) -> str:
 def render_review_index_markdown(review: ReviewReport) -> str:
     counts = _assessment_counts(review)
     return (
-        "# Review index\n\n"
+        "# Review overview\n\n"
         f"{review.summary}\n\n"
-        "## Specialist reports\n\n"
-        "- [Macro report](macro.md) — document-level rubric readiness and questions\n"
-        "- [Section report](sections.md) — correct / missing / improve for every section\n"
-        "- [Flow report](flow.md) — inferred Mermaid, proposed Mermaid, and adjustment reasoning\n\n"
-        "## Machine artifacts\n\n"
-        "- [Inferred Mermaid](flow.inferred.mmd)\n"
-        "- [Proposed Mermaid](flow.proposed.mmd)\n"
-        "- [Decisions](decisions.yaml)\n"
-        "- [Review JSON](review.json)\n\n"
+        "This overview is the starting point for the human review. Read the numbered reports in "
+        "order so that document-level findings, section evidence, and process-flow proposals are "
+        "understood before answering the decision file.\n\n"
+        "## Recommended reading order\n\n"
+        "1. [Source normalized](01-source-normalized.md) — the parsed source used as evidence.\n"
+        "2. [Macro report](03-macro-review.md) — document-level rubric readiness and questions.\n"
+        "3. [Section report](04-section-review.md) — correct / missing / improve for every section.\n"
+        "4. [Flow report](05-process-flow-review.md) — inferred Mermaid, proposed Mermaid, and adjustment reasoning.\n"
+        "5. Edit [`../review/decisions.yaml`](../review/decisions.yaml) only after reviewing the evidence.\n\n"
+        "## Supporting machine artifacts\n\n"
+        "- [Inferred Mermaid](../diagrams/01-inferred-flow.mmd)\n"
+        "- [Proposed Mermaid](../diagrams/02-proposed-flow.mmd)\n"
+        "- [Review JSON](../json/05-review.json)\n\n"
         "## Snapshot\n\n"
         f"- Correct sections: {counts.get('correct', 0)}\n"
         f"- Improve sections: {counts.get('improve', 0)}\n"
         f"- Missing sections: {counts.get('missing', 0)}\n"
         f"- Process applicable: {'yes' if review.process_applicable else 'no'}\n"
-        f"- Blocking questions: {sum(1 for item in review.questions if item.blocking)}\n"
+        f"- Blocking questions: {sum(1 for item in review.questions if item.blocking)}\n\n"
+        "## What happens next\n\n"
+        "Answer every blocking question, add optional steering or explicit waivers, keep "
+        "`approve_rewrite: true`, save the YAML file, and continue this same run. Stage 2 then "
+        "adds the final document, change explanation, and detailed final audit to this sequence.\n"
     )
 
 

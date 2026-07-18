@@ -13,6 +13,20 @@ from pathlib import Path
 import pytest
 
 from document_enhancer.core import CoreRunner
+from document_enhancer.core.layout import (
+    AUDIT,
+    DECISIONS_YAML,
+    FLOW_MARKDOWN,
+    GRAPH_JSONL,
+    HTML_REPORT,
+    INFERRED_FLOW,
+    MACRO_MARKDOWN,
+    ONTOLOGY,
+    PROPOSED_FLOW,
+    REVIEW,
+    SEAL,
+    SECTIONS_MARKDOWN,
+)
 from document_enhancer.core.recipes import load_recipe
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -44,7 +58,7 @@ def test_core_reference_examples_preserve_review_contract_for_all_document_types
     ).start(source)
 
     run_path = tmp_path / "runs" / result.run_id
-    review = json.loads((run_path / "review" / "review.json").read_text(encoding="utf-8"))
+    review = json.loads((run_path / REVIEW).read_text(encoding="utf-8"))
 
     assert result.status == "waiting"
     assert result.phase == "human_review"
@@ -62,19 +76,11 @@ def test_core_reference_examples_preserve_review_contract_for_all_document_types
     assert review["questions"]
     assert expected_rubric_id in review["rubric_ids"]
     assert any(item["rubric_id"] == expected_rubric_id for item in review["findings"])
-    assert (run_path / "review" / "macro.md").is_file()
-    assert (run_path / "review" / "sections.md").is_file()
-    assert (run_path / "review" / "flow.md").is_file()
-    assert (
-        (run_path / "review" / "flow.inferred.mmd")
-        .read_text(encoding="utf-8")
-        .startswith("flowchart TD")
-    )
-    assert (
-        (run_path / "review" / "flow.proposed.mmd")
-        .read_text(encoding="utf-8")
-        .startswith("flowchart TD")
-    )
+    assert (run_path / MACRO_MARKDOWN).is_file()
+    assert (run_path / SECTIONS_MARKDOWN).is_file()
+    assert (run_path / FLOW_MARKDOWN).is_file()
+    assert (run_path / INFERRED_FLOW).read_text(encoding="utf-8").startswith("flowchart TD")
+    assert (run_path / PROPOSED_FLOW).read_text(encoding="utf-8").startswith("flowchart TD")
     if document_type in {"process", "desktop_procedure"}:
         assert review["process_applicable"] is True
         assert (
@@ -84,7 +90,7 @@ def test_core_reference_examples_preserve_review_contract_for_all_document_types
     else:
         assert review["process_applicable"] is False
         assert "No process flow applicable" in review["inferred_mermaid"]
-    assert (run_path / "review" / "decisions.yaml").is_file()
+    assert (run_path / DECISIONS_YAML).is_file()
 
 
 def test_core_clean_synthetic_process_seals_ontology_graph_and_audit_bundle(
@@ -121,11 +127,11 @@ def test_core_clean_synthetic_process_seals_ontology_graph_and_audit_bundle(
     assert result.phase == "verify"
     assert not result.unresolved_question_ids
 
-    audit = json.loads((run_path / "audit" / "audit.json").read_text(encoding="utf-8"))
-    ontology = json.loads((run_path / "output" / "ontology.json").read_text(encoding="utf-8"))
-    graph_lines = (run_path / "output" / "graph.jsonl").read_text(encoding="utf-8").splitlines()
-    seal = json.loads((run_path / "audit" / "seal.json").read_text(encoding="utf-8"))
-    review = json.loads((run_path / "review" / "review.json").read_text(encoding="utf-8"))
+    audit = json.loads((run_path / AUDIT).read_text(encoding="utf-8"))
+    ontology = json.loads((run_path / ONTOLOGY).read_text(encoding="utf-8"))
+    graph_lines = (run_path / GRAPH_JSONL).read_text(encoding="utf-8").splitlines()
+    seal = json.loads((run_path / SEAL).read_text(encoding="utf-8"))
+    review = json.loads((run_path / REVIEW).read_text(encoding="utf-8"))
 
     assert audit["status"] == "pass"
     assert all(audit["checks"].values())
@@ -137,10 +143,25 @@ def test_core_clean_synthetic_process_seals_ontology_graph_and_audit_bundle(
     assert all(json.loads(line)["kind"] in {"node", "edge"} for line in graph_lines)
     assert review["section_assessments"]
     assert review["process_applicable"] is True
-    assert (run_path / "review" / "flow.inferred.mmd").is_file()
-    assert (run_path / "review" / "flow.proposed.mmd").is_file()
+    assert (run_path / INFERRED_FLOW).is_file()
+    assert (run_path / PROPOSED_FLOW).is_file()
+    assert (run_path / HTML_REPORT).is_file()
+    html = (run_path / HTML_REPORT).read_text(encoding="utf-8")
+    assert "Final audit: pass" in html
+    assert "Report 08" in html
+    assert [path.name[:2] for path in sorted((run_path / "markdown").glob("*.md"))] == [
+        "01",
+        "02",
+        "03",
+        "04",
+        "05",
+        "06",
+        "07",
+        "08",
+    ]
     assert seal["sealed"] is True
     assert seal["source_digest"] == result.source_digest
-    assert "output/ontology.json" in seal["artifact_paths"]
-    assert "output/graph.jsonl" in seal["artifact_paths"]
-    assert "audit/audit.json" in seal["artifact_paths"]
+    assert ONTOLOGY in seal["artifact_paths"]
+    assert GRAPH_JSONL in seal["artifact_paths"]
+    assert AUDIT in seal["artifact_paths"]
+    assert HTML_REPORT in seal["artifact_paths"]

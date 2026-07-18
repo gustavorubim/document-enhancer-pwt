@@ -37,6 +37,38 @@ from .audit import (
     source_sections_retained,
 )
 from .export import public_graph
+from .html_report import render_html_report
+from .layout import (
+    AUDIT,
+    AUDIT_MARKDOWN,
+    CHANGES_MARKDOWN,
+    DECISIONS_JSON,
+    DECISIONS_YAML,
+    FINAL_DOCX,
+    FINAL_FLOW,
+    FINAL_MARKDOWN,
+    FLOW_MARKDOWN,
+    GRAPH_JSONL,
+    HTML_REPORT,
+    INFERRED_FLOW,
+    MACRO_MARKDOWN,
+    ONTOLOGY,
+    ORIGINAL_DOCUMENT_PREFIX,
+    PROPOSED_FLOW,
+    RECIPE,
+    REVIEW,
+    REVIEW_INDEX_MARKDOWN,
+    REWRITE_PLAN,
+    SEAL,
+    SECTIONS_MARKDOWN,
+    SEMANTIC,
+    SEMANTIC_DIFF,
+    SOURCE_MARKDOWN,
+    SOURCE_METADATA,
+    SOURCE_TO_TARGET_CSV,
+    STRUCTURE_QUALITY,
+    STRUCTURE_ROUTING,
+)
 from .models import (
     AuditReport,
     Decision,
@@ -160,9 +192,11 @@ class CoreRunner:
                         item.question_id for item in questions if item.blocking
                     ],
                 )
-                return record
+                return self._refresh_html_report(record)
             if stop_at == "questions":
-                return self._update(record, status="waiting", phase="human_review")
+                return self._refresh_html_report(
+                    self._update(record, status="waiting", phase="human_review")
+                )
             return self._finish(record)
         except Exception as exc:
             self._update(record, status="failed", error=f"{type(exc).__name__}: {exc}")
@@ -173,11 +207,7 @@ class CoreRunner:
 
         record = self.store.load_run(run_id)
         if record.status == "running" and record.phase == "analyze":
-            source_path = (
-                self.store.run_path(run_id)
-                / "source"
-                / ("original" + Path(record.source_name).suffix.lower())
-            )
+            source_path = self.store.run_path(run_id) / record.artifacts["source.original"].path
             if not source_path.is_file():
                 raise FileNotFoundError(f"source artifact is missing for run {run_id}")
             raw = self.ingestor.parse(source_path)
@@ -197,7 +227,7 @@ class CoreRunner:
             return self._finish(record)
         if record.status != "waiting" or record.phase != "human_review":
             raise ValueError(f"run {run_id} is not waiting for human review")
-        path = decisions_path or (self.store.run_path(run_id) / "review/decisions.yaml")
+        path = decisions_path or (self.store.run_path(run_id) / DECISIONS_YAML)
         if not path.is_file():
             return record
         bundle = self._read_decision_bundle(path)
@@ -221,7 +251,7 @@ class CoreRunner:
             unresolved = [*unresolved, "approve_rewrite"]
         self.store.write_json(
             run_id,
-            "review/decisions.json",
+            DECISIONS_JSON,
             bundle.model_dump(mode="json"),
         )
         if unresolved:
@@ -235,7 +265,7 @@ class CoreRunner:
                 "recipe.compiled",
                 self.store.write_json(
                     record.run_id,
-                    "recipe/compiled.json",
+                    RECIPE,
                     self._recipe_manifest(),
                 ),
             )
@@ -302,7 +332,7 @@ class CoreRunner:
             "source.original",
             self.store.write_bytes(
                 record.run_id,
-                f"source/original{suffix}",
+                f"{ORIGINAL_DOCUMENT_PREFIX}{suffix}",
                 raw_bytes,
                 media_type=raw.media_type,
             ),
@@ -310,16 +340,14 @@ class CoreRunner:
         record = register_artifact(
             record,
             "source.metadata",
-            self.store.write_json(
-                record.run_id, "source/source.json", metadata.model_dump(mode="json")
-            ),
+            self.store.write_json(record.run_id, SOURCE_METADATA, metadata.model_dump(mode="json")),
         )
         record = register_artifact(
             record,
             "source.structure_quality",
             self.store.write_json(
                 record.run_id,
-                "source/structure-quality.json",
+                STRUCTURE_QUALITY,
                 normalized.quality.model_dump(mode="json"),
             ),
         )
@@ -328,7 +356,7 @@ class CoreRunner:
             "source.structure_routing",
             self.store.write_json(
                 record.run_id,
-                "source/structure-routing.json",
+                STRUCTURE_ROUTING,
                 {
                     "configured_mode": self.structure_mode,
                     "selected_mode": selected_structure_mode,
@@ -353,7 +381,7 @@ class CoreRunner:
             "source.normalized",
             self.store.write_text(
                 record.run_id,
-                "source/normalized.md",
+                SOURCE_MARKDOWN,
                 normalized.normalized_markdown,
                 media_type="text/markdown; charset=utf-8",
             ),
@@ -464,16 +492,14 @@ class CoreRunner:
         record = register_artifact(
             record,
             "review.report",
-            self.store.write_json(
-                record.run_id, "review/review.json", review.model_dump(mode="json")
-            ),
+            self.store.write_json(record.run_id, REVIEW, review.model_dump(mode="json")),
         )
         record = register_artifact(
             record,
             "review.report_markdown",
             self.store.write_text(
                 record.run_id,
-                "review/review.md",
+                REVIEW_INDEX_MARKDOWN,
                 render_review_index_markdown(review),
                 media_type="text/markdown; charset=utf-8",
             ),
@@ -483,7 +509,7 @@ class CoreRunner:
             "review.macro_markdown",
             self.store.write_text(
                 record.run_id,
-                "review/macro.md",
+                MACRO_MARKDOWN,
                 render_macro_markdown(review),
                 media_type="text/markdown; charset=utf-8",
             ),
@@ -493,7 +519,7 @@ class CoreRunner:
             "review.sections_markdown",
             self.store.write_text(
                 record.run_id,
-                "review/sections.md",
+                SECTIONS_MARKDOWN,
                 render_sections_markdown(review),
                 media_type="text/markdown; charset=utf-8",
             ),
@@ -503,7 +529,7 @@ class CoreRunner:
             "review.flow_markdown",
             self.store.write_text(
                 record.run_id,
-                "review/flow.md",
+                FLOW_MARKDOWN,
                 render_flow_markdown(review),
                 media_type="text/markdown; charset=utf-8",
             ),
@@ -522,32 +548,20 @@ class CoreRunner:
                     media_type="application/jsonl",
                 ),
             )
-        record = register_artifact(
-            record,
-            "review.flow",
-            self.store.write_text(
-                record.run_id,
-                "review/flow.mmd",
-                review.inferred_mermaid,
-                media_type="text/vnd.mermaid; charset=utf-8",
-            ),
+        inferred_flow = self.store.write_text(
+            record.run_id,
+            INFERRED_FLOW,
+            review.inferred_mermaid,
+            media_type="text/vnd.mermaid; charset=utf-8",
         )
-        record = register_artifact(
-            record,
-            "review.flow_inferred",
-            self.store.write_text(
-                record.run_id,
-                "review/flow.inferred.mmd",
-                review.inferred_mermaid,
-                media_type="text/vnd.mermaid; charset=utf-8",
-            ),
-        )
+        record = register_artifact(record, "review.flow", inferred_flow)
+        record = register_artifact(record, "review.flow_inferred", inferred_flow)
         record = register_artifact(
             record,
             "review.flow_proposed",
             self.store.write_text(
                 record.run_id,
-                "review/flow.proposed.mmd",
+                PROPOSED_FLOW,
                 review.proposed_mermaid,
                 media_type="text/vnd.mermaid; charset=utf-8",
             ),
@@ -557,7 +571,7 @@ class CoreRunner:
             "review.decisions",
             self.store.write_text(
                 record.run_id,
-                "review/decisions.yaml",
+                DECISIONS_YAML,
                 self._questions_yaml(review),
                 media_type="application/yaml; charset=utf-8",
             ),
@@ -569,7 +583,7 @@ class CoreRunner:
         )
 
     def _finish(self, record: RunRecord) -> RunRecord:
-        normalized = self.store.read_text(record.run_id, "source/normalized.md")
+        normalized = self.store.read_text(record.run_id, SOURCE_MARKDOWN)
         decisions = self._read_decisions_file(record.run_id)
         review = self._load_review(record)
         plan = compile_rewrite_plan(
@@ -583,12 +597,12 @@ class CoreRunner:
             "rewrite.plan",
             self.store.write_json(
                 record.run_id,
-                "rewrite/plan.json",
+                REWRITE_PLAN,
                 plan.model_dump(mode="json"),
             ),
         )
         decision_bundle = self._read_decision_bundle(
-            self.store.run_path(record.run_id) / "review/decisions.yaml"
+            self.store.run_path(record.run_id) / DECISIONS_YAML
         )
         waived = {item.requirement_id for item in decision_bundle.waivers}
         final_text = normalized
@@ -627,7 +641,7 @@ class CoreRunner:
             "output.final_markdown",
             self.store.write_text(
                 record.run_id,
-                "output/final.md",
+                FINAL_MARKDOWN,
                 final_text,
                 media_type="text/markdown; charset=utf-8",
             ),
@@ -637,7 +651,7 @@ class CoreRunner:
             "output.final_docx",
             self.store.write_bytes(
                 record.run_id,
-                "output/final.docx",
+                FINAL_DOCX,
                 render_docx(final_text),
                 media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             ),
@@ -646,14 +660,14 @@ class CoreRunner:
         record = register_artifact(
             record,
             "output.semantic",
-            self.store.write_json(record.run_id, "output/semantic.json", semantic),
+            self.store.write_json(record.run_id, SEMANTIC, semantic),
         )
         record = register_artifact(
             record,
             "output.ontology",
             self.store.write_json(
                 record.run_id,
-                "output/ontology.json",
+                ONTOLOGY,
                 public_graph(semantic),
             ),
         )
@@ -664,7 +678,7 @@ class CoreRunner:
             "audit.semantic_diff",
             self.store.write_json(
                 record.run_id,
-                "audit/semantic-diff.json",
+                SEMANTIC_DIFF,
                 semantic_diff_payload,
             ),
         )
@@ -673,7 +687,7 @@ class CoreRunner:
             record,
             "output.graph",
             self.store.write_text(
-                record.run_id, "output/graph.jsonl", graph_lines, media_type="application/jsonl"
+                record.run_id, GRAPH_JSONL, graph_lines, media_type="application/jsonl"
             ),
         )
         record = register_artifact(
@@ -681,7 +695,7 @@ class CoreRunner:
             "output.flow",
             self.store.write_text(
                 record.run_id,
-                "output/flow.mmd",
+                FINAL_FLOW,
                 review.proposed_mermaid or review.inferred_mermaid,
                 media_type="text/vnd.mermaid; charset=utf-8",
             ),
@@ -691,26 +705,45 @@ class CoreRunner:
             difflib.unified_diff(
                 source_text.splitlines(),
                 final_text.splitlines(),
-                fromfile="source/normalized.md",
-                tofile="output/final.md",
+                fromfile=SOURCE_MARKDOWN,
+                tofile=FINAL_MARKDOWN,
                 lineterm="",
             )
         )
+        change_items = (
+            "\n".join(f"- {item}" for item in changes)
+            if changes
+            else "- No explicit rewrite changes were recorded."
+        )
         change_note = (
-            f"Applied {len(changes)} rewrite change(s).\n"
-            + (
-                "\n".join(f"- {item}" for item in changes)
-                if changes
-                else "- No explicit rewrite changes were recorded."
-            )
-            + f"\n\n{diff or 'No textual changes were required.'}\n"
+            "# Change explanation\n\n"
+            "## Summary\n\n"
+            f"The rewrite stage recorded **{len(changes)}** explicit change(s). The final document "
+            "was produced from the normalized source, the selected recipe, and the accepted "
+            "human decisions. This report explains the recorded changes and preserves the exact "
+            "textual diff for audit.\n\n"
+            "## Recorded rewrite actions\n\n"
+            f"{change_items}\n\n"
+            "## How to review the result\n\n"
+            "Read the final document first for coherence, then use the diff below to inspect "
+            "specific additions, removals, and wording changes. A leading `-` is source text that "
+            "was removed; a leading `+` is final text that was added. Unchanged context is shown "
+            "around each edit so reviewers can evaluate meaning rather than isolated lines.\n\n"
+            "## Source-to-final textual diff\n\n"
+            "```diff\n"
+            f"{diff or 'No textual changes were required.'}\n"
+            "```\n\n"
+            "## Traceability note\n\n"
+            "This explanation is descriptive, not a new source of business truth. The accepted "
+            "decision file and source-to-target map remain the authoritative trace for why the "
+            "rewrite was allowed.\n"
         )
         record = register_artifact(
             record,
             "audit.changes",
             self.store.write_text(
                 record.run_id,
-                "audit/changes.md",
+                CHANGES_MARKDOWN,
                 change_note,
                 media_type="text/markdown; charset=utf-8",
             ),
@@ -731,7 +764,7 @@ class CoreRunner:
             "audit.source_to_target",
             self.store.write_text(
                 record.run_id,
-                "audit/source-to-target.csv",
+                SOURCE_TO_TARGET_CSV,
                 source_target_csv(review, final_text),
                 media_type="text/csv; charset=utf-8",
             ),
@@ -819,52 +852,90 @@ class CoreRunner:
         record = register_artifact(
             record,
             "audit.report",
-            self.store.write_json(record.run_id, "audit/audit.json", audit.model_dump(mode="json")),
+            self.store.write_json(record.run_id, AUDIT, audit.model_dump(mode="json")),
         )
         record = register_artifact(
             record,
             "audit.report_markdown",
             self.store.write_text(
                 record.run_id,
-                "audit/audit.md",
+                AUDIT_MARKDOWN,
                 render_audit_markdown(audit),
                 media_type="text/markdown; charset=utf-8",
             ),
         )
+        record = self._update(
+            record,
+            status="succeeded" if audit.status == "pass" else "failed",
+            phase="verify",
+            error=None,
+        )
+        record = self._refresh_html_report(record, audit=audit)
         if audit.status == "pass":
             record = register_artifact(
                 record,
                 "audit.seal",
                 self.store.write_json(
                     record.run_id,
-                    "audit/seal.json",
+                    SEAL,
                     {
                         "run_id": record.run_id,
                         "source_digest": record.source_digest,
                         "final_digest": record.artifacts["output.final_markdown"].sha256,
                         "audit_digest": record.artifacts["audit.report"].sha256,
-                        "artifact_paths": sorted(item.path for item in record.artifacts.values()),
+                        "artifact_paths": sorted({item.path for item in record.artifacts.values()}),
                         "sealed": True,
                     },
                 ),
             )
-        return self._update(
-            record,
-            status="succeeded" if audit.status == "pass" else "failed",
-            phase="verify",
-            error=None,
+            self.store.save_run(record)
+        return record
+
+    def _refresh_html_report(
+        self, record: RunRecord, *, audit: AuditReport | None = None
+    ) -> RunRecord:
+        report_paths = (
+            SOURCE_MARKDOWN,
+            REVIEW_INDEX_MARKDOWN,
+            MACRO_MARKDOWN,
+            SECTIONS_MARKDOWN,
+            FLOW_MARKDOWN,
+            FINAL_MARKDOWN,
+            CHANGES_MARKDOWN,
+            AUDIT_MARKDOWN,
         )
+        documents = [
+            (path, self.store.read_text(record.run_id, path))
+            for path in report_paths
+            if self.store.exists(record.run_id, path)
+        ]
+        review = self._load_review(record)
+        record = register_artifact(
+            record,
+            "report.html",
+            self.store.write_text(
+                record.run_id,
+                HTML_REPORT,
+                render_html_report(
+                    record=record,
+                    review=review,
+                    documents=documents,
+                    audit=audit,
+                ),
+                media_type="text/html; charset=utf-8",
+            ),
+        )
+        self.store.save_run(record)
+        return record
 
     def _load_review(self, record: RunRecord) -> ReviewReport:
-        return ReviewReport.model_validate(
-            self.store.read_json(record.run_id, "review/review.json")
-        )
+        return ReviewReport.model_validate(self.store.read_json(record.run_id, REVIEW))
 
     def _source_sections(
         self, record: RunRecord, blocks: tuple[Any, ...], spans: list[SourceSpan]
     ) -> list[Section]:
         try:
-            payload = self.store.read_json(record.run_id, "source/source.json")
+            payload = self.store.read_json(record.run_id, SOURCE_METADATA)
             sections = [Section.model_validate(item) for item in payload.get("sections", [])]
             if self._valid_recovered_sections(sections, {item.span_id for item in spans}):
                 return sections
@@ -873,7 +944,7 @@ class CoreRunner:
         return self._sections(blocks, spans)
 
     def _read_decisions_file(self, run_id: str) -> list[Decision]:
-        path = self.store.run_path(run_id) / "review/decisions.yaml"
+        path = self.store.run_path(run_id) / DECISIONS_YAML
         return self._read_decision_bundle(path).decisions if path.is_file() else []
 
     @staticmethod

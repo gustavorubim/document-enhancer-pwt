@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from document_enhancer.core import CoreBundleIndex, CoreRunner
+from document_enhancer.core.layout import AUDIT
 
 
 @pytest.mark.unit
@@ -24,7 +25,7 @@ def test_core_bundle_indexer_rejects_failed_bundle(tmp_path: Path) -> None:
     source = tmp_path / "input.md"
     source.write_text("# Intake\n\nThe owner reviews the request.\n", encoding="utf-8")
     result = CoreRunner(tmp_path / "runs").start(source)
-    audit = tmp_path / "runs" / result.run_id / "audit/audit.json"
+    audit = tmp_path / "runs" / result.run_id / AUDIT
     audit.parent.mkdir(parents=True, exist_ok=True)
     audit.write_text('{"status":"fail"}', encoding="utf-8")
 

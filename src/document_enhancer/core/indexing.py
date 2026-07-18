@@ -16,8 +16,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
 
+from .layout import AUDIT, FINAL_MARKDOWN, ONTOLOGY, ORIGINAL_DOCUMENT_PREFIX, SEAL
+
 _DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
-_REQUIRED_ARTIFACTS = ("audit/audit.json", "output/final.md", "output/ontology.json")
+_REQUIRED_ARTIFACTS = (AUDIT, FINAL_MARKDOWN, ONTOLOGY)
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,7 +49,7 @@ def load_sealed_bundle(bundle: Path) -> SealedBundle:
     resolved = bundle.expanduser().resolve()
     if not resolved.is_dir():
         raise FileNotFoundError(f"core bundle does not exist: {resolved}")
-    seal = _read_object(resolved / "audit/seal.json", "seal")
+    seal = _read_object(resolved / SEAL, "seal")
     if seal.get("sealed") is not True:
         raise ValueError("core bundle is not sealed")
     run_id = _required_string(seal, "run_id", "seal")
@@ -68,8 +70,8 @@ def load_sealed_bundle(bundle: Path) -> SealedBundle:
         if omitted:
             raise ValueError("seal does not list required artifacts: " + ", ".join(omitted))
 
-    audit_path = resolved / "audit/audit.json"
-    final_path = resolved / "output/final.md"
+    audit_path = resolved / AUDIT
+    final_path = resolved / FINAL_MARKDOWN
     audit = _read_object(audit_path, "audit")
     if audit.get("status") != "pass":
         raise ValueError("only a passing core bundle may be consumed")
@@ -78,13 +80,14 @@ def load_sealed_bundle(bundle: Path) -> SealedBundle:
     if _sha256(final_path) != final_digest:
         raise ValueError("final document digest does not match the sealed artifact")
 
-    source_candidates = [path for path in (resolved / "source").glob("original*") if path.is_file()]
+    source_root = resolved / Path(ORIGINAL_DOCUMENT_PREFIX).parent
+    source_candidates = [path for path in source_root.glob("original*") if path.is_file()]
     if len(source_candidates) != 1:
-        raise FileNotFoundError("core bundle must contain exactly one source/original artifact")
+        raise FileNotFoundError("core bundle must contain exactly one documents/original artifact")
     if _sha256(source_candidates[0]) != source_digest:
         raise ValueError("source digest does not match the sealed artifact")
 
-    graph = _read_object(resolved / "output/ontology.json", "ontology")
+    graph = _read_object(resolved / ONTOLOGY, "ontology")
     nodes = _records(graph, "nodes", "ontology")
     edges = _records(graph, "edges", "ontology")
     node_ids = _validate_nodes(nodes)

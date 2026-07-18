@@ -107,19 +107,95 @@ def deferred_decisions_resolved(deferred_ids: list[str]) -> bool:
 
 
 def render_audit_markdown(audit: AuditReport) -> str:
+    descriptions = {
+        "final_markdown_nonempty": "The final Markdown contains reviewable document content.",
+        "source_digest_preserved": "The recorded source identity still matches the original input.",
+        "questions_resolved": "No blocking human-review question remains unresolved.",
+        "no_unresolved_placeholders": "No TBD, TODO, TBC, or equivalent placeholder remains.",
+        "deferred_decisions_resolved": "The rewrite plan contains no deferred business decision.",
+        "source_anchor_retained": "Distinctive source language survives at the required fidelity floor.",
+        "source_sections_accounted_for": "Every source section remains represented in the result.",
+        "required_sections_present": "Required recipe sections are present or explicitly waived.",
+        "section_assessments_present": "Every reviewed section has a valid readiness assessment.",
+        "dual_flow_artifacts_present": "Applicable process work includes inferred and proposed flows.",
+        "semantic_references_valid": "Semantic graph edges reference existing graph nodes.",
+        "graph_types_valid": "Graph node and edge types conform to the selected ontology recipe.",
+        "independent_content_audit": "The optional independent provider audit also passed.",
+    }
+    passed = sum(1 for value in audit.checks.values() if value)
+    failed = len(audit.checks) - passed
     lines = [
-        f"# Audit: {audit.status}",
+        f"# Final audit: {audit.status}",
+        "",
+        "## Executive conclusion",
         "",
         audit.summary,
         "",
-        "| Check | Result |",
-        "| --- | --- |",
+        (
+            "The bundle passed its promotion gate and is sealed for downstream use. The result "
+            "below means the deterministic checks found no unresolved condition that would block "
+            "delivery. A passing audit is evidence of workflow completeness and traceability; it "
+            "does not replace the accountable owner's approval of business meaning."
+            if audit.status == "pass"
+            else "The bundle did not pass its promotion gate and has not been sealed. Review the "
+            "failed checks and blockers below before treating the final document as approved."
+        ),
+        "",
+        "## Verification summary",
+        "",
+        f"- Overall result: **{audit.status.upper()}**",
+        f"- Checks passed: **{passed}** of **{len(audit.checks)}**",
+        f"- Checks failed: **{failed}**",
+        f"- Blocking items recorded: **{len(audit.blockers)}**",
+        "",
+        "## Detailed checks",
+        "",
+        "| Check | Result | What the check establishes |",
+        "| --- | --- | --- |",
     ]
     lines.extend(
-        f"| {name} | {'pass' if passed else 'fail'} |" for name, passed in audit.checks.items()
+        f"| `{name}` | **{'pass' if check_passed else 'fail'}** | "
+        f"{descriptions.get(name, 'The named deterministic bundle condition was evaluated.')} |"
+        for name, check_passed in audit.checks.items()
     )
     if audit.blockers:
-        lines.extend(["", "Blockers: " + ", ".join(audit.blockers)])
+        lines.extend(["", "## Blocking items", ""])
+        lines.extend(f"- `{item}`" for item in audit.blockers)
+        lines.extend(
+            [
+                "",
+                "Resolve these items, regenerate the affected artifacts, and rerun verification. "
+                "Do not distribute the bundle as sealed while any blocker remains.",
+            ]
+        )
+    else:
+        lines.extend(
+            [
+                "",
+                "## Blocking items",
+                "",
+                "None. All evaluated promotion conditions passed.",
+            ]
+        )
+    lines.extend(
+        [
+            "",
+            "## Delivered evidence",
+            "",
+            "The final bundle includes the rewritten Markdown and DOCX, the accepted decision "
+            "record, a source-to-target map, a detailed change explanation, inferred and proposed "
+            "process diagrams, and portable semantic and ontology exports. Together these files "
+            "allow a reviewer to trace what changed and allow downstream systems to consume the "
+            "sealed result without depending on the authoring runtime.",
+            "",
+            "## Reviewer guidance",
+            "",
+            "Read `06-final-document.md` alongside `07-change-explanation.md`. Confirm that the "
+            "accepted decisions were applied as intended and that no approved nuance was lost. "
+            "Use this audit as the final technical control record for the run.",
+            "",
+        ]
+    )
     return "\n".join(lines) + "\n"
 
 

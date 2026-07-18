@@ -9,6 +9,7 @@ import pytest
 from typer.testing import CliRunner
 
 from document_enhancer.cli import _select_source, app
+from document_enhancer.core.layout import DECISIONS_YAML, REVIEW
 from document_enhancer.core.recipes import load_recipe
 from document_enhancer.errors import DocumentEnhancerError
 
@@ -69,7 +70,7 @@ def test_default_cli_runs_and_continues_the_core_bundle(tmp_path: Path) -> None:
     assert status.exit_code == 0
     assert json.loads(status.stdout)["schema_version"] == "core.cli.v1"
 
-    review_path = run_root / run_id / "review" / "review.json"
+    review_path = run_root / run_id / REVIEW
     review = json.loads(review_path.read_text(encoding="utf-8"))
     decisions = 'approve_rewrite: true\nsteering: ""\nwaivers: []\ndecisions:\n' + "".join(
         "  - question_id: {question_id}\n    answer: approved\n    disposition: accept\n".format(
@@ -78,7 +79,7 @@ def test_default_cli_runs_and_continues_the_core_bundle(tmp_path: Path) -> None:
         for item in review["questions"]
         if item["blocking"]
     )
-    (run_root / run_id / "review" / "decisions.yaml").write_text(decisions, encoding="utf-8")
+    (run_root / run_id / DECISIONS_YAML).write_text(decisions, encoding="utf-8")
 
     continued = runner.invoke(app, ["continue", run_id, "--run-dir", str(run_root), "--json"])
 
