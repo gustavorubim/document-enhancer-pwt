@@ -15,7 +15,9 @@ retrieval system, prompt-pack runtime, or compatibility mode is required on the 
 4. Compare the inferred and proposed Mermaid diagrams when a process is documented.
 5. Answer questions and steering in `review/decisions.yaml`.
 6. Continue so the runner rewrites, audits, and seals the bundle.
-7. Use the portable semantic, ontology, and graph exports later for GraphRAG, RAG, or ontology.
+7. When the source contains extractable screenshots, use the `FIG-###` references in the rewritten
+   body and the source-screenshot appendix in the final Markdown and DOCX.
+8. Use the portable semantic, ontology, and graph exports later for GraphRAG, RAG, or ontology.
 
 ## Quick start
 
@@ -169,6 +171,8 @@ runs/RUN_ID/
 ├── review/decisions.yaml       # questions, steering, waivers, approve_rewrite
 ├── diagrams/                   # numbered inferred, proposed, and final Mermaid sources
 ├── documents/                  # original source and styled DOCX with native headings/tables
+├── assets/source/              # immutable extracted source screenshots
+├── assets/final/               # screenshot copies embedded by the final renderers
 ├── data/                       # graph.jsonl and source-to-target.csv
 └── debug/                      # optional provider call manifests in JSONL
 ```
@@ -180,6 +184,9 @@ continues live after human review.
 ## Quality boundaries
 
 - Parsers preserve source bytes, block order, locations, stable span IDs, warnings, and digests.
+- Embedded PNG/JPEG figures in the DOCX body and local relative PNG/JPEG Markdown images are assigned
+  stable `FIG-###` IDs, referenced from their source section, and rendered once in a final appendix.
+  PDF images remain inventoried but are not extracted, and remote Markdown images are never fetched.
 - Heuristics choose parser structure or bounded LLM structure recovery; providers cannot invent
   source spans or replace deterministic evidence checks.
 - Reference packs define the document type, policy context, rubric, terminology, and templates.

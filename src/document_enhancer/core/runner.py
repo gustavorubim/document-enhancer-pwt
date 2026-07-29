@@ -27,6 +27,10 @@ from document_enhancer.ingest.pipeline import DocumentIngestor
 from .audit import (
     deferred_decisions_resolved,
     dual_flow_artifacts_present,
+    figure_appendix_complete,
+    figure_asset_digests_match,
+    figure_references_valid,
+    final_docx_figures_embedded,
     graph_types_valid,
     no_unresolved_placeholders,
     render_audit_markdown,
@@ -37,6 +41,11 @@ from .audit import (
     source_sections_retained,
 )
 from .export import public_graph
+from .figures import (
+    compose_figure_appendix,
+    materialize_final_figures,
+    persist_source_figures,
+)
 from .html_report import render_html_report
 from .layout import (
     AUDIT,
@@ -330,6 +339,13 @@ class CoreRunner:
                 selected_structure_mode = "parser"
         elif selected_structure_mode == "llm_recovery":
             structure_warnings.append("recovery_dependencies_unavailable")
+        record, figures = persist_source_figures(
+            store=self.store,
+            record=record,
+            assets=normalized.assets,
+            blocks=raw.blocks,
+            sections=sections,
+        )
         metadata = SourceDocument(
             source_name=source.name,
             source_digest=raw.source_digest,
@@ -342,6 +358,7 @@ class CoreRunner:
             warnings=[item.message for item in raw.warnings] + structure_warnings,
             spans=spans,
             sections=sections,
+            figures=figures,
         )
         suffix = source.suffix.lower() or ".bin"
         record = register_artifact(
@@ -613,11 +630,19 @@ class CoreRunner:
         normalized = self.store.read_text(record.run_id, SOURCE_MARKDOWN)
         decisions = self._read_decisions_file(record.run_id)
         review = self._load_review(record)
+        try:
+            source_document = self._load_source(record)
+            figures = source_document.figures
+            source_sections = source_document.sections
+        except FileNotFoundError:
+            figures = []
+            source_sections = review.sections
         plan = compile_rewrite_plan(
             source_digest=record.source_digest,
             review=review,
             decisions=decisions,
             recipe=self.recipe,
+            figures=figures,
         )
         record = register_artifact(
             record,
@@ -662,6 +687,20 @@ class CoreRunner:
                 waived_requirement_ids=waived,
             )
             changes.extend(stub_changes)
+        record = materialize_final_figures(
+            store=self.store,
+            record=record,
+            figures=figures,
+        )
+        final_text = compose_figure_appendix(
+            final_text,
+            figures=figures,
+            sections=source_sections,
+        )
+        if figures:
+            changes.append(
+                f"Preserved {len(figures)} source screenshot(s) in a referenced appendix."
+            )
         record = self._update(record, status="running", phase="rewrite", unresolved_question_ids=[])
         record = register_artifact(
             record,
@@ -679,7 +718,10 @@ class CoreRunner:
             self.store.write_bytes(
                 record.run_id,
                 FINAL_DOCX,
-                render_docx(final_text),
+                render_docx(
+                    final_text,
+                    asset_root=self.store.run_path(record.run_id) / "assets/final",
+                ),
                 media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             ),
         )
@@ -815,6 +857,14 @@ class CoreRunner:
                 "dual_flow_artifacts_present": dual_flow_artifacts_present(review),
                 "semantic_references_valid": semantic_references_valid(semantic),
                 "graph_types_valid": graph_types_valid(semantic, self.recipe),
+                "figure_references_valid": figure_references_valid(final_text, figures),
+                "figure_appendix_complete": figure_appendix_complete(final_text, figures),
+                "figure_asset_digests_match": figure_asset_digests_match(
+                    self.store.run_path(record.run_id), figures
+                ),
+                "final_docx_figures_embedded": final_docx_figures_embedded(
+                    self.store.read_bytes(record.run_id, FINAL_DOCX), figures
+                ),
             },
             summary="Final document was rendered and passed the deterministic bundle checks.",
         )
@@ -910,6 +960,7 @@ class CoreRunner:
                         "source_digest": record.source_digest,
                         "final_digest": record.artifacts["output.final_markdown"].sha256,
                         "audit_digest": record.artifacts["audit.report"].sha256,
+                        "figure_digests": {figure.figure_id: figure.sha256 for figure in figures},
                         "artifact_paths": sorted({item.path for item in record.artifacts.values()}),
                         "sealed": True,
                     },
@@ -938,6 +989,10 @@ class CoreRunner:
             if self.store.exists(record.run_id, path)
         ]
         review = self._load_review(record)
+        try:
+            figures = self._load_source(record).figures
+        except (FileNotFoundError, TypeError, ValueError):
+            figures = []
         record = register_artifact(
             record,
             "report.html",
@@ -949,6 +1004,7 @@ class CoreRunner:
                     review=review,
                     documents=documents,
                     audit=audit,
+                    figures=figures,
                 ),
                 media_type="text/html; charset=utf-8",
             ),
@@ -958,6 +1014,9 @@ class CoreRunner:
 
     def _load_review(self, record: RunRecord) -> ReviewReport:
         return ReviewReport.model_validate(self.store.read_json(record.run_id, REVIEW))
+
+    def _load_source(self, record: RunRecord) -> SourceDocument:
+        return SourceDocument.model_validate(self.store.read_json(record.run_id, SOURCE_METADATA))
 
     def _source_sections(
         self, record: RunRecord, blocks: tuple[Any, ...], spans: list[SourceSpan]

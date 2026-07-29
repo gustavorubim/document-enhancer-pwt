@@ -138,6 +138,7 @@ def _asset_for_relationship(
     }.get(suffix)
     digest: str | None = None
     size: int | None = None
+    payload: bytes | None = None
     safety: str = "unresolved" if mode == "external" else "passive"
     if mode != "external":
         normalized = target.lstrip("/")
@@ -151,7 +152,11 @@ def _asset_for_relationship(
             digest = sha256_bytes(payload)
             size = len(payload)
     return EmbeddedAsset(
-        asset_id=f"asset-{sha256_bytes(f'{relation_id}:{index}:{target}'.encode())[:20]}",
+        asset_id=(
+            f"asset-{digest[:20]}"
+            if digest
+            else f"asset-{sha256_bytes(f'{relation_id}:{index}:{target}'.encode())[:20]}"
+        ),
         kind=(
             "link"
             if "hyperlink" in relation.get("type", "").lower()
@@ -167,6 +172,7 @@ def _asset_for_relationship(
         relationship_id=relation_id,
         target=target,
         metadata={"relationship_type": relation.get("type", ""), "target_mode": mode},
+        payload=payload,
     )
 
 
@@ -343,6 +349,14 @@ class DocxParser:
                             attributes={
                                 "rows": rows,
                                 "column_count": max((len(row) for row in rows), default=0),
+                                "relationship_ids": sorted(
+                                    {
+                                        value_id
+                                        for element in child.iter()
+                                        for attribute, value_id in element.attrib.items()
+                                        if attribute in {f"{R}embed", f"{R}id"}
+                                    }
+                                ),
                             },
                         )
                     )
@@ -360,6 +374,47 @@ class DocxParser:
                             ),
                         )
                     )
+
+            block_by_relationship: dict[str, list[RawBlock]] = {}
+            for block in blocks:
+                for relation_id in block.attributes.get("relationship_ids", []):
+                    block_by_relationship.setdefault(str(relation_id), []).append(block)
+            located_assets: list[EmbeddedAsset] = []
+            for asset in assets:
+                occurrences = block_by_relationship.get(asset.relationship_id or "", [])
+                if asset.kind == "figure" and occurrences:
+                    first = occurrences[0]
+                    caption = next(
+                        (
+                            block.text.strip()
+                            for block in blocks[first.ordinal + 1 : first.ordinal + 3]
+                            if block.caption and block.text.strip()
+                        ),
+                        "",
+                    )
+                    located_assets.append(
+                        asset.model_copy(
+                            update={
+                                "source_span_id": first.span_id,
+                                "location": first.location,
+                                "metadata": {
+                                    **asset.metadata,
+                                    "caption": caption,
+                                    "occurrences": [
+                                        {
+                                            "source_span_id": block.span_id,
+                                            "ordinal": block.ordinal,
+                                            "location": block.location.model_dump(mode="json"),
+                                        }
+                                        for block in occurrences
+                                    ],
+                                },
+                            }
+                        )
+                    )
+                else:
+                    located_assets.append(asset)
+            assets = located_assets
 
             if any("footnotes" in name for name in names):
                 warnings.append(

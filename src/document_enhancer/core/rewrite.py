@@ -6,6 +6,7 @@ import csv
 import hashlib
 import io
 import re
+from pathlib import Path
 from typing import Any
 
 from docx import Document
@@ -27,6 +28,7 @@ from .models import (
     RewritePlanItem,
     SemanticEdge,
     SemanticNode,
+    SourceFigure,
 )
 from .recipes import Recipe
 from .review import title_matches
@@ -40,6 +42,7 @@ def compile_rewrite_plan(
     review: ReviewReport,
     decisions: list[Decision],
     recipe: Recipe | None,
+    figures: list[SourceFigure] | None = None,
 ) -> RewritePlan:
     findings_by_section: dict[str, list[Finding]] = {}
     for finding in review.findings:
@@ -60,6 +63,13 @@ def compile_rewrite_plan(
                     if item.recommendation
                 )
             ),
+            figure_ids=[
+                figure.figure_id
+                for figure in figures or []
+                if any(
+                    occurrence.section_id == section.section_id for occurrence in figure.occurrences
+                )
+            ],
         )
         for section in review.sections
     ]
@@ -338,7 +348,13 @@ def _inline_text(token: Any) -> str:
     ).strip()
 
 
-def _append_inline(paragraph: Any, token: Any, *, force_bold: bool = False) -> None:
+def _append_inline(
+    paragraph: Any,
+    token: Any,
+    *,
+    force_bold: bool = False,
+    asset_root: Path | None = None,
+) -> None:
     """Translate Markdown inline tokens to native Word runs."""
 
     bold = force_bold
@@ -377,6 +393,15 @@ def _append_inline(paragraph: Any, token: Any, *, force_bold: bool = False) -> N
             paragraph.add_run().add_break()
             continue
         if child.type == "image":
+            source = str(child.attrGet("src") or "")
+            name = Path(source).name
+            expected_source = f"../assets/final/{name}"
+            if asset_root is not None and source == expected_source and name:
+                root = asset_root.resolve()
+                image_path = (root / name).resolve()
+                if root in image_path.parents and image_path.is_file():
+                    paragraph.add_run().add_picture(str(image_path), width=Inches(6.0))
+                    continue
             text = f"[Image: {child.content or child.attrGet('alt') or 'illustration'}]"
         elif child.type in {"text", "code_inline"}:
             text = str(child.content)
@@ -516,7 +541,7 @@ def _add_markdown_table(document: Any, rows: list[list[tuple[Any, bool, str]]]) 
     document.add_paragraph().paragraph_format.space_after = Pt(2)
 
 
-def render_docx(markdown: str) -> bytes:
+def render_docx(markdown: str, *, asset_root: Path | None = None) -> bytes:
     """Render Markdown as a structured, styled Word document with native tables."""
 
     tokens = _markdown_parser().parse(markdown)
@@ -537,7 +562,7 @@ def render_docx(markdown: str) -> bytes:
             level = min(int(token.tag[1:]), 6)
             inline = tokens[index + 1]
             paragraph = document.add_paragraph(style=f"Heading {level}")
-            _append_inline(paragraph, inline)
+            _append_inline(paragraph, inline, asset_root=asset_root)
             if first_heading:
                 document.core_properties.title = _inline_text(inline)
                 first_heading = False
@@ -571,7 +596,7 @@ def render_docx(markdown: str) -> bytes:
             paragraph = document.add_paragraph(style=style)
             if len(list_stack) > 1:
                 paragraph.paragraph_format.left_indent = Inches(0.25 * (len(list_stack) - 1))
-            _append_inline(paragraph, inline)
+            _append_inline(paragraph, inline, asset_root=asset_root)
             index += 3
             continue
         if token.type == "table_open":

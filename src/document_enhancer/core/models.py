@@ -59,6 +59,30 @@ class Section(StrictModel):
     parent_id: str | None = None
 
 
+class FigureOccurrence(StrictModel):
+    """One source location at which an extracted figure appeared."""
+
+    source_span_id: str | None = None
+    section_id: str | None = None
+    ordinal: int = Field(ge=0)
+    location: dict[str, object] = Field(default_factory=dict)
+    anchor_text: str = ""
+
+
+class SourceFigure(StrictModel):
+    """Persisted source figure with a stable reader-facing identifier."""
+
+    figure_id: str = Field(pattern=r"^FIG-\d{3}$")
+    asset_id: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    media_type: Literal["image/png", "image/jpeg"]
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    size_bytes: int = Field(ge=0)
+    source_path: str = Field(min_length=1)
+    caption: str = ""
+    occurrences: list[FigureOccurrence] = Field(default_factory=list)
+
+
 class Finding(StrictModel):
     finding_id: str = Field(min_length=1)
     scope: FindingScope
@@ -128,7 +152,7 @@ class Waiver(StrictModel):
 class SourceDocument(StrictModel):
     """Canonical extracted source metadata; source text remains an artifact."""
 
-    schema_version: Literal["core.source.v1"] = "core.source.v1"
+    schema_version: Literal["core.source.v1", "core.source.v2"] = "core.source.v2"
     source_digest: str = Field(pattern=r"^[0-9a-f]{64}$")
     source_name: str = Field(min_length=1)
     media_type: str = Field(min_length=1)
@@ -140,6 +164,7 @@ class SourceDocument(StrictModel):
     warnings: list[str] = Field(default_factory=list)
     spans: list[SourceSpan] = Field(default_factory=list)
     sections: list[Section] = Field(default_factory=list)
+    figures: list[SourceFigure] = Field(default_factory=list)
 
 
 class ReviewBundle(StrictModel):
@@ -179,6 +204,7 @@ class RewritePlanItem(StrictModel):
     source_span_ids: list[str] = Field(default_factory=list)
     finding_ids: list[str] = Field(default_factory=list)
     recommendations: list[str] = Field(default_factory=list)
+    figure_ids: list[str] = Field(default_factory=list)
     missing_required: bool = False
     requirement_id: str | None = None
 

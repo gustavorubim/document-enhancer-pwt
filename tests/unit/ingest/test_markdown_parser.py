@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 from pathlib import Path
 
 import pytest
@@ -8,6 +9,9 @@ from document_enhancer.ingest.markdown import MarkdownParser, TextParser
 from document_enhancer.ingest.normalize import normalize_document
 
 FIXTURES = Path(__file__).parents[3] / "fixtures" / "synthetic" / "ingest"
+PNG_1X1 = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+)
 
 
 @pytest.mark.unit
@@ -54,6 +58,26 @@ def test_normalization_keeps_source_span_mapping_and_renders_markdown() -> None:
     assert "| Input | Owner | Period |" in normalized.normalized_markdown
     assert normalized.routing.mode == "parser"
     assert normalized.quality.parser_error_count == 0
+
+
+@pytest.mark.unit
+def test_markdown_materializes_local_png_beneath_source_directory(tmp_path: Path) -> None:
+    image = tmp_path / "screen.png"
+    image.write_bytes(PNG_1X1)
+    source = tmp_path / "process.md"
+    source.write_text(
+        "# Submit\n\nSelect Submit.\n\n![Submission screen](screen.png)\n",
+        encoding="utf-8",
+    )
+
+    raw = MarkdownParser().parse(source)
+
+    figures = [asset for asset in raw.assets if asset.kind == "figure"]
+    assert len(figures) == 1
+    assert figures[0].payload == PNG_1X1
+    assert figures[0].digest is not None
+    assert figures[0].media_type == "image/png"
+    assert figures[0].source_span_id is not None
 
 
 @pytest.mark.unit

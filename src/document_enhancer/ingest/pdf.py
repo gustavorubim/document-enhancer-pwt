@@ -178,7 +178,7 @@ class PdfParser:
                             name=f"page-{page_number}-image",
                             source_span_id=block.span_id,
                             location=location,
-                            safety="passive",
+                            safety="unsupported",
                             metadata={"page_image": True},
                         )
                     )

@@ -10,3 +10,10 @@
   section IDs into chunk metadata. Prefer explicit IDs over fuzzy entity matching, preserve
   ambiguous/unmatched counts, and add a rewritten-heading integration fixture before broadening the
   linker.
+
+## PDF screenshot extraction
+
+- PDF image objects are still inventoried with page provenance but are not materialized into the
+  screenshot appendix. Add bounded raster extraction only when a representative PDF fixture and a
+  supported image-decoding dependency are available; do not rasterize whole pages or introduce OCR
+  on the authoring path.

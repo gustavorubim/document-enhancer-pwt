@@ -68,6 +68,7 @@ class EmbeddedAsset(FrozenContract):
     relationship_id: str | None = None
     target: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
+    payload: bytes | None = Field(default=None, repr=False)
 
 
 class RawBlock(FrozenContract):

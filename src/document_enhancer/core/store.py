@@ -82,6 +82,13 @@ class RunStore:
     def read_text(self, run_id: str, relative_path: str) -> str:
         return self._safe_path(run_id, relative_path).read_text(encoding="utf-8")
 
+    def read_bytes(self, run_id: str, relative_path: str) -> bytes:
+        return self._safe_path(run_id, relative_path).read_bytes()
+
+    @staticmethod
+    def sha256(data: bytes) -> str:
+        return sha256_bytes(data)
+
     def read_json(self, run_id: str, relative_path: str) -> Any:
         return json.loads(self.read_text(run_id, relative_path))
 

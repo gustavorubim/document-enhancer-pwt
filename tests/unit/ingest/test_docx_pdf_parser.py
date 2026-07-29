@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import io
 import zipfile
 from pathlib import Path
@@ -12,11 +13,22 @@ from document_enhancer.ingest.docx import DocxParser
 from document_enhancer.ingest.normalize import normalize_document
 from document_enhancer.ingest.pdf import PdfParser, ScannedPDFError
 
+PNG_1X1 = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+)
 
-def _docx_bytes(*, macro: bool = False, traversal: bool = False) -> bytes:
-    document = """<?xml version="1.0" encoding="UTF-8"?>
+
+def _docx_bytes(*, macro: bool = False, traversal: bool = False, image: bool = False) -> bytes:
+    image_paragraph = (
+        "<w:p><w:r><w:t>Open the review screen.</w:t>"
+        '<w:drawing><a:blip r:embed="rId2"/></w:drawing></w:r></w:p>'
+        if image
+        else ""
+    )
+    document = f"""<?xml version="1.0" encoding="UTF-8"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
- xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+ xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+ xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
  <w:body>
   <w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>Monthly Loss Forecasting</w:t></w:r></w:p>
   <w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="7"/></w:numPr></w:pPr><w:r><w:t>Load approved extract</w:t></w:r></w:p>
@@ -24,6 +36,7 @@ def _docx_bytes(*, macro: bool = False, traversal: bool = False) -> bytes:
    <w:tr><w:tc><w:p><w:r><w:t>Input</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>Owner</w:t></w:r></w:p></w:tc></w:tr>
    <w:tr><w:tc><w:p><w:r><w:t>Claims</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>Forecasting</w:t></w:r></w:p></w:tc></w:tr>
   </w:tbl>
+  {image_paragraph}
   <w:p><w:pPr><w:pStyle w:val="Caption"/></w:pPr><w:r><w:t>Figure 1. Review flow</w:t></w:r></w:p>
   <w:p><w:hyperlink r:id="rId1"><w:r><w:t>External reference</w:t></w:r></w:hyperlink></w:p>
   <w:sectPr/>
@@ -32,11 +45,14 @@ def _docx_bytes(*, macro: bool = False, traversal: bool = False) -> bytes:
     relationships = """<?xml version="1.0" encoding="UTF-8"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://example.com" TargetMode="External"/>
+ {('<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/screen.png"/>') if image else ''}
 </Relationships>"""
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
         archive.writestr("word/document.xml", document)
         archive.writestr("word/_rels/document.xml.rels", relationships)
+        if image:
+            archive.writestr("word/media/screen.png", PNG_1X1)
         if macro:
             archive.writestr("word/vbaProject.bin", b"not executable here")
         if traversal:
@@ -99,6 +115,21 @@ def test_docx_preserves_body_order_headings_lists_tables_captions_and_relationsh
         for asset in raw.assets
     )
     assert normalize_document(raw).selected_view is not None
+
+
+@pytest.mark.unit
+def test_docx_extracts_image_bytes_and_maps_them_to_source_span(tmp_path: Path) -> None:
+    source = tmp_path / "figures.docx"
+    source.write_bytes(_docx_bytes(image=True))
+
+    raw = DocxParser().parse(source)
+
+    figures = [asset for asset in raw.assets if asset.kind == "figure"]
+    assert len(figures) == 1
+    assert figures[0].payload == PNG_1X1
+    assert figures[0].source_span_id is not None
+    assert figures[0].metadata["caption"] == "Figure 1. Review flow"
+    assert figures[0].metadata["occurrences"][0]["ordinal"] == 3
 
 
 @pytest.mark.security

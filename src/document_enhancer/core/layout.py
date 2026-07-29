@@ -36,6 +36,8 @@ SOURCE_TO_TARGET_CSV = "data/source-to-target.csv"
 ORIGINAL_DOCUMENT_PREFIX = "documents/original"
 FINAL_DOCX = "documents/final.docx"
 HTML_REPORT = "report.html"
+SOURCE_ASSET_PREFIX = "assets/source"
+FINAL_ASSET_PREFIX = "assets/final"
 
 
 __all__ = [
@@ -48,6 +50,7 @@ __all__ = [
     "FINAL_FLOW",
     "FINAL_MARKDOWN",
     "FLOW_MARKDOWN",
+    "FINAL_ASSET_PREFIX",
     "GRAPH_JSONL",
     "HTML_REPORT",
     "INFERRED_FLOW",
@@ -67,6 +70,7 @@ __all__ = [
     "SEMANTIC_DIFF",
     "SOURCE_MARKDOWN",
     "SOURCE_METADATA",
+    "SOURCE_ASSET_PREFIX",
     "SOURCE_TO_TARGET_CSV",
     "STRUCTURE_QUALITY",
     "STRUCTURE_ROUTING",

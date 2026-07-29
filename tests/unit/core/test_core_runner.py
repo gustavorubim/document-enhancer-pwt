@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import base64
 import io
 import json
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -24,6 +26,7 @@ from document_enhancer.core.layout import (
     REWRITE_PLAN,
     RUN_RECORD,
     SOURCE_MARKDOWN,
+    SOURCE_METADATA,
 )
 from document_enhancer.core.models import (
     AuditReport,
@@ -45,6 +48,10 @@ from document_enhancer.core.rewrite import (
 )
 from document_enhancer.core.store import register_artifact
 from document_enhancer.ingest.pipeline import DocumentIngestor
+
+PNG_1X1 = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+)
 
 
 @pytest.mark.unit
@@ -391,6 +398,65 @@ def test_docx_renderer_preserves_markdown_structure_and_native_tables() -> None:
     ]
     assert all(cell.paragraphs[0].runs[0].bold for cell in table.rows[0].cells)
     assert table.rows[1].cells[0].text == "Intake"
+
+
+@pytest.mark.unit
+def test_runner_preserves_source_screenshot_as_referenced_appendix(tmp_path: Path) -> None:
+    image = tmp_path / "submit.png"
+    image.write_bytes(PNG_1X1)
+    source = tmp_path / "process.md"
+    source.write_text(
+        "# Submission\n\nSelect Submit to complete the request.\n\n"
+        "![Submission confirmation](submit.png)\n",
+        encoding="utf-8",
+    )
+
+    result = CoreRunner(tmp_path / "runs").start(source)
+    run_path = tmp_path / "runs" / result.run_id
+    source_metadata = json.loads((run_path / SOURCE_METADATA).read_text(encoding="utf-8"))
+    final_markdown = (run_path / FINAL_MARKDOWN).read_text(encoding="utf-8")
+    audit = json.loads((run_path / AUDIT).read_text(encoding="utf-8"))
+
+    assert result.status == "succeeded"
+    assert [figure["figure_id"] for figure in source_metadata["figures"]] == ["FIG-001"]
+    assert "Select Submit to complete the request. **[FIG-001]**" in final_markdown
+    assert "## Appendix A — Source screenshots" in final_markdown
+    assert "### [FIG-001] Submission confirmation" in final_markdown
+    assert "![Submission confirmation](../assets/final/FIG-001.png)" in final_markdown
+    assert (run_path / "assets/source/FIG-001.png").read_bytes() == PNG_1X1
+    assert (run_path / "assets/final/FIG-001.png").read_bytes() == PNG_1X1
+    with zipfile.ZipFile(run_path / FINAL_DOCX) as archive:
+        assert any(name.startswith("word/media/") for name in archive.namelist())
+    assert audit["checks"]["figure_references_valid"] is True
+    assert audit["checks"]["figure_appendix_complete"] is True
+    assert audit["checks"]["figure_asset_digests_match"] is True
+    assert audit["checks"]["final_docx_figures_embedded"] is True
+    assert "Source screenshots" in (run_path / HTML_REPORT).read_text(encoding="utf-8")
+
+
+@pytest.mark.unit
+def test_runner_carries_docx_screenshot_into_final_docx_appendix(tmp_path: Path) -> None:
+    image = tmp_path / "review.png"
+    image.write_bytes(PNG_1X1)
+    source = tmp_path / "process.docx"
+    document = Document()
+    document.add_heading("Review", level=1)
+    document.add_paragraph("Open the review screen and confirm the result.")
+    document.add_picture(str(image))
+    caption = document.add_paragraph("Review confirmation screen")
+    caption.style = "Caption"
+    document.save(str(source))
+
+    result = CoreRunner(tmp_path / "runs").start(source)
+    run_path = tmp_path / "runs" / result.run_id
+    final_markdown = (run_path / FINAL_MARKDOWN).read_text(encoding="utf-8")
+
+    assert result.status == "succeeded"
+    assert "confirm the result. **[FIG-001]**" in final_markdown
+    assert "### [FIG-001] Review confirmation screen" in final_markdown
+    with zipfile.ZipFile(run_path / FINAL_DOCX) as archive:
+        media = [name for name in archive.namelist() if name.startswith("word/media/")]
+        assert media
 
 
 @pytest.mark.unit

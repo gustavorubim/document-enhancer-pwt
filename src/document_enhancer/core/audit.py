@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+import hashlib
+import io
 import re
+import zipfile
+from pathlib import Path
 from typing import Any
 
-from .models import AuditReport, ReviewReport
+from .figures import final_figure_path
+from .models import AuditReport, ReviewReport, SourceFigure
 from .recipes import Recipe
 from .review import title_matches
 
@@ -106,6 +111,51 @@ def deferred_decisions_resolved(deferred_ids: list[str]) -> bool:
     return not deferred_ids
 
 
+def figure_references_valid(final_text: str, figures: list[SourceFigure]) -> bool:
+    expected = {figure.figure_id for figure in figures}
+    observed = set(re.findall(r"\[(FIG-\d{3})\]", final_text))
+    return observed == expected and all(
+        final_text.count(f"[{figure_id}]") >= 2 for figure_id in expected
+    )
+
+
+def figure_appendix_complete(final_text: str, figures: list[SourceFigure]) -> bool:
+    if not figures:
+        return True
+    if not re.search(r"^## Appendix [A-Z] — Source screenshots$", final_text, re.MULTILINE):
+        return False
+    return all(
+        final_text.count(f"### [{figure.figure_id}]") == 1
+        and final_text.count(f"](../{final_figure_path(figure)})") == 1
+        for figure in figures
+    )
+
+
+def figure_asset_digests_match(run_path: Path, figures: list[SourceFigure]) -> bool:
+    for figure in figures:
+        path = (run_path / final_figure_path(figure)).resolve()
+        if run_path.resolve() not in path.parents or not path.is_file():
+            return False
+        if hashlib.sha256(path.read_bytes()).hexdigest() != figure.sha256:
+            return False
+    return True
+
+
+def final_docx_figures_embedded(docx_bytes: bytes, figures: list[SourceFigure]) -> bool:
+    if not figures:
+        return True
+    try:
+        with zipfile.ZipFile(io.BytesIO(docx_bytes)) as archive:
+            media_digests = {
+                hashlib.sha256(archive.read(name)).hexdigest()
+                for name in archive.namelist()
+                if name.startswith("word/media/")
+            }
+    except (OSError, KeyError, zipfile.BadZipFile):
+        return False
+    return all(figure.sha256 in media_digests for figure in figures)
+
+
 def render_audit_markdown(audit: AuditReport) -> str:
     descriptions = {
         "final_markdown_nonempty": "The final Markdown contains reviewable document content.",
@@ -121,6 +171,10 @@ def render_audit_markdown(audit: AuditReport) -> str:
         "semantic_references_valid": "Semantic graph edges reference existing graph nodes.",
         "graph_types_valid": "Graph node and edge types conform to the selected ontology recipe.",
         "independent_content_audit": "The optional independent provider audit also passed.",
+        "figure_references_valid": "Every source figure has a body reference and no unknown figure ID appears.",
+        "figure_appendix_complete": "Every source figure appears exactly in the governed screenshot appendix.",
+        "figure_asset_digests_match": "Final appendix image bytes match the extracted source figures.",
+        "final_docx_figures_embedded": "The final DOCX contains every referenced source figure.",
     }
     passed = sum(1 for value in audit.checks.values() if value)
     failed = len(audit.checks) - passed
@@ -202,6 +256,10 @@ def render_audit_markdown(audit: AuditReport) -> str:
 __all__ = [
     "deferred_decisions_resolved",
     "dual_flow_artifacts_present",
+    "figure_appendix_complete",
+    "figure_asset_digests_match",
+    "figure_references_valid",
+    "final_docx_figures_embedded",
     "graph_types_valid",
     "no_unresolved_placeholders",
     "render_audit_markdown",

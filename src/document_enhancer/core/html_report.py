@@ -11,7 +11,7 @@ from typing import Any
 
 from markdown_it import MarkdownIt
 
-from .models import AuditReport, FlowEdge, FlowNode, ReviewReport, RunRecord
+from .models import AuditReport, FlowEdge, FlowNode, ReviewReport, RunRecord, SourceFigure
 
 
 def _fence_renderer(
@@ -185,6 +185,7 @@ def render_html_report(
     review: ReviewReport,
     documents: Sequence[tuple[str, str]],
     audit: AuditReport | None = None,
+    figures: Sequence[SourceFigure] = (),
 ) -> str:
     """Render every available numbered Markdown artifact into one static HTML file."""
 
@@ -206,7 +207,9 @@ def render_html_report(
                 path,
                 _display_title(content, path),
                 _anchor(path),
-                markdown.render(content, environment),
+                markdown.render(content, environment).replace(
+                    'src="../assets/final/', 'src="assets/final/'
+                ),
             )
         )
     navigation = "".join(
@@ -236,6 +239,34 @@ def render_html_report(
     )
     document_label = re.sub(r"[_-]+", " ", Path(record.source_name).stem).title()
     document_label = re.sub(r"\bAi\b", "AI", document_label)
+    figure_gallery = ""
+    if figures:
+        cards = []
+        for figure in figures:
+            caption = figure.caption or "Source screenshot"
+            section_ids = sorted(
+                {
+                    occurrence.section_id
+                    for occurrence in figure.occurrences
+                    if occurrence.section_id
+                }
+            )
+            context = ", ".join(section_ids) or "source document"
+            cards.append(
+                '<figure class="source-figure">'
+                f'<img src="{html.escape(figure.source_path)}" '
+                f'alt="{html.escape(caption)}" loading="lazy">'
+                f"<figcaption><strong>{html.escape(figure.figure_id)}</strong> · "
+                f"{html.escape(caption)}<small>{html.escape(context)}</small></figcaption>"
+                "</figure>"
+            )
+        figure_gallery = (
+            '<section class="figure-gallery"><div class="figure-gallery-head">'
+            "<h2>Source screenshots</h2>"
+            "<p>These figures will be referenced from the rewritten document and preserved in "
+            "its appendix when the rewrite is approved.</p></div>"
+            f'<div class="figure-grid">{"".join(cards)}</div></section>'
+        )
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -307,6 +338,14 @@ def render_html_report(
     tr:nth-child(even) td {{ background: #fcf8fb; }}
     blockquote {{ margin: 22px 0; padding: 13px 19px; border-left: 4px solid var(--rose); background: var(--rose-soft); color: #6a555b; }}
     .diagram-shell {{ margin: 24px 0; padding: 18px; overflow-x: auto; border: 1px solid #d8d0e0; border-radius: 16px; background: linear-gradient(180deg, #fffdfb, var(--sage-soft)); }}
+    .figure-gallery {{ max-width: 1120px; margin: 0 auto 24px; padding: 28px; border: 1px solid var(--line); border-radius: 23px; background: var(--paper); box-shadow: var(--shadow); }}
+    .figure-gallery-head h2 {{ margin: 0 0 8px; color: #554760; font-family: Georgia, serif; }}
+    .figure-gallery-head p {{ margin: 0 0 20px; color: var(--muted); }}
+    .figure-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }}
+    .source-figure {{ margin: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: #fff; }}
+    .source-figure img {{ display: block; width: 100%; max-height: 260px; object-fit: contain; background: #f7f4f8; }}
+    .source-figure figcaption {{ display: block; padding: 12px; color: #554760; }}
+    .source-figure figcaption small {{ display: block; margin-top: 4px; color: var(--muted); }}
     .diagram-label {{ margin-bottom: 12px; color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }}
     .flow-svg {{ display: block; width: 100%; min-width: 620px; height: auto; }}
     .mermaid-source {{ margin-top: 12px; text-align: left; }}
@@ -339,6 +378,7 @@ def render_html_report(
         </div>
       </header>
       <section class="stats">{_stat_cards(review, audit)}</section>
+      {figure_gallery}
       {articles}
     </main>
   </div>

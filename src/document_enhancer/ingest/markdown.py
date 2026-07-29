@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 from typing import Any, Literal
+from urllib.parse import unquote, urlsplit
 
 from .common import (
     DEFAULT_MAX_SOURCE_BYTES,
@@ -16,7 +17,7 @@ from .common import (
     sha256_bytes,
     span_id,
 )
-from .models import ExtractionWarning, RawBlock, RawDocument, SourceLocation
+from .models import EmbeddedAsset, ExtractionWarning, RawBlock, RawDocument, SourceLocation
 
 _HEADING_RE = re.compile(r"^(#{1,6})(?:[ \t]+|$)(.*?)[ \t]*#*[ \t]*$")
 _FENCE_RE = re.compile(r"^[ \t]{0,3}(`{3,}|~{3,})([^`]*)$")
@@ -398,7 +399,7 @@ class MarkdownParser:
     def parse(self, source: Path) -> RawDocument:
         data = read_source(source, max_bytes=self.max_source_bytes)
         text, _ = decode_utf8(data)
-        return _raw_document(
+        raw = _raw_document(
             source=source,
             data=data,
             text=text,
@@ -406,6 +407,7 @@ class MarkdownParser:
             parser_name="markdown",
             headings=True,
         )
+        return _materialize_local_images(raw, max_bytes=self.max_source_bytes)
 
 
 class TextParser:
@@ -425,6 +427,84 @@ class TextParser:
         return _raw_document(
             source=source, data=data, text=text, kind="text", parser_name="text", headings=False
         )
+
+
+def _materialize_local_images(raw: RawDocument, *, max_bytes: int) -> RawDocument:
+    """Resolve passive Markdown image references beneath the source directory only."""
+
+    source_root = raw.source_path.parent.resolve()
+    assets: list[EmbeddedAsset] = []
+    warnings = list(raw.warnings)
+    for asset in raw.assets:
+        if asset.kind != "figure" or not asset.target:
+            assets.append(asset)
+            continue
+        parsed = urlsplit(asset.target)
+        if parsed.scheme or parsed.netloc:
+            assets.append(asset.model_copy(update={"safety": "unresolved"}))
+            warnings.append(
+                ExtractionWarning(
+                    code="external_image_not_fetched",
+                    message="External Markdown image was inventoried but not fetched.",
+                    severity="warning",
+                    location=asset.location,
+                )
+            )
+            continue
+        candidate = (source_root / unquote(parsed.path)).resolve()
+        if candidate == source_root or source_root not in candidate.parents:
+            assets.append(asset.model_copy(update={"safety": "unsafe"}))
+            warnings.append(
+                ExtractionWarning(
+                    code="unsafe_image_target",
+                    message="Markdown image path escapes the source directory and was not read.",
+                    severity="error",
+                    location=asset.location,
+                )
+            )
+            continue
+        try:
+            if not candidate.is_file() or candidate.stat().st_size > max_bytes:
+                raise OSError
+            payload = candidate.read_bytes()
+        except OSError:
+            assets.append(asset.model_copy(update={"safety": "unresolved"}))
+            warnings.append(
+                ExtractionWarning(
+                    code="local_image_unavailable",
+                    message="Local Markdown image could not be read within the configured limit.",
+                    severity="warning",
+                    location=asset.location,
+                )
+            )
+            continue
+        media_type = media_type_for(candidate)
+        if media_type not in {"image/png", "image/jpeg"}:
+            assets.append(asset.model_copy(update={"safety": "unsupported"}))
+            warnings.append(
+                ExtractionWarning(
+                    code="unsupported_image_format",
+                    message="Only PNG and JPEG source figures can be carried into the final appendix.",
+                    severity="warning",
+                    location=asset.location,
+                )
+            )
+            continue
+        digest = sha256_bytes(payload)
+        assets.append(
+            asset.model_copy(
+                update={
+                    "asset_id": f"asset-{digest[:20]}",
+                    "name": candidate.name,
+                    "media_type": media_type,
+                    "digest": digest,
+                    "size_bytes": len(payload),
+                    "payload": payload,
+                    "metadata": {**asset.metadata, "resolved_local": True},
+                }
+            )
+        )
+    return raw.model_copy(update={"assets": tuple(assets), "warnings": tuple(warnings)})
 
 
 def parse_markdown_text(text: str, *, source_name: str = "<memory>") -> RawDocument:
