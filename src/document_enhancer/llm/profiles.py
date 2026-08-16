@@ -118,6 +118,8 @@ STAGE_ROUTES: Final[dict[str, str]] = {
     "structure": ROUTE_FLASH_LITE,
     "structure_scan": ROUTE_FLASH_LITE,
     "structure_recovery": ROUTE_FLASH_LITE,
+    "visual": ROUTE_FLASH_LITE,
+    "multimodal": ROUTE_FLASH_LITE,
     "terminology": ROUTE_FLASH_LITE,
     "questions": ROUTE_FLASH_LITE,
     "analysis": ROUTE_FLASH,

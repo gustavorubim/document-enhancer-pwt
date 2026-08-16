@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import importlib
 import json
 import os
@@ -349,6 +350,29 @@ def _extract_parsed(response: object) -> object:
     raise StructuredOutputError("provider returned no structured object")
 
 
+def _request_digest(request: object) -> str:
+    """Digest text or bounded multimodal content without retaining its payload."""
+
+    if isinstance(request, str):
+        return digest_bytes(request.encode("utf-8"))
+    return digest_json(request)
+
+
+def _content_with_prompt(
+    content: Sequence[Mapping[str, object]] | None, prompt: str
+) -> list[dict[str, object]] | None:
+    """Replace the text part of a multimodal request for a bounded repair attempt."""
+
+    if content is None:
+        return None
+    result = [dict(part) for part in content]
+    for index, part in enumerate(result):
+        if part.get("type") == "text":
+            result[index] = {**part, "text": prompt}
+            return result
+    return [{"type": "text", "text": prompt}, *result]
+
+
 def _factory_model(
     factory: Callable[..., Any], route: GeminiRoute, config: GeminiGatewayConfig
 ) -> Any:
@@ -531,6 +555,7 @@ class GeminiModelGateway:
         output_token_budget: int | None = None,
         promote: Callable[[ArtifactT], ResultT] | None = None,
         result_schema: type[ResultT] | None = None,
+        _request_content: Sequence[Mapping[str, object]] | None = None,
     ) -> StructuredCall[ArtifactT] | StructuredCall[ResultT]:
         resolved = resolve_route(route)
         if (input_token_budget is None) != (output_token_budget is None):
@@ -637,6 +662,7 @@ class GeminiModelGateway:
                 started=started,
                 token_budget=call_token_budget,
                 output_budget=call_output_budget,
+                request_content=_request_content,
             )
         except ProviderError as exc:
             if resolved.route_id != ROUTE_PRO_PREVIEW or not self.config.allow_pro_fallback:
@@ -664,6 +690,7 @@ class GeminiModelGateway:
                 fallback_reason=_error_text(exc),
                 token_budget=call_token_budget,
                 output_budget=call_output_budget,
+                request_content=_request_content,
             )
             result.manifest.status = CallStatus.FALLBACK
             if self._cache is not None:
@@ -703,6 +730,69 @@ class GeminiModelGateway:
             input_digests=input_digests,
         ).artifact
 
+    def invoke_multimodal(
+        self,
+        *,
+        route: str,
+        schema: type[ArtifactT],
+        prompt: str,
+        image_bytes: bytes | bytearray,
+        media_type: str,
+        stage: str | None = None,
+        prompt_id: str | None = None,
+        prompt_version: str | None = None,
+        prompt_digest: str | None = None,
+        input_digests: Sequence[str] = (),
+        use_cache: bool = True,
+        input_token_budget: int | None = None,
+        output_token_budget: int | None = None,
+    ) -> StructuredCall[ArtifactT]:
+        """Invoke the existing structured gateway with one bounded inline image.
+
+        The image is sent as an inline media content block.  It is never written to a
+        manifest or cache record; its digest is included in ``input_digests`` instead.
+        """
+
+        if media_type not in {"image/png", "image/jpeg"}:
+            raise ValueError("multimodal input media_type must be image/png or image/jpeg")
+        payload = bytes(image_bytes)
+        if not payload:
+            raise ValueError("multimodal input image_bytes must not be empty")
+        if len(payload) > 4_000_000:
+            raise ValueError("multimodal input image_bytes exceeds the 4000000-byte gateway limit")
+        image_digest = digest_bytes(payload)
+        request_content: tuple[Mapping[str, object], ...] = (
+            {"type": "text", "text": prompt},
+            {
+                "type": "media",
+                "mime_type": media_type,
+                "data": base64.b64encode(payload).decode("ascii"),
+            },
+        )
+        dependencies = tuple(input_digests)
+        if image_digest not in dependencies:
+            dependencies = (*dependencies, image_digest)
+        result = self.invoke(
+            route=route,
+            schema=schema,
+            prompt=prompt,
+            stage=stage,
+            prompt_id=prompt_id,
+            prompt_version=prompt_version,
+            prompt_digest=prompt_digest,
+            input_digests=dependencies,
+            use_cache=use_cache,
+            input_token_budget=input_token_budget,
+            output_token_budget=output_token_budget,
+            _request_content=request_content,
+        )
+        return cast(StructuredCall[ArtifactT], result)
+
+    def structured_multimodal(self, **kwargs: Any) -> Any:
+        """Return only the validated artifact from :meth:`invoke_multimodal`."""
+
+        return self.invoke_multimodal(**kwargs).artifact
+
     def _invoke_route(
         self,
         *,
@@ -725,6 +815,7 @@ class GeminiModelGateway:
         output_budget: int,
         fallback_from: str | None = None,
         fallback_reason: str | None = None,
+        request_content: Sequence[Mapping[str, object]] | None = None,
     ) -> StructuredCall[ArtifactT] | StructuredCall[ResultT]:
         repairs = 0
         provider_retries = 0
@@ -746,8 +837,9 @@ class GeminiModelGateway:
                     include_raw=True,
                 )
                 callback = UsageCallbackHandler()
+                request = _content_with_prompt(request_content, attempt_prompt)
                 response = native_model.invoke(
-                    attempt_prompt,
+                    request if request is not None else attempt_prompt,
                     config={
                         "callbacks": [callback],
                         "metadata": {
@@ -1047,8 +1139,8 @@ class FakeStructuredModel:
         parent = self
 
         class Runnable:
-            def invoke(self, prompt: str, **__: Any) -> dict[str, object]:
-                digest = digest_bytes(prompt.encode())
+            def invoke(self, prompt: object, **__: Any) -> dict[str, object]:
+                digest = _request_digest(prompt)
                 parent.calls.append({"route": parent._route_id, "prompt_digest": digest})
                 if isinstance(parent._responses, dict):
                     values = parent._responses.get(parent._route_id, [])
@@ -1079,8 +1171,8 @@ class RecordedStructuredModel(FakeStructuredModel):
         base = super().with_structured_output(schema, **kwargs)
 
         class Runnable:
-            def invoke(self, prompt: str, **call_kwargs: Any) -> dict[str, object]:
-                digest = digest_bytes(prompt.encode())
+            def invoke(self, prompt: object, **call_kwargs: Any) -> dict[str, object]:
+                digest = _request_digest(prompt)
                 if digest in parent._recorded:
                     parent.calls.append({"route": parent._route_id, "prompt_digest": digest})
                     return {"parsed": parent._recorded[digest], "raw": {"recorded": True}}
