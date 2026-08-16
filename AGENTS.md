@@ -98,13 +98,27 @@ Prefer `PYTHONPATH=src` when diagnosing install/import issues. Recreate `.venv` 
 install is polluted. Run opt-in live-provider checks only when the increment requires them and
 credentials are explicitly available.
 
+## README maintenance
+
+- Update `README.md` after every completed implementation task before declaring the task closed.
+- Keep the README synchronized with the implementation, including supported commands, operator
+  workflow, phase transitions, artifact paths, module ownership, model/agent boundaries, and
+  safety or retrieval boundaries.
+- When control flow, module responsibilities, provider behavior, agent tools, or the run/catalog
+  lifecycle changes, update the corresponding Mermaid diagram in the same task.
+- Verify edited Mermaid blocks and local README links as part of task verification. Do not leave a
+  diagram that describes a planned or historical architecture as if it were the current code.
+- Workers that do not own the root `README.md` must return the exact documentation delta and
+  implementation evidence to the integrator; the integrator owns applying it before closure.
+
 ## Increment closure
 
 After an increment passes its acceptance criteria, the integrator must:
 
 1. Merge the verified implementation.
 2. Update `SIMPLIFICATION_PLAN.md` / `plan.md` with evidence-backed status when the contract changed.
-3. Update `README.md` when the supported product surface or user workflow changed.
+3. Update `README.md` for the completed implementation, including any affected diagrams. README
+   synchronization is mandatory, not conditional on whether the public command surface changed.
 4. Record remaining non-blocking work in `FOLLOW_UP.md`.
 5. Archive or close completed threads and remove completed worktrees when safe.
 6. Push the integrated branch when a remote is configured and pushing is in scope.
