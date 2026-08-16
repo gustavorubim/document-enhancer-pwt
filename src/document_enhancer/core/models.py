@@ -7,16 +7,31 @@ digests needed to resume or audit a run.
 
 from __future__ import annotations
 
+import re
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 RunStatus = Literal["created", "running", "waiting", "succeeded", "failed"]
 PhaseName = Literal["extract", "analyze", "human_review", "rewrite", "verify"]
 Severity = Literal["info", "warning", "error", "blocker"]
 FindingScope = Literal["macro", "section", "flow", "rewrite", "verify"]
 AssessmentStatus = Literal["correct", "missing", "improve"]
+SuggestionBasis = Literal["source_supported", "recipe_guidance", "none"]
+
+_UNSAFE_RECIPE_GUIDANCE_RE = re.compile(
+    r"(?:"
+    r"\b(?:zero|one|two|three|four|five|six|seven|eight|nine|ten)\s+"
+    r"(?:seconds?|minutes?|hours?|days?|weeks?|months?|years?|percent)\b"
+    r"|\b\d{4}[-/]\d{1,2}(?:[-/]\d{1,2})?\b"
+    r"|\b(?:threshold|limit|deadline|value|duration|period|retention(?:\s+period)?)"
+    r"\s*(?:is|=|:|of|to)\s*(?:\d+(?:\.\d+)?|zero|one|two|three|four|five|six|seven|eight|nine|ten)\b"
+    r"|\b(?:owner|approver|responsible(?:\s+party)?|system)\s*(?:is|=|:)\s*\S+"
+    r")",
+    re.IGNORECASE,
+)
 
 
 def utc_now() -> datetime:
@@ -111,13 +126,84 @@ class SectionAssessment(StrictModel):
 
 
 class Question(StrictModel):
+    """A human-review question with whole-document evidence and safe guidance.
+
+    ``suggestion_basis`` is deliberately explicit.  A suggestion without a declared
+    basis is dropped during validation, which keeps legacy/provider payloads from
+    silently promoting unsupported business values.
+    """
+
     question_id: str = Field(min_length=1)
     prompt: str = Field(min_length=1)
     reason: str = Field(min_length=1)
+    context: str = ""
+    evidence_span_ids: list[str] = Field(default_factory=list)
+    figure_ids: list[str] = Field(default_factory=list)
     blocking: bool = True
     section_id: str | None = None
     suggestion: str | None = None
+    suggestion_basis: SuggestionBasis = "none"
     answer: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalise_figure_evidence_alias(cls, value: object) -> object:
+        """Accept the descriptive alias used by provider/enrichment callers."""
+
+        if not isinstance(value, Mapping):
+            return value
+        payload = dict(value)
+        alias = payload.pop("evidence_figure_ids", None)
+        if alias is not None:
+            existing = payload.get("figure_ids")
+            if existing is not None and list(existing) != list(alias):
+                raise ValueError("figure_ids and evidence_figure_ids must agree")
+            payload["figure_ids"] = alias
+        # Older callers could provide a suggestion without a safety basis.  Keep
+        # the contract compatible while failing closed: the unclassified text is
+        # absent rather than being treated as an approved recommendation.
+        if (
+            payload.get("suggestion") is not None
+            and payload.get("suggestion_basis", "none") == "none"
+        ):
+            payload["suggestion"] = None
+        return payload
+
+    @model_validator(mode="after")
+    def _validate_suggestion_safety(self) -> Question:
+        suggestion = self.suggestion.strip() if self.suggestion is not None else None
+        if suggestion == "":
+            raise ValueError("suggestion must be non-empty when supplied")
+        if suggestion is None:
+            if self.suggestion_basis != "none":
+                raise ValueError("suggestion_basis must be 'none' when suggestion is absent")
+            return self
+        if self.suggestion_basis == "none":
+            raise ValueError("a suggestion requires source_supported or recipe_guidance basis")
+        if self.suggestion_basis == "source_supported" and not (
+            self.evidence_span_ids or self.figure_ids
+        ):
+            object.__setattr__(self, "suggestion", None)
+            object.__setattr__(self, "suggestion_basis", "none")
+            return self
+        if self.suggestion_basis == "recipe_guidance" and _UNSAFE_RECIPE_GUIDANCE_RE.search(
+            suggestion
+        ):
+            # Recipe guidance may explain a safe review process, but it may not
+            # supply a business value.  This also protects provider-enriched
+            # questions that arrive without source text available to this model.
+            object.__setattr__(self, "suggestion", None)
+            object.__setattr__(self, "suggestion_basis", "none")
+            return self
+        if suggestion != self.suggestion:
+            object.__setattr__(self, "suggestion", suggestion)
+        return self
+
+    @property
+    def evidence_figure_ids(self) -> list[str]:
+        """Compatibility/readability alias for figure evidence references."""
+
+        return self.figure_ids
 
 
 class FlowNode(StrictModel):

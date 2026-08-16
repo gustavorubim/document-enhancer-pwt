@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import Any, Literal
 
 from .models import (
@@ -20,6 +21,7 @@ from .models import (
     ReviewReport,
     Section,
     SectionAssessment,
+    SourceFigure,
     SourceSpan,
 )
 from .recipes import Recipe
@@ -36,6 +38,104 @@ _TITLE_ALIASES = {
     "inputs and entry criteria": {"preconditions triggers and inputs"},
     "related requirements policies standards and documents": {"appendix a source inventory"},
 }
+_NUMBER_WORDS = (
+    "zero",
+    "one",
+    "two",
+    "three",
+    "four",
+    "five",
+    "six",
+    "seven",
+    "eight",
+    "nine",
+    "ten",
+)
+_VALUE_RE = re.compile(
+    r"(?:"
+    rf"\b(?:\d+(?:\.\d+)?|{'|'.join(_NUMBER_WORDS)})\s*"
+    r"(?:seconds?|minutes?|hours?|days?|weeks?|months?|years?|percent|%)\b"
+    r"|\b\d{4}[-/]\d{1,2}(?:[-/]\d{1,2})?\b"
+    r")",
+    re.IGNORECASE,
+)
+_CONFLICT_MARKER_RE = re.compile(
+    r"\b(?:conflict(?:s|ing|ed)?|contradict(?:s|ory|ed|ion)?|inconsisten(?:t|cy)|"
+    r"discrepanc(?:y|ies)|versus|vs\.?|instead of|rather than|"
+    r"(?:says|states|specifies|requires).{0,80}(?:but|while|whereas))\b",
+    re.IGNORECASE,
+)
+_AUTHORITY_AFTER_RE = re.compile(
+    r"\b(?:approved|approves|approval|approver|owner|responsible|authority|authoritative)\b"
+    r"\s+(?:by|is|=|:)\s+(?P<actor>[A-Za-z][A-Za-z0-9 &/_-]{1,50}?)(?=[.;,]|$|\band\b|\bbut\b)",
+    re.IGNORECASE,
+)
+_AUTHORITY_BEFORE_RE = re.compile(
+    r"\b(?P<actor>[A-Za-z][A-Za-z0-9 &/_-]{1,40}?)\s+"
+    r"(?:approves|owns|is responsible for)\b",
+    re.IGNORECASE,
+)
+_CONTEXT_STOPWORDS = frozenset(
+    {
+        "a",
+        "an",
+        "and",
+        "are",
+        "be",
+        "by",
+        "for",
+        "from",
+        "in",
+        "is",
+        "it",
+        "of",
+        "on",
+        "or",
+        "that",
+        "the",
+        "this",
+        "to",
+        "with",
+    }
+)
+_CONTEXT_CUES = frozenset(
+    {
+        "approve",
+        "approval",
+        "authoritative",
+        "complete",
+        "deadline",
+        "duration",
+        "limit",
+        "must",
+        "owner",
+        "period",
+        "process",
+        "record",
+        "retain",
+        "retention",
+        "responsible",
+        "review",
+        "required",
+        "requirement",
+        "service",
+        "sla",
+        "threshold",
+        "within",
+        "authority",
+    }
+)
+
+
+@dataclass(frozen=True)
+class _ConflictClaim:
+    """A bounded, source-backed value claim used to consolidate contradictions."""
+
+    span_id: str
+    section_id: str | None
+    value: str
+    context_tokens: frozenset[str]
+    excerpt: str
 
 
 def normalise_title(value: str) -> str:
@@ -65,6 +165,147 @@ def evidence_for_offset(blocks: tuple[Any, ...], offset: int) -> list[str]:
         if start <= offset <= end:
             return [block.span_id]
     return []
+
+
+def _section_for_span(sections: list[Section], span_id: str) -> Section | None:
+    return next((section for section in sections if span_id in section.span_ids), None)
+
+
+def _figure_ids_for_evidence(
+    figures: list[SourceFigure] | None,
+    *,
+    span_ids: list[str] | tuple[str, ...] = (),
+    section_ids: set[str] | frozenset[str] = frozenset(),
+) -> list[str]:
+    """Return stable figure IDs linked to cited spans or sections."""
+
+    if not figures:
+        return []
+    spans = set(span_ids)
+    result: list[str] = []
+    for figure in figures:
+        if any(
+            occurrence.source_span_id in spans or occurrence.section_id in section_ids
+            for occurrence in figure.occurrences
+        ):
+            result.append(figure.figure_id)
+    return result
+
+
+def _question_context(
+    *,
+    sections: list[Section],
+    evidence_span_ids: list[str],
+    summary: str,
+    figures: list[SourceFigure] | None = None,
+) -> str:
+    """Build a concise whole-document context line without adding source facts."""
+
+    titles = [
+        section.title
+        for section in sections
+        if any(span_id in section.span_ids for span_id in evidence_span_ids)
+    ]
+    # Keep order stable and avoid repeating a section when several spans point to it.
+    unique_titles = list(dict.fromkeys(titles))
+    section_text = ", ".join(unique_titles) if unique_titles else "the document as a whole"
+    figure_ids = _figure_ids_for_evidence(figures, span_ids=evidence_span_ids)
+    figure_text = f" Related figures: {', '.join(figure_ids)}." if figure_ids else ""
+    evidence_text = (
+        f" Evidence spans: {', '.join(evidence_span_ids)}."
+        if evidence_span_ids
+        else " No direct source-span evidence was available."
+    )
+    return f"Whole-document context: {summary} Relevant sections: {section_text}.{evidence_text}{figure_text}"
+
+
+def _context_tokens_without_span(text: str, start: int, end: int) -> frozenset[str]:
+    without_value = f"{text[:start]} {text[end:]}"
+    tokens = re.findall(r"[a-z][a-z0-9-]{2,}", without_value.lower())
+    return frozenset(
+        token for token in tokens if token not in _CONTEXT_STOPWORDS and not token.isdigit()
+    )
+
+
+def _claim_context_tokens(text: str, match: re.Match[str]) -> frozenset[str]:
+    return _context_tokens_without_span(text, match.start(), match.end())
+
+
+def _find_contextual_conflicts(
+    *,
+    blocks: tuple[Any, ...],
+    sections: list[Section],
+) -> list[_ConflictClaim]:
+    """Find cross-section contradictory claims without resolving their values."""
+
+    claims: list[_ConflictClaim] = []
+    explicit_markers: list[_ConflictClaim] = []
+    for block in blocks:
+        text = str(getattr(block, "text", "")).strip()
+        if not text or getattr(block, "block_type", "") in {"heading", "figure"}:
+            continue
+        section = _section_for_span(sections, str(block.span_id))
+        section_id = section.section_id if section else None
+        excerpt = " ".join(text.split())[:220]
+        matches = list(_VALUE_RE.finditer(text))
+        for match in matches:
+            claims.append(
+                _ConflictClaim(
+                    span_id=str(block.span_id),
+                    section_id=section_id,
+                    value=match.group(0).lower().replace(" ", ""),
+                    context_tokens=_claim_context_tokens(text, match),
+                    excerpt=excerpt,
+                )
+            )
+        for authority_match in (
+            *_AUTHORITY_AFTER_RE.finditer(text),
+            *_AUTHORITY_BEFORE_RE.finditer(text),
+        ):
+            actor = str(authority_match.group("actor")).strip().lower()
+            if not actor or actor in {"required", "the request", "the review"}:
+                continue
+            claims.append(
+                _ConflictClaim(
+                    span_id=str(block.span_id),
+                    section_id=section_id,
+                    value=actor,
+                    context_tokens=_context_tokens_without_span(
+                        text, authority_match.start("actor"), authority_match.end("actor")
+                    ),
+                    excerpt=excerpt,
+                )
+            )
+        if _CONFLICT_MARKER_RE.search(text):
+            explicit_markers.append(
+                _ConflictClaim(
+                    span_id=str(block.span_id),
+                    section_id=section_id,
+                    value="explicit-conflict-marker",
+                    context_tokens=frozenset(),
+                    excerpt=excerpt,
+                )
+            )
+
+    conflicting: list[_ConflictClaim] = list(explicit_markers)
+    for index, left in enumerate(claims):
+        for right in claims[index + 1 :]:
+            if left.section_id == right.section_id or left.value == right.value:
+                continue
+            shared = left.context_tokens & right.context_tokens
+            if len(shared) < 2 and not (shared & _CONTEXT_CUES):
+                continue
+            conflicting.extend((left, right))
+
+    unique: list[_ConflictClaim] = []
+    seen: set[tuple[str, str]] = set()
+    for claim in conflicting:
+        key = (claim.span_id, claim.value)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(claim)
+    return unique
 
 
 def bounded_batches(items: list[Section], *, size: int) -> list[list[Section]]:
@@ -127,6 +368,7 @@ def build_review(
     source_spans: list[SourceSpan],
     sections: list[Section],
     recipe: Recipe | None,
+    figures: list[SourceFigure] | None = None,
 ) -> ReviewReport:
     """Build macro, section, flow, rubric, and question views in one bundle."""
 
@@ -136,6 +378,7 @@ def build_review(
     questions: list[Question] = []
     assessments: list[SectionAssessment] = []
     rubric_ids: list[str] = []
+    figure_list = figures or []
     criteria_index = _criteria_by_id(recipe) if recipe else {}
     if recipe:
         rubric_ids = [
@@ -171,31 +414,73 @@ def build_review(
                     question_id=f"question-required-{requirement_id.lower()}",
                     prompt=f"Should the final document include the required section {heading!r}?",
                     reason="The selected recipe requires this section for a complete governed document.",
+                    context=(
+                        f"Whole-document context: the selected recipe requires {heading!r}, but no "
+                        "matching source section was found. The section cannot be populated from "
+                        "the current source without an explicit human decision."
+                    ),
                     suggestion=(
                         f"Include a clearly labeled {heading!r} section using only owner-approved, "
                         "source-backed content; if that evidence is unavailable, keep the gap "
                         "explicit or record a waiver instead of inventing detail."
                     ),
+                    suggestion_basis="recipe_guidance",
                 )
             )
-        if "conflicting draft statements" in source_text.lower():
-            questions.append(
-                Question(
-                    question_id="question-open-points-001",
-                    prompt=(
-                        "How should the final document handle the pilot-approval conflicts listed "
-                        "in the open-points section?"
-                    ),
-                    reason=(
-                        "The source explicitly identifies conflicting operational values that require "
-                        "owner steering rather than automatic resolution."
-                    ),
-                    suggestion=(
-                        "Choose one authoritative value for each conflict, identify the accountable "
-                        "owner, and preserve superseded values in the change explanation."
-                    ),
-                )
+    conflict_claims = _find_contextual_conflicts(blocks=blocks, sections=sections)
+    if conflict_claims:
+        conflict_span_ids = list(dict.fromkeys(item.span_id for item in conflict_claims))
+        conflict_section_ids = {
+            item.section_id for item in conflict_claims if item.section_id is not None
+        }
+        section_names = [
+            section.title for section in sections if section.section_id in conflict_section_ids
+        ]
+        claim_context = "; ".join(
+            f"{item.section_id or 'document'}: {item.excerpt}" for item in conflict_claims
+        )
+        question_context = _question_context(
+            sections=sections,
+            evidence_span_ids=conflict_span_ids,
+            summary=(
+                "the source contains potentially contradictory statements that must be resolved "
+                "as a document-level decision"
+            ),
+            figures=figure_list,
+        )
+        if section_names:
+            question_context += (
+                f" Contradictory sections: {', '.join(dict.fromkeys(section_names))}."
             )
+        if claim_context:
+            question_context += f" Cited claim excerpts: {claim_context}."
+        questions.append(
+            Question(
+                question_id="question-open-points-001",
+                prompt=(
+                    "Which source statement or value is authoritative where the document contains "
+                    "cross-section contradictions?"
+                ),
+                reason=(
+                    "The source contains conflicting or explicitly disputed guidance. Automatic "
+                    "resolution could silently choose an owner, date, threshold, approval, or "
+                    "other business value that the evidence does not establish."
+                ),
+                context=question_context,
+                evidence_span_ids=conflict_span_ids,
+                figure_ids=_figure_ids_for_evidence(
+                    figure_list,
+                    span_ids=conflict_span_ids,
+                    section_ids=conflict_section_ids,
+                ),
+                suggestion=(
+                    "Review the cited statements with the accountable document owner, select or "
+                    "reconcile the authoritative source, and record the decision without inferring "
+                    "a missing business value."
+                ),
+                suggestion_basis="recipe_guidance",
+            )
+        )
     if not any(block.block_type == "heading" for block in blocks):
         findings.append(
             Finding(
@@ -218,13 +503,31 @@ def build_review(
                 question_id="question-structure-001",
                 prompt="What are the intended major sections for this document?",
                 reason="A section map is required for section-by-section review and graph export.",
+                context=_question_context(
+                    sections=sections,
+                    evidence_span_ids=[item.span_id for item in source_spans[:3]],
+                    summary=(
+                        "no explicit heading spans were found, so the source is currently treated "
+                        "as one implicit document section"
+                    ),
+                    figures=figure_list,
+                ),
+                evidence_span_ids=[item.span_id for item in source_spans[:3]],
+                figure_ids=_figure_ids_for_evidence(
+                    figure_list, span_ids=[item.span_id for item in source_spans[:3]]
+                ),
                 suggestion=(
                     "Use a small hierarchy of purpose, scope, responsibilities, process steps, "
                     "controls, exceptions, and records where those concepts are supported."
                 ),
+                suggestion_basis="recipe_guidance",
             )
         )
     for match_index, match in enumerate(_PLACEHOLDER_RE.finditer(source_text), start=1):
+        evidence_span_ids = evidence_for_offset(blocks, match.start())
+        evidence_section = (
+            _section_for_span(sections, evidence_span_ids[0]) if evidence_span_ids else None
+        )
         findings.append(
             Finding(
                 finding_id=f"finding-placeholder-{match_index:03d}",
@@ -233,7 +536,7 @@ def build_review(
                 title="Unresolved placeholder",
                 detail=f"The source contains the unresolved marker {match.group(0)!r}.",
                 rubric_id="completeness.no_placeholders",
-                evidence_span_ids=evidence_for_offset(blocks, match.start()),
+                evidence_span_ids=evidence_span_ids,
                 recommendation="Answer the corresponding reviewer question before rewrite.",
                 disposition="missing",
             )
@@ -243,6 +546,19 @@ def build_review(
                 question_id=f"question-placeholder-{match_index:03d}",
                 prompt=f"What should replace {match.group(0)!r}?",
                 reason="The placeholder would otherwise be promoted into the final document.",
+                context=_question_context(
+                    sections=sections,
+                    evidence_span_ids=evidence_span_ids,
+                    summary=(
+                        f"an unresolved marker appears in {evidence_section.title!r}"
+                        if evidence_section
+                        else "an unresolved marker appears in the source"
+                    ),
+                    figures=figure_list,
+                ),
+                evidence_span_ids=evidence_span_ids,
+                figure_ids=_figure_ids_for_evidence(figure_list, span_ids=evidence_span_ids),
+                section_id=evidence_section.section_id if evidence_section else None,
             )
         )
 
@@ -285,6 +601,7 @@ def build_review(
                     )
                 )
                 if hard_blocker:
+                    evidence_span_ids = section.span_ids[:3]
                     questions.append(
                         Question(
                             question_id=(
@@ -295,11 +612,25 @@ def build_review(
                                 f"{section.title!r}?"
                             ),
                             reason="The selected rubric marks this criterion as a hard blocker.",
+                            context=_question_context(
+                                sections=sections,
+                                evidence_span_ids=evidence_span_ids,
+                                summary=(
+                                    f"{section.title!r} is present, but the mapped hard-blocking "
+                                    f"criterion {criterion_id} is not supported by its source text"
+                                ),
+                                figures=figure_list,
+                            ),
+                            evidence_span_ids=evidence_span_ids,
+                            figure_ids=_figure_ids_for_evidence(
+                                figure_list, span_ids=evidence_span_ids
+                            ),
                             section_id=section.section_id,
                             suggestion=(
                                 f"Add owner-approved evidence for {criterion_id} to {section.title!r}, "
                                 "or reject this suggestion and explain why the criterion does not apply."
                             ),
+                            suggestion_basis="recipe_guidance",
                         )
                     )
         if recipe and requirement and not criterion_ids:
@@ -879,12 +1210,20 @@ def render_questions_markdown(review: ReviewReport) -> str:
                 f"- Question ID: `{question.question_id}`",
                 f"- Blocking: {'yes' if question.blocking else 'no'}",
                 f"- Section: `{question.section_id or 'document'}`",
+                f"- Evidence spans: {', '.join(question.evidence_span_ids) or 'none'}",
+                f"- Evidence figures: {', '.join(question.figure_ids) or 'none'}",
+                "",
+                "### Whole-document context",
+                "",
+                question.context or "No additional generated context was recorded.",
                 "",
                 "### Why this needs a human decision",
                 "",
                 question.reason,
                 "",
                 "### Suggested approach",
+                "",
+                f"Suggestion basis: `{question.suggestion_basis}`",
                 "",
                 question.suggestion
                 or "No safe suggestion is available. Supply an accountable, source-backed answer.",
@@ -1156,6 +1495,7 @@ def merge_provider_review(
     candidate: ReviewReport,
     *,
     allowed_span_ids: set[str],
+    allowed_figure_ids: set[str] | None = None,
 ) -> ReviewReport:
     """Promote provider judgments only after deterministic evidence filtering."""
 
@@ -1173,10 +1513,49 @@ def merge_provider_review(
         findings.append(finding)
     seen_questions = {item.question_id for item in base.questions}
     questions = list(base.questions)
-    for question in candidate.questions:
-        question = question.model_copy(
-            update={"question_id": _unique_provider_id(question.question_id, seen_questions)}
+    known_section_ids = {item.section_id for item in base.sections}
+    known_figure_ids = set(allowed_figure_ids or ())
+    for raw_question in candidate.questions:
+        evidence_span_ids = [
+            item for item in raw_question.evidence_span_ids if item in allowed_span_ids
+        ]
+        figure_ids = [item for item in raw_question.figure_ids if item in known_figure_ids]
+        # A provider may omit evidence for a recipe-only gap, but it may not
+        # retain references that fail the deterministic source catalog.
+        if raw_question.evidence_span_ids and not evidence_span_ids and not figure_ids:
+            continue
+        if raw_question.figure_ids and not figure_ids and not evidence_span_ids:
+            continue
+        section_id = (
+            raw_question.section_id if raw_question.section_id in known_section_ids else None
         )
+        suggestion = raw_question.suggestion
+        suggestion_basis = raw_question.suggestion_basis
+        if suggestion_basis == "source_supported" and not (evidence_span_ids or figure_ids):
+            suggestion = None
+            suggestion_basis = "none"
+        context = raw_question.context or (
+            "Whole-document context: provider enrichment raised this question for "
+            f"{next((item.title for item in base.sections if item.section_id == section_id), 'the document')!r}. "
+            "Review the complete source and the cited evidence before answering."
+        )
+        try:
+            question = Question.model_validate(
+                raw_question.model_dump(mode="python")
+                | {
+                    "question_id": _unique_provider_id(raw_question.question_id, seen_questions),
+                    "section_id": section_id,
+                    "context": context,
+                    "evidence_span_ids": list(dict.fromkeys(evidence_span_ids)),
+                    "figure_ids": list(dict.fromkeys(figure_ids)),
+                    "suggestion": suggestion,
+                    "suggestion_basis": suggestion_basis,
+                }
+            )
+        except Exception:
+            # Provider payloads are untrusted.  One malformed question must not
+            # make the deterministic review unavailable or bypass the gate.
+            continue
         seen_questions.add(question.question_id)
         questions.append(question)
     section_ids = {item.section_id for item in base.sections}
