@@ -19,6 +19,218 @@ retrieval system, prompt-pack runtime, or compatibility mode is required on the 
    body and the source-screenshot appendix in the final Markdown and DOCX.
 8. Use the portable semantic, ontology, and graph exports later for GraphRAG, RAG, or ontology.
 
+## How the repository is implemented
+
+Document Enhancer is one Python package with two deliberately separated runtimes:
+
+1. The **authoring runtime** turns one source into a file-backed run bundle through a controlled
+   five-phase state machine. It is always available and has no retrieval dependency.
+2. The **optional retrieval runtime** indexes explicitly selected, passing sealed bundles. It adds
+   LangChain, FAISS, Gemini embeddings, and a read-only question-answering agent without changing
+   the authoring path.
+
+The Typer CLI composes dependencies at the boundary. `CoreRunner` owns authoring transitions,
+`RunStore` owns atomic artifact persistence, Pydantic models own the durable contracts, and the
+reference pack supplies the rubric, template, terminology, and allowed graph vocabulary.
+
+### System architecture
+
+```mermaid
+flowchart LR
+    operator["Operator or automation"] --> cli["Typer CLI<br/>src/document_enhancer/cli.py"]
+    source["One MD, TXT, DOCX, or PDF"] --> ingest["Parser registry and normalization<br/>ingest/"]
+    pack["Validated reference pack<br/>reference_packs/enterprise_core/"] --> recipe["Compiled Recipe<br/>core/recipes.py"]
+    cli --> runner["CoreRunner<br/>core/runner.py"]
+    ingest --> runner
+    recipe --> runner
+    runner --> store["RunStore<br/>atomic named artifacts"]
+    runner -. "live mode only" .-> providers["Typed structure, review,<br/>rewrite, and audit providers"]
+    providers --> gateway["GeminiModelGateway<br/>budgets, repair, cache, call manifests"]
+    store --> bundle["Run bundle<br/>reviewed, audited, optionally sealed"]
+    bundle -. "explicit rag index" .-> catalog["Local RAG catalog<br/>SQLite FTS5 + FAISS + graph"]
+    catalog --> rag["Read-only retrieval agent<br/>validated citations or insufficient"]
+```
+
+The solid path is the authoring critical path. The dashed integrations are opt-in. A normal import,
+offline run, or sealed-bundle audit does not import the optional retrieval stack. Live model output
+is always treated as a typed candidate: deterministic application checks decide whether recovered
+structure, findings, rewritten text, and audit results can be promoted.
+
+### Repository map
+
+```mermaid
+flowchart TD
+    root["document-enhancer/"] --> package["src/document_enhancer/"]
+    package --> cliFile["cli.py<br/>commands and dependency composition"]
+    package --> core["core/<br/>runner, contracts, review, rewrite, audit, export, store"]
+    package --> ingestDir["ingest/<br/>format parsers, spans, assets, normalization, structure routing"]
+    package --> refs["references/<br/>safe reference-pack loading and validation"]
+    package --> llm["llm/<br/>Gemini routes, structured gateway, cache, usage manifests"]
+    package --> retrieval["retrieval/<br/>sealed corpus, chunks, catalog, agent, evaluation, graph HTML"]
+
+    root --> packs["reference_packs/enterprise_core/<br/>rubrics, templates, context, ontology"]
+    root --> tests["tests/<br/>unit, integration-style, and end-to-end gates"]
+    root --> fixtures["fixtures/<br/>synthetic ingest, document corpus, and RAG evidence"]
+    root --> scripts["scripts/<br/>core gate, reference-pack verification, RAG evaluation"]
+    root --> docs["docs/<br/>reference-pack authoring documentation"]
+    root --> examples["examples/cookbook/<br/>two-stage operator example"]
+```
+
+| Area | Primary implementation responsibility |
+| --- | --- |
+| `src/document_enhancer/cli.py` | Validates command options, chooses offline/live dependencies, maps run states to exit codes, and renders Rich operator output. |
+| `src/document_enhancer/ingest/` | Dispatches by suffix, preserves ordered source blocks and stable span IDs, inventories figures, normalizes Markdown, scores structure, and routes optional recovery. |
+| `src/document_enhancer/core/` | Implements the five phases, human gate, review reports, rewrite plan, figure appendix, DOCX rendering, graph exports, deterministic audit, seal, and atomic store. |
+| `src/document_enhancer/references/` and `reference_packs/` | Validate and compile governed templates, rubrics, context, and ontology vocabularies into the selected recipe. |
+| `src/document_enhancer/llm/` | Provides bounded structured Gemini calls with explicit routes, budgets, safe repair, caching, redacted errors, and call manifests. |
+| `src/document_enhancer/retrieval/` | Validates sealed inputs, chunks only approved final Markdown, builds the local catalog, answers cited questions, and exports the graph observatory. |
+| `tests/`, `fixtures/`, and `scripts/` | Hold deterministic evidence for contracts, negative cases, document types, retrieval behavior, and release gates. |
+
+### Authoring control flow
+
+`json/00-run.json` is the only mutable state manifest. It records one status, one phase, digests,
+artifact references, and unresolved question IDs; large values stay in named files.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Extract
+    state "running · extract" as Extract
+    state "running · analyze" as Analyze
+    state "human_review" as HumanReview
+    state "waiting · human_review" as Waiting
+    state "running · rewrite" as Rewrite
+    state "verify" as Verify
+    state "succeeded · verify" as Succeeded
+    state "failed · verify" as Failed
+
+    Extract --> Analyze: parse, normalize, persist source evidence
+    Analyze --> HumanReview: rubric, section, and flow analysis
+    HumanReview --> Waiting: questions exist or --until questions
+    HumanReview --> Rewrite: no questions and completion requested
+    Waiting --> Waiting: decision contract incomplete; exit 10
+    Waiting --> Rewrite: blockers resolved and approve_rewrite is true
+    Rewrite --> Verify: final documents and portable exports written
+    Verify --> Succeeded: every promotion check passes; write seal
+    Verify --> Failed: one or more checks fail; do not seal
+    Failed --> Rewrite: retry a failed verification run
+    Succeeded --> [*]
+```
+
+`docenhance run` and `continue` use exit `10` for an intentional human wait and `20` for command or
+workflow failure. `docenhance stage-two` additionally uses exit `30` when outputs exist but the
+promotion audit fails. Failed verification artifacts remain available for diagnosis; only a passing
+audit produces `json/12-seal.json`, after which `RunStore` rejects writes to non-seal artifacts.
+
+### Operator and artifact sequence
+
+This is the explicit two-stage path used when questions are generated or `--until questions` is
+selected. A question-free run with completion requested proceeds directly from analysis to rewrite.
+
+```mermaid
+sequenceDiagram
+    actor Operator
+    participant CLI as docenhance CLI
+    participant Runner as CoreRunner
+    participant Inputs as Ingest + Recipe
+    participant Models as Optional live providers
+    participant Store as RunStore
+    participant Decisions as review/decisions.yaml
+
+    Operator->>CLI: run SOURCE
+    CLI->>Runner: start(source, configuration)
+    Runner->>Inputs: parse, normalize, score structure, load rubric
+    Inputs-->>Runner: spans, sections, figures, recipe
+    opt execution-mode live
+        Runner->>Models: bounded typed structure and review calls
+        Models-->>Runner: candidates with source-span references
+    end
+    Runner->>Store: write source, review, Mermaid, YAML, and report.html
+    Store-->>CLI: waiting run record
+    CLI-->>Operator: exit 10 and run path
+    Operator->>Decisions: answer, steer, waive, approve
+    Operator->>CLI: stage-two RUN_ID
+    CLI->>Runner: resume(run_id)
+    Runner->>Runner: validate immutable question context and compile rewrite plan
+    opt execution-mode live
+        Runner->>Models: approved rewrite and independent audit calls
+        Models-->>Runner: typed candidates
+    end
+    Runner->>Store: final Markdown/DOCX, change report, semantic/graph exports, audit
+    alt every deterministic check passes
+        Runner->>Store: write seal
+        CLI-->>Operator: succeeded, exit 0
+    else a promotion check fails
+        CLI-->>Operator: unsealed diagnostic bundle, exit 30
+    end
+```
+
+### Model and agent boundaries
+
+The authoring runtime is **not** a free-running agent. `CoreRunner` selects each operation and the
+application owns every promotion decision. In live mode, four narrow providers share one structured
+gateway: structure recovery is called only when heuristics route to it; review performs one macro
+call plus bounded section batches; rewrite receives only source evidence, the compiled plan, and
+approved human decisions; and the independent content audit is additive to deterministic checks.
+
+The optional RAG runtime contains the tool-using agent. `AdaptiveRagAnswerer` routes focused
+questions to a bounded LangChain agent and corpus-wide questions to a question-driven map/reduce
+path. The focused agent receives exactly two read-only tools. It has no shell, web, arbitrary
+filesystem, authoring, or catalog-write capability.
+
+```mermaid
+flowchart TB
+    subgraph authoring["Authoring: deterministic orchestration"]
+        runner2["CoreRunner"] --> router["Heuristic structure router"]
+        router -. "low quality + live" .-> structure["GeminiStructureProvider"]
+        runner2 -. "live" .-> review["GeminiReviewProvider"]
+        runner2 -. "approved decisions + live" .-> rewrite["GeminiRewriteProvider"]
+        runner2 -. "live" .-> audit["GeminiAuditProvider"]
+        structure --> gateway2["GeminiModelGateway"]
+        review --> gateway2
+        rewrite --> gateway2
+        audit --> gateway2
+        gateway2 --> typed["Strict Pydantic candidate"]
+        typed --> gates["Span, decision, graph, source-retention,<br/>figure, and audit promotion gates"]
+        gates --> runner2
+    end
+
+    subgraph answering["Optional retrieval: bounded read-only answering"]
+        question["Question"] --> adaptive["AdaptiveRagAnswerer"]
+        adaptive --> focused["Focused route"]
+        adaptive --> corpus["Corpus map/reduce route"]
+        focused --> agent["document_enhancer_rag agent<br/>8 tool calls, 12 chunks, 30k evidence chars"]
+        agent --> search["search_evidence<br/>FAISS + FTS5 rank fusion"]
+        agent --> expand["expand_graph<br/>real edges, depth at most 2"]
+        search --> catalog2["Validated read-only catalog"]
+        expand --> catalog2
+        agent --> citationGate["validate_answer<br/>reject unknown or missing citations"]
+        corpus --> catalog2
+        corpus --> coverageGate["Per-document map, bounded reducer,<br/>citation and coverage validation"]
+        citationGate --> answer["Cited answer or insufficient"]
+        coverageGate --> answer
+    end
+```
+
+### Durable contracts and safety invariants
+
+- Every invocation creates a new run ID, even for identical source bytes; stale or failed state is
+  never silently reused.
+- Source bytes, normalized evidence, recipe/configuration digests, stable spans, and every artifact
+  digest remain inspectable. `RunStore` uses path containment and atomic replacement for writes.
+- The reviewer edits one file. Question IDs, question text, and suggestions are validated against
+  the generated review before accepted answers can reach rewriting.
+- Offline mode uses deterministic local analysis and rewriting. Live mode can enrich the same
+  contracts but cannot bypass source-span, decision, graph, figure, or promotion checks.
+- The final Markdown is the canonical approved text. DOCX, semantic JSON, ontology JSON, Mermaid,
+  graph JSONL, and source-to-target CSV are derived outputs from the same reviewed run.
+- Retrieval indexing is explicit and fail-closed: it accepts passing sealed bundles, embeds only
+  `markdown/07-final-document.md`, loads ontology as graph data, validates staged counts and hashes,
+  and atomically replaces the previous local catalog only after validation.
+
+When an implementation change moves a responsibility or changes a transition, update the relevant
+diagram and table in this section in the same task. `AGENTS.md` makes that README synchronization a
+required completion step.
+
 ## Quick start
 
 ```bash
