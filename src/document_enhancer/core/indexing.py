@@ -7,7 +7,6 @@ importing ``CoreRunner``.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import re
 import sqlite3
@@ -16,10 +15,25 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
 
-from .layout import AUDIT, FINAL_MARKDOWN, ONTOLOGY, ORIGINAL_DOCUMENT_PREFIX, SEAL
+from .integrity import (
+    REQUIRED_SEAL_ARTIFACT_KEYS,
+    IntegrityError,
+    SealManifest,
+    digest_bytes,
+    validate_seal_manifest,
+    verify_artifact,
+)
+from .layout import (
+    AUDIT,
+    FINAL_MARKDOWN,
+    GRAPH_JSONL,
+    ONTOLOGY,
+    ORIGINAL_DOCUMENT_PREFIX,
+    SEAL,
+)
 
 _DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
-_REQUIRED_ARTIFACTS = (AUDIT, FINAL_MARKDOWN, ONTOLOGY)
+_REQUIRED_MANIFEST_KEYS = REQUIRED_SEAL_ARTIFACT_KEYS
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,14 +41,27 @@ class SealedBundle:
     """Validated, provider-independent data exposed to optional consumers."""
 
     path: Path
+    manifest: SealManifest
     run_id: str
     source_digest: str
     final_digest: str
     audit_digest: str
+    graph_digest: str
+    ontology_digest: str
     graph_schema: str
+    final_markdown: str
+    graph_jsonl: str
+    graph: tuple[Mapping[str, Any], ...]
+    ontology: Mapping[str, Any]
     nodes: tuple[Mapping[str, Any], ...]
     edges: tuple[Mapping[str, Any], ...]
     sections: tuple[tuple[str, str], ...]
+
+    @property
+    def graph_records(self) -> tuple[Mapping[str, Any], ...]:
+        """Return the parsed canonical graph JSONL records."""
+
+        return self.graph
 
 
 def load_sealed_bundle(bundle: Path) -> SealedBundle:
@@ -46,60 +73,79 @@ def load_sealed_bundle(bundle: Path) -> SealedBundle:
     not create or mutate any consumer state.
     """
 
-    resolved = bundle.expanduser().resolve()
-    if not resolved.is_dir():
-        raise FileNotFoundError(f"core bundle does not exist: {resolved}")
+    resolved = _resolve_bundle(bundle)
     seal = _read_object(resolved / SEAL, "seal")
-    if seal.get("sealed") is not True:
-        raise ValueError("core bundle is not sealed")
-    run_id = _required_string(seal, "run_id", "seal")
-    source_digest = _required_digest(seal, "source_digest", "seal")
-    final_digest = _required_digest(seal, "final_digest", "seal")
-    audit_digest = _required_digest(seal, "audit_digest", "seal")
+    manifest = _validated_manifest(seal)
+    _validate_manifest_paths(manifest, resolved)
+    manifest = _validated_manifest(manifest, artifact_root=resolved)
 
-    missing = [path for path in _REQUIRED_ARTIFACTS if not (resolved / path).is_file()]
-    if missing:
-        raise FileNotFoundError("core bundle is missing: " + ", ".join(missing))
-    artifact_paths = seal.get("artifact_paths")
-    if artifact_paths is not None:
-        if not isinstance(artifact_paths, list) or not all(
-            isinstance(path, str) for path in artifact_paths
-        ):
-            raise ValueError("seal artifact_paths must be a list of strings")
-        omitted = [path for path in _REQUIRED_ARTIFACTS if path not in artifact_paths]
-        if omitted:
-            raise ValueError("seal does not list required artifacts: " + ", ".join(omitted))
+    source_ref = manifest.artifacts["source.original"]
+    source_root = resolved / Path(ORIGINAL_DOCUMENT_PREFIX).parent
+    source_path = resolved / source_ref.path
+    source_candidates = [
+        path for path in source_root.glob("original*") if path.is_file() and not path.is_symlink()
+    ]
+    if len(source_candidates) != 1 or source_candidates[0] != source_path:
+        raise FileNotFoundError("core bundle must contain exactly one documents/original artifact")
+    _read_verified_bytes(resolved, source_ref, key="source.original")
 
-    audit_path = resolved / AUDIT
-    final_path = resolved / FINAL_MARKDOWN
-    audit = _read_object(audit_path, "audit")
+    final_ref = manifest.artifacts["output.final_markdown"]
+    final_bytes = _read_verified_bytes(resolved, final_ref, key="output.final_markdown")
+    try:
+        final_markdown = final_bytes.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError("final document artifact is not valid UTF-8") from exc
+
+    audit = _read_object_bytes(
+        _read_verified_bytes(resolved, manifest.artifacts["audit.report"], key="audit.report"),
+        "audit",
+    )
     if audit.get("status") != "pass":
         raise ValueError("only a passing core bundle may be consumed")
-    if _sha256(audit_path) != audit_digest:
-        raise ValueError("audit digest does not match the sealed artifact")
-    if _sha256(final_path) != final_digest:
-        raise ValueError("final document digest does not match the sealed artifact")
 
-    source_root = resolved / Path(ORIGINAL_DOCUMENT_PREFIX).parent
-    source_candidates = [path for path in source_root.glob("original*") if path.is_file()]
-    if len(source_candidates) != 1:
-        raise FileNotFoundError("core bundle must contain exactly one documents/original artifact")
-    if _sha256(source_candidates[0]) != source_digest:
-        raise ValueError("source digest does not match the sealed artifact")
-
-    graph = _read_object(resolved / ONTOLOGY, "ontology")
-    nodes = _records(graph, "nodes", "ontology")
-    edges = _records(graph, "edges", "ontology")
+    ontology = _read_object_bytes(
+        _read_verified_bytes(
+            resolved, manifest.artifacts["output.ontology"], key="output.ontology"
+        ),
+        "ontology",
+    )
+    if _required_string(ontology, "schema_version", "ontology") != "core.graph.v1":
+        raise ValueError("ontology artifact does not use core.graph.v1")
+    if _required_digest(ontology, "markdown_sha256", "ontology") != manifest.final_digest:
+        raise ValueError("ontology markdown digest does not match the sealed final document")
+    nodes = _records(ontology, "nodes", "ontology")
+    edges = _records(ontology, "edges", "ontology")
     node_ids = _validate_nodes(nodes)
     _validate_edges(edges, node_ids)
-    sections = tuple(_chunks(final_path.read_text(encoding="utf-8")))
+
+    graph_bytes = _read_verified_bytes(
+        resolved, manifest.artifacts["output.graph"], key="output.graph"
+    )
+    try:
+        graph_jsonl = graph_bytes.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError("graph artifact is not valid UTF-8") from exc
+    graph, graph_nodes, graph_edges = _parse_graph_jsonl(graph_jsonl)
+    graph_node_ids = _validate_nodes(graph_nodes)
+    _validate_edges(graph_edges, graph_node_ids)
+    if graph_node_ids != node_ids or _edge_keys(graph_edges) != _edge_keys(edges):
+        raise ValueError("graph and ontology exports do not describe the same graph")
+
+    sections = tuple(_chunks(final_markdown))
     return SealedBundle(
         path=resolved,
-        run_id=run_id,
-        source_digest=source_digest,
-        final_digest=final_digest,
-        audit_digest=audit_digest,
-        graph_schema=_required_string(graph, "schema_version", "ontology"),
+        manifest=manifest,
+        run_id=manifest.run_id,
+        source_digest=manifest.source_digest,
+        final_digest=manifest.final_digest,
+        audit_digest=manifest.audit_digest,
+        graph_digest=manifest.graph_digest,
+        ontology_digest=manifest.ontology_digest,
+        graph_schema=_required_string(ontology, "schema_version", "ontology"),
+        final_markdown=final_markdown,
+        graph_jsonl=graph_jsonl,
+        graph=tuple(graph),
+        ontology=ontology,
         nodes=tuple(nodes),
         edges=tuple(edges),
         sections=sections,
@@ -212,22 +258,138 @@ class CoreBundleIndex:
         return f"file:{self.database}?mode=ro"
 
 
-def _read_object(path: Path, label: str) -> dict[str, Any]:
+def _resolve_bundle(bundle: Path) -> Path:
+    candidate = bundle.expanduser()
+    if candidate.is_symlink():
+        raise ValueError("core bundle path must not be a symlink")
+    resolved = candidate.resolve()
+    if not resolved.is_dir():
+        raise FileNotFoundError(f"core bundle does not exist: {resolved}")
+    return resolved
+
+
+def _validated_manifest(
+    value: SealManifest | Mapping[str, object],
+    *,
+    artifact_root: Path | None = None,
+) -> SealManifest:
     try:
-        raw = path.read_text(encoding="utf-8")
-    except FileNotFoundError as exc:
-        raise FileNotFoundError(f"{label} artifact is missing: {path}") from exc
+        return validate_seal_manifest(value, artifact_root=artifact_root)
+    except IntegrityError as exc:
+        digest_labels = {
+            "output.final_markdown": "final document",
+            "audit.report": "audit",
+            "output.graph": "graph",
+            "output.ontology": "ontology",
+            "source.original": "source",
+        }
+        key = exc.details.get("key")
+        if exc.code == "artifact_digest_mismatch" and isinstance(key, str) and key in digest_labels:
+            raise ValueError(
+                f"{digest_labels[key]} digest does not match the sealed artifact"
+            ) from exc
+        raise ValueError(f"seal manifest is invalid: {exc}") from exc
+
+
+def _validate_manifest_paths(manifest: SealManifest, bundle: Path) -> None:
+    if manifest.run_id != bundle.name:
+        raise ValueError("seal run_id does not match the bundle directory")
+    missing = [key for key in _REQUIRED_MANIFEST_KEYS if key not in manifest.artifacts]
+    if missing:
+        raise ValueError("seal manifest is missing authoritative artifacts: " + ", ".join(missing))
+    expected_paths = {
+        "output.final_markdown": FINAL_MARKDOWN,
+        "audit.report": AUDIT,
+        "output.graph": GRAPH_JSONL,
+        "output.ontology": ONTOLOGY,
+    }
+    for key, expected_path in expected_paths.items():
+        reference = manifest.artifacts[key]
+        if reference.path != expected_path:
+            raise ValueError(f"sealed artifact {key} must use canonical path {expected_path!r}")
+        if "draft" in Path(reference.path).parts:
+            raise ValueError(f"sealed artifact {key} cannot reference a Stage 1 draft path")
+
+    source_path = Path(manifest.artifacts["source.original"].path)
+    source_prefix = Path(ORIGINAL_DOCUMENT_PREFIX)
+    if source_path.parent != source_prefix.parent or (
+        source_path.name != source_prefix.name
+        and not source_path.name.startswith(f"{source_prefix.name}.")
+    ):
+        raise ValueError("sealed source artifact must use the documents/original path")
+
+
+def _read_verified_bytes(root: Path, artifact: Any, *, key: str) -> bytes:
+    try:
+        reference = verify_artifact(root, artifact, key=key)
+    except IntegrityError as exc:
+        raise ValueError(f"{key} artifact failed integrity validation: {exc}") from exc
+    path = root.expanduser().resolve() / reference.path
+    try:
+        data = path.read_bytes()
+    except OSError as exc:
+        raise ValueError(f"{key} artifact cannot be read") from exc
+    if len(data) != reference.size_bytes or digest_bytes(data) != reference.sha256:
+        raise ValueError(f"{key} artifact changed while being read")
+    return data
+
+
+def _read_object_bytes(raw: bytes, label: str) -> dict[str, Any]:
+    try:
+        text = raw.decode("utf-8")
     except UnicodeDecodeError as exc:
         raise ValueError(f"{label} artifact is not valid JSON") from exc
-    except OSError as exc:
-        raise ValueError(f"{label} artifact cannot be read: {path}") from exc
     try:
-        value = json.loads(raw)
+        value = json.loads(text)
     except json.JSONDecodeError as exc:
         raise ValueError(f"{label} artifact is not valid JSON") from exc
     if not isinstance(value, dict):
         raise ValueError(f"{label} artifact must be a JSON object")
     return cast(dict[str, Any], value)
+
+
+def _parse_graph_jsonl(
+    graph_jsonl: str,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+    records: list[dict[str, Any]] = []
+    nodes: list[dict[str, Any]] = []
+    edges: list[dict[str, Any]] = []
+    for line_number, line in enumerate(graph_jsonl.splitlines(), start=1):
+        if not line.strip():
+            continue
+        try:
+            value = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"graph artifact line {line_number} is not valid JSON") from exc
+        if not isinstance(value, dict):
+            raise ValueError(f"graph artifact line {line_number} must be a JSON object")
+        record = cast(dict[str, Any], value)
+        kind = record.get("kind")
+        if kind not in {"node", "edge"}:
+            raise ValueError(f"graph artifact line {line_number} has an invalid kind")
+        records.append(record)
+        payload = {key: item for key, item in record.items() if key != "kind"}
+        if kind == "node":
+            nodes.append(payload)
+        else:
+            edges.append(payload)
+    return records, nodes, edges
+
+
+def _edge_keys(edges: list[dict[str, Any]]) -> set[tuple[str, str, str]]:
+    return {(str(edge["source"]), str(edge["target"]), str(edge["edge_type"])) for edge in edges}
+
+
+def _read_object(path: Path, label: str) -> dict[str, Any]:
+    if path.is_symlink():
+        raise ValueError(f"{label} artifact must not be a symlink")
+    try:
+        raw = path.read_bytes()
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(f"{label} artifact is missing: {path}") from exc
+    except OSError as exc:
+        raise ValueError(f"{label} artifact cannot be read: {path}") from exc
+    return _read_object_bytes(raw, label)
 
 
 def _required_string(payload: Mapping[str, Any], key: str, label: str) -> str:
@@ -242,14 +404,6 @@ def _required_digest(payload: Mapping[str, Any], key: str, label: str) -> str:
     if not _DIGEST_RE.fullmatch(value):
         raise ValueError(f"{label} field {key!r} must be a sha256 digest")
     return value
-
-
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _records(payload: Mapping[str, Any], key: str, label: str) -> list[dict[str, Any]]:
