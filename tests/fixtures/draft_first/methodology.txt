@@ -1,0 +1,7 @@
+Monthly loss forecasting methodology
+
+Objective: support a documented monthly loss estimate for internal risk review.
+Scope: the method covers the approved monthly extract and excludes ad hoc forecasts.
+Data inputs and lineage: the forecasting owner records the source system, period, and quality checks.
+Methodological steps: validate the extract, calculate the estimate, review the result, and record evidence.
+Limitations: the source does not establish a new threshold, owner, approval, or retention period.

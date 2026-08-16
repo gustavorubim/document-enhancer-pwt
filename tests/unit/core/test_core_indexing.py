@@ -11,6 +11,17 @@ from document_enhancer.core.layout import AUDIT, SEAL
 from document_enhancer.core.models import ArtifactRef, RunRecord
 
 
+def _approve_all(run_path: Path) -> None:
+    decisions = run_path / "review/decisions.yaml"
+    decisions.write_text(
+        decisions.read_text(encoding="utf-8")
+        .replace("approve_rewrite: false", "approve_rewrite: true")
+        .replace('answer: ""', "answer: approved")
+        .replace("disposition: defer", "disposition: accept"),
+        encoding="utf-8",
+    )
+
+
 def _regenerate_v2_seal(run_path: Path, record: RunRecord) -> None:
     artifacts: dict[str, ArtifactRef] = {}
     seen_paths: set[str] = set()
@@ -44,11 +55,19 @@ def _regenerate_v2_seal(run_path: Path, record: RunRecord) -> None:
 def test_core_bundle_indexer_consumes_only_sealed_output(tmp_path: Path) -> None:
     source = tmp_path / "input.md"
     source.write_text("# Intake\n\nThe owner reviews the request.\n", encoding="utf-8")
-    result = CoreRunner(tmp_path / "runs").start(source)
-    _regenerate_v2_seal(tmp_path / "runs" / result.run_id, result)
+    runner = CoreRunner(tmp_path / "runs")
+    result = runner.start(source)
+    run_path = tmp_path / "runs" / result.run_id
+    _approve_all(run_path)
+    result = runner.resume(result.run_id)
+
+    assert result.status == "succeeded"
+    assert json.loads((run_path / SEAL).read_text(encoding="utf-8"))["schema_version"] == (
+        "core.seal.v2"
+    )
 
     index = CoreBundleIndex(tmp_path / "catalog.sqlite3")
-    assert index.index(tmp_path / "runs" / result.run_id) == 1
+    assert index.index(run_path) >= 1
     matches = index.search("owner")
     assert matches and matches[0]["section_id"] == "intake"
 
@@ -57,11 +76,21 @@ def test_core_bundle_indexer_consumes_only_sealed_output(tmp_path: Path) -> None
 def test_core_bundle_indexer_rejects_failed_bundle(tmp_path: Path) -> None:
     source = tmp_path / "input.md"
     source.write_text("# Intake\n\nThe owner reviews the request.\n", encoding="utf-8")
-    result = CoreRunner(tmp_path / "runs").start(source)
-    audit = tmp_path / "runs" / result.run_id / AUDIT
-    audit.parent.mkdir(parents=True, exist_ok=True)
-    audit.write_text('{"status":"fail"}', encoding="utf-8")
-    _regenerate_v2_seal(tmp_path / "runs" / result.run_id, result)
+    runner = CoreRunner(tmp_path / "runs")
+    result = runner.start(source)
+    run_path = tmp_path / "runs" / result.run_id
+    _approve_all(run_path)
+    result = runner.resume(result.run_id)
+    assert result.status == "succeeded"
+
+    # Preserve a complete, digest-valid v2 manifest while making the audit fail.  This
+    # exercises the consumer's failed-audit gate rather than manufacturing a legacy seal.
+    audit = run_path / AUDIT
+    audit.write_text(
+        json.dumps({"schema_version": "core.audit.v1", "status": "fail", "checks": {}}),
+        encoding="utf-8",
+    )
+    _regenerate_v2_seal(run_path, result)
 
     with pytest.raises(ValueError, match="passing"):
-        CoreBundleIndex(tmp_path / "catalog.sqlite3").index(tmp_path / "runs" / result.run_id)
+        CoreBundleIndex(tmp_path / "catalog.sqlite3").index(run_path)

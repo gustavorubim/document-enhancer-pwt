@@ -1,23 +1,31 @@
 # Document Enhancer
 
-Turn one governed source document into a reviewed, rewritten, audited, and graph-ready document
-bundle. Drop a file, run Stage 1, answer business questions in a single YAML file, then run Stage 2
-to a sealed final package.
+Turn one governed source document plus a selected reference/template into a reviewed, rewritten,
+audited, and graph-ready document bundle. Stage 1 produces an unapproved candidate draft, analysis,
+and questions; explicit decisions and approval are required before Stage 2 can produce a strict-v2
+sealed final package.
 
 The product is intentionally file-backed and linear: no workflow engine, database checkpoint,
-retrieval system, prompt-pack runtime, or compatibility mode is required on the authoring path.
+retrieval system, prompt-pack runtime, Deep Agents runtime, or compatibility mode is required on the
+authoring path.
 
 ## Operator journey
 
-1. Drop one `.md`, `.txt`, `.docx`, or `.pdf` into an inbox (or pass the file path).
-2. Parse with heuristics and optional bounded LLM structure recovery.
-3. Open `report.html` and read the numbered macro, section, and process-flow reports in order.
-4. Compare the inferred and proposed Mermaid diagrams when a process is documented.
-5. Answer questions and steering in `review/decisions.yaml`.
-6. Continue so the runner rewrites, audits, and seals the bundle.
-7. When the source contains extractable screenshots, use the `FIG-###` references in the rewritten
+1. Drop one `.md`, `.txt`, `.docx`, or `.pdf` into an inbox (or pass the file path) and select the
+   reference pack/template and document type.
+2. Run Stage 1. Parse with heuristics and optional bounded LLM structure recovery, then write the
+   candidate draft, macro/section/flow analysis, contextual questions, and visual review markers.
+3. Open `report.html`, read the candidate draft first, and compare the inferred and proposed Mermaid
+   diagrams when a process is documented.
+4. Answer questions and steering in `review/decisions.yaml`, then set explicit
+   `approve_rewrite: true`.
+5. Run Stage 2. The runner revises the exact candidate draft from approved decisions, performs the
+   deterministic and independent audit checks, and writes `json/12-seal.json` only after a strict-v2
+   manifest validates every authoritative artifact.
+6. When the source contains extractable screenshots, use the `FIG-###` references in the rewritten
    body and the source-screenshot appendix in the final Markdown and DOCX.
-8. Use the portable semantic, ontology, and graph exports later for GraphRAG, RAG, or ontology.
+7. Use the portable semantic, ontology, and graph exports later for GraphRAG, RAG, or ontology;
+   retrieval consumes sealed final bundles only.
 
 ## How the repository is implemented
 
@@ -44,17 +52,19 @@ flowchart LR
     ingest --> runner
     recipe --> runner
     runner --> store["RunStore<br/>atomic named artifacts"]
-    runner -. "live mode only" .-> providers["Typed structure, review,<br/>rewrite, and audit providers"]
+    runner -. "bounded typed calls;<br/>live optional" .-> providers["Structure, visual, mapping,<br/>draft, review, rewrite, and audit providers"]
     providers --> gateway["GeminiModelGateway<br/>budgets, repair, cache, call manifests"]
     store --> bundle["Run bundle<br/>reviewed, audited, optionally sealed"]
     bundle -. "explicit rag index" .-> catalog["Local RAG catalog<br/>SQLite FTS5 + FAISS + graph"]
     catalog --> rag["Read-only retrieval agent<br/>validated citations or insufficient"]
 ```
 
-The solid path is the authoring critical path. The dashed integrations are opt-in. A normal import,
-offline run, or sealed-bundle audit does not import the optional retrieval stack. Live model output
-is always treated as a typed candidate: deterministic application checks decide whether recovered
-structure, findings, rewritten text, and audit results can be promoted.
+The solid path is the authoring critical path. The dashed provider integration is bounded and live
+mode is optional. A normal import, offline run, or sealed-bundle audit does not import the optional
+retrieval stack. Full-context preflight accounts for source, selected template, visual evidence,
+prompts, and expected output before mapping, drafting, or audit calls. Live model output is always
+treated as a typed candidate: deterministic application checks decide whether recovered structure,
+findings, rewritten text, and audit results can be promoted.
 
 ### Repository map
 
@@ -105,8 +115,7 @@ stateDiagram-v2
 
     Extract --> Analyze: parse, normalize, persist source evidence
     Analyze --> HumanReview: rubric, section, and flow analysis
-    HumanReview --> Waiting: questions exist or --until questions
-    HumanReview --> Rewrite: no questions and completion requested
+    HumanReview --> Waiting: always pause for explicit approval
     Waiting --> Waiting: decision contract incomplete; exit 10
     Waiting --> Rewrite: blockers resolved and approve_rewrite is true
     Rewrite --> Verify: final documents and portable exports written
@@ -123,8 +132,9 @@ audit produces `json/12-seal.json`, after which `RunStore` rejects writes to non
 
 ### Operator and artifact sequence
 
-This is the explicit two-stage path used when questions are generated or `--until questions` is
-selected. A question-free run with completion requested proceeds directly from analysis to rewrite.
+This is the explicit two-stage path. Stage 1 always pauses for human review, even when no blocking
+question was generated; Stage 2 starts only after the editable decision contract contains explicit
+approval.
 
 ```mermaid
 sequenceDiagram
@@ -144,7 +154,7 @@ sequenceDiagram
         Runner->>Models: bounded typed structure and review calls
         Models-->>Runner: candidates with source-span references
     end
-    Runner->>Store: write source, review, Mermaid, YAML, and report.html
+    Runner->>Store: write source, candidate draft, review, Mermaid, YAML, and report.html
     Store-->>CLI: waiting run record
     CLI-->>Operator: exit 10 and run path
     Operator->>Decisions: answer, steer, waive, approve
@@ -166,11 +176,13 @@ sequenceDiagram
 
 ### Model and agent boundaries
 
-The authoring runtime is **not** a free-running agent. `CoreRunner` selects each operation and the
-application owns every promotion decision. In live mode, four narrow providers share one structured
-gateway: structure recovery is called only when heuristics route to it; review performs one macro
-call plus bounded section batches; rewrite receives only source evidence, the compiled plan, and
-approved human decisions; and the independent content audit is additive to deterministic checks.
+The authoring runtime is **not** a free-running agent and does not use Deep Agents. `CoreRunner`
+selects each operation and the application owns every promotion decision. Bounded typed providers
+use full-context preflight: structure recovery is called only when heuristics route to it; visual
+interpretation is limited to eligible extracted images; mapping, drafting, and draft audit consume
+the complete source/template/visual context within explicit budgets; review and rewrite receive
+typed evidence and approved decisions; and the independent content audit is additive to
+deterministic checks. Every model-derived visual table or diagram remains a human-review candidate.
 
 The optional RAG runtime contains the tool-using agent. `AdaptiveRagAnswerer` routes focused
 questions to a bounded LangChain agent and corpus-wide questions to a question-driven map/reduce
@@ -221,6 +233,9 @@ flowchart TB
   the generated review before accepted answers can reach rewriting.
 - Offline mode uses deterministic local analysis and rewriting. Live mode can enrich the same
   contracts but cannot bypass source-span, decision, graph, figure, or promotion checks.
+- Stage 1 candidate artifacts are unapproved and never final or retrieval-authoritative. Stage 2
+  validates explicit approval, immutable artifact digests, provenance, visual review, and audit
+  results before emitting a strict `core.seal.v2` manifest.
 - The final Markdown is the canonical approved text. DOCX, semantic JSON, ontology JSON, Mermaid,
   graph JSONL, and source-to-target CSV are derived outputs from the same reviewed run.
 - Retrieval indexing is explicit and fail-closed: it accepts passing sealed bundles, embeds only
@@ -379,6 +394,7 @@ Only these `.env` keys are loaded: `GOOGLE_API_KEY`, `GEMINI_API_KEY`, `GOOGLE_C
 runs/RUN_ID/
 ├── report.html                 # pastel tabbed rendering of all Markdown reports
 ├── json/                       # 00-run.json through 12-seal.json; every JSON artifact
+├── draft/                      # Stage 1 candidate, mapping, draft audit, and visual candidates
 ├── markdown/                   # 01 source through 09 final audit; numbered reading order
 ├── review/decisions.yaml       # questions, steering, waivers, approve_rewrite
 ├── diagrams/                   # numbered inferred, proposed, and final Mermaid sources
@@ -391,7 +407,10 @@ runs/RUN_ID/
 
 The five phases are extract, analyze, human review, rewrite, and verify. Large values live in named
 artifacts; `json/00-run.json` remains below 50 KB and records the selected execution mode so a live run
-continues live after human review.
+continues live after human review. Stage 1 always writes `draft/document.md`,
+`draft/transformation.json`, `draft/audit.json`, and `draft/visual-extractions.json`; these paths
+are verified during Stage 2 but are never accepted by retrieval. Only a passing audit writes the
+complete strict-v2 seal and makes `markdown/07-final-document.md` eligible for retrieval.
 
 ## Quality boundaries
 
@@ -401,12 +420,35 @@ continues live after human review.
   PDF images remain inventoried but are not extracted, and remote Markdown images are never fetched.
 - Heuristics choose parser structure or bounded LLM structure recovery; providers cannot invent
   source spans or replace deterministic evidence checks.
+- Cross-section ambiguity is consolidated into evidence-linked questions with safe suggestions only
+  when the source or recipe supports them; missing owners, dates, thresholds, and approvals remain
+  human decisions.
+- Native tables are deterministic parser output. Eligible image tables and diagrams can receive
+  bounded candidate conversions, but the original figure is retained and every conversion remains
+  `requires_review` until an explicit human decision.
 - Reference packs define the document type, policy context, rubric, terminology, and templates.
 - The single decision file holds genuine business questions plus steering/waivers/approval.
 - Final auditing checks source retention, required sections, graph references, unresolved blockers,
   section assessments, and dual flow artifacts before sealing an approved bundle.
 - Semantic JSON and JSONL graph exports are portable for a future RAG/ontology consumer; no retrieval
-  runtime is required on the authoring path.
+  runtime is required on the authoring path, and the retrieval runtime accepts only complete passing
+  strict-v2 sealed bundles.
+
+## Draft-first release evidence
+
+The deterministic DFT-8 evaluator covers Markdown, plain text, DOCX, and PDF fixtures, including a
+cross-section ambiguity, safe contextual guidance, one native DOCX table, and one image-table
+candidate. It writes machine-readable coverage, provenance, blocker, and citation/reference
+metrics:
+
+```bash
+PYTHONPATH=src:. uv run python -m tests.evaluation.draft_first_evaluation \
+  --output /tmp/document-enhancer-dft8.json
+```
+
+The evidence ledger is [DRAFT_FIRST_IMPLEMENTATION_EVIDENCE.md](DRAFT_FIRST_IMPLEMENTATION_EVIDENCE.md).
+Live-provider proof is separate from the offline reward and is reported as not run unless credentials
+are explicitly available and the live checks actually execute.
 
 ## Optional local RAG and GraphRAG CLI
 

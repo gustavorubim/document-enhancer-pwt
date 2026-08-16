@@ -9,6 +9,10 @@ import pytest
 
 from document_enhancer.core import CoreRunner
 from document_enhancer.core.layout import (
+    DRAFT_AUDIT,
+    DRAFT_DOCUMENT,
+    DRAFT_TRANSFORMATION,
+    DRAFT_VISUAL_EXTRACTIONS,
     FLOW_MARKDOWN,
     HTML_REPORT,
     INFERRED_FLOW,
@@ -76,13 +80,18 @@ def test_core_process_docx_characterization_pauses_with_review_bundle(tmp_path: 
     assert result.unresolved_question_ids
     assert (run_path / RUN_RECORD).stat().st_size < 50_000
     html = (run_path / HTML_REPORT).read_text(encoding="utf-8")
-    assert "Original Normalized Document" in html
+    assert "Candidate draft" in html
+    assert "UNAPPROVED" in html
     assert 'role="tablist"' in html
     assert 'class="report-tab"' in html
     assert 'class="flow-svg"' in html
     assert "cdn.jsdelivr.net" not in html
-    assert all(path.parent.name == "json" for path in run_path.rglob("*.json"))
-    assert all(path.parent.name == "markdown" for path in run_path.rglob("*.md"))
+    assert all(path.parent.name in {"json", "draft"} for path in run_path.rglob("*.json"))
+    assert all(path.parent.name in {"markdown", "draft"} for path in run_path.rglob("*.md"))
+    assert all(
+        (run_path / path).is_file()
+        for path in (DRAFT_TRANSFORMATION, DRAFT_DOCUMENT, DRAFT_AUDIT, DRAFT_VISUAL_EXTRACTIONS)
+    )
     decisions_yaml = (run_path / "review/decisions.yaml").read_text(encoding="utf-8")
     assert "question:" in decisions_yaml
     assert "suggestion:" in decisions_yaml

@@ -5,7 +5,8 @@ import json
 from pathlib import Path
 from typing import Any
 
-from document_enhancer.core.layout import AUDIT, FINAL_MARKDOWN, ONTOLOGY, SEAL
+from document_enhancer.core.integrity import build_seal_manifest, register_artifact
+from document_enhancer.core.layout import AUDIT, FINAL_MARKDOWN, GRAPH_JSONL, ONTOLOGY, SEAL
 
 
 def write_bundle(
@@ -40,14 +41,32 @@ def write_bundle(
     (bundle / "documents/original.md").write_bytes(source)
     (bundle / FINAL_MARKDOWN).write_text(final, encoding="utf-8")
     (bundle / ONTOLOGY).write_text(json.dumps(graph, sort_keys=True), encoding="utf-8")
+    (bundle / GRAPH_JSONL).parent.mkdir(parents=True, exist_ok=True)
+    graph_records = [{"kind": "node", **node} for node in graph["nodes"]] + [
+        {"kind": "edge", **edge} for edge in graph["edges"]
+    ]
+    (bundle / GRAPH_JSONL).write_text(
+        "".join(json.dumps(record, sort_keys=True) + "\n" for record in graph_records),
+        encoding="utf-8",
+    )
     (bundle / AUDIT).write_text(json.dumps(audit, sort_keys=True), encoding="utf-8")
-    seal = {
-        "run_id": run_id,
-        "source_digest": hashlib.sha256(source).hexdigest(),
-        "final_digest": hashlib.sha256(final.encode()).hexdigest(),
-        "audit_digest": hashlib.sha256((bundle / AUDIT).read_bytes()).hexdigest(),
-        "artifact_paths": [AUDIT, FINAL_MARKDOWN, ONTOLOGY],
-        "sealed": True,
+    artifacts = {
+        "source.original": register_artifact(bundle, "documents/original.md"),
+        "output.final_markdown": register_artifact(bundle, FINAL_MARKDOWN),
+        "audit.report": register_artifact(bundle, AUDIT),
+        "output.graph": register_artifact(bundle, GRAPH_JSONL),
+        "output.ontology": register_artifact(bundle, ONTOLOGY),
     }
-    (bundle / SEAL).write_text(json.dumps(seal, sort_keys=True), encoding="utf-8")
+    seal = build_seal_manifest(
+        run_id=run_id,
+        source_digest=artifacts["source.original"].sha256,
+        recipe_id="test-fixture",
+        recipe_digest=hashlib.sha256(b"test-fixture-recipe").hexdigest(),
+        configuration_digest=hashlib.sha256(b"test-fixture-configuration").hexdigest(),
+        artifacts=artifacts,
+        artifact_root=bundle,
+    )
+    (bundle / SEAL).write_text(
+        json.dumps(seal.model_dump(mode="json"), sort_keys=True), encoding="utf-8"
+    )
     return bundle

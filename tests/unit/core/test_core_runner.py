@@ -7,6 +7,7 @@ import io
 import json
 import zipfile
 from pathlib import Path
+from typing import Any
 
 import pytest
 from docx import Document
@@ -289,7 +290,7 @@ def test_recovery_uses_registered_decisions_not_mutable_yaml(
 def test_recovery_blocks_changed_recipe_or_configuration(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
-    runner_kwargs: dict[str, object],
+    runner_kwargs: dict[str, Any],
 ) -> None:
     source = tmp_path / "input.md"
     source.write_text("# Source\n\nStatus: TBD\n", encoding="utf-8")
@@ -385,7 +386,8 @@ def test_resume_retries_a_failed_verification_with_current_rewrite_contract(
 
     source = tmp_path / "input.md"
     source.write_text("# Source\n\nThe owner reviews the result.\n", encoding="utf-8")
-    runner = CoreRunner(tmp_path / "runs", rewrite_provider=RewriteStub())
+    rewrite_stub = RewriteStub()
+    runner = CoreRunner(tmp_path / "runs", rewrite_provider=rewrite_stub)
 
     waiting = runner.start(source)
     _approve_all(tmp_path / "runs" / waiting.run_id)
@@ -393,7 +395,7 @@ def test_resume_retries_a_failed_verification_with_current_rewrite_contract(
 
     assert resumed.status == "succeeded"
     assert "audit.seal" in resumed.artifacts
-    assert runner.rewrite_provider.calls == 0
+    assert rewrite_stub.calls == 0
 
 
 @pytest.mark.unit
