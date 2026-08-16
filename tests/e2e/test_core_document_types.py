@@ -123,6 +123,21 @@ def test_core_clean_synthetic_process_seals_ontology_graph_and_audit_bundle(
     ).start(source)
 
     run_path = tmp_path / "runs" / result.run_id
+    assert result.status == "waiting"
+    assert not (run_path / SEAL).exists()
+    decisions = run_path / DECISIONS_YAML
+    decisions.write_text(
+        decisions.read_text(encoding="utf-8")
+        .replace("approve_rewrite: false", "approve_rewrite: true")
+        .replace('answer: ""', "answer: approved")
+        .replace("disposition: defer", "disposition: accept"),
+        encoding="utf-8",
+    )
+    result = CoreRunner(
+        tmp_path / "runs",
+        recipe_pack=REFERENCE_PACK,
+        document_type="process",
+    ).resume(result.run_id)
     assert result.status == "succeeded"
     assert result.phase == "verify"
     assert not result.unresolved_question_ids
@@ -165,7 +180,8 @@ def test_core_clean_synthetic_process_seals_ontology_graph_and_audit_bundle(
     ]
     assert seal["sealed"] is True
     assert seal["source_digest"] == result.source_digest
-    assert ONTOLOGY in seal["artifact_paths"]
-    assert GRAPH_JSONL in seal["artifact_paths"]
-    assert AUDIT in seal["artifact_paths"]
-    assert HTML_REPORT in seal["artifact_paths"]
+    assert seal["schema_version"] == "core.seal.v2"
+    assert ONTOLOGY in {item["path"] for item in seal["artifacts"].values()}
+    assert GRAPH_JSONL in {item["path"] for item in seal["artifacts"].values()}
+    assert AUDIT in {item["path"] for item in seal["artifacts"].values()}
+    assert HTML_REPORT in {item["path"] for item in seal["artifacts"].values()}

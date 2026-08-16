@@ -39,6 +39,16 @@ HTML_REPORT = "report.html"
 SOURCE_ASSET_PREFIX = "assets/source"
 FINAL_ASSET_PREFIX = "assets/final"
 
+# Stage 1 candidate artifacts.  These are deliberately separate from the canonical
+# final paths so a draft can never be mistaken for retrieval-authoritative output.
+DRAFT_TRANSFORMATION = "draft/transformation.json"
+DRAFT_DOCUMENT = "draft/document.md"
+DRAFT_DOCUMENT_MD = DRAFT_DOCUMENT
+DRAFT_MARKDOWN = DRAFT_DOCUMENT
+DRAFT_DOCUMENT_DOCX = "draft/document.docx"
+DRAFT_AUDIT = "draft/audit.json"
+DRAFT_VISUAL_EXTRACTIONS = "draft/visual-extractions.json"
+
 
 __all__ = [
     "AUDIT",
@@ -46,6 +56,13 @@ __all__ = [
     "CHANGES_MARKDOWN",
     "DECISIONS_JSON",
     "DECISIONS_YAML",
+    "DRAFT_AUDIT",
+    "DRAFT_DOCUMENT",
+    "DRAFT_DOCUMENT_DOCX",
+    "DRAFT_DOCUMENT_MD",
+    "DRAFT_MARKDOWN",
+    "DRAFT_TRANSFORMATION",
+    "DRAFT_VISUAL_EXTRACTIONS",
     "FINAL_DOCX",
     "FINAL_FLOW",
     "FINAL_MARKDOWN",

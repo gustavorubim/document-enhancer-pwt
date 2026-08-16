@@ -31,9 +31,11 @@ from .providers import (
     GeminiReviewProvider,
     GeminiRewriteProvider,
     GeminiStructureProvider,
+    GeminiTransformationProvider,
     ReviewProvider,
     RewriteProvider,
     StructureProvider,
+    TransformationProvider,
 )
 from .runner import CoreRunner
 from .store import RunStore
@@ -55,6 +57,7 @@ __all__ = [
     "GeminiAuditProvider",
     "GeminiRewriteProvider",
     "GeminiStructureProvider",
+    "GeminiTransformationProvider",
     "Question",
     "public_graph",
     "public_graph_jsonl",
@@ -68,6 +71,7 @@ __all__ = [
     "RewriteProvider",
     "SectionAssessment",
     "StructureProvider",
+    "TransformationProvider",
     "SourceDocument",
     "Waiver",
     "load_sealed_bundle",

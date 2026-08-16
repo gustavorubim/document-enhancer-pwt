@@ -13,9 +13,15 @@ from docx import Document
 from docx.enum.section import WD_ORIENT
 
 from document_enhancer.core import CoreRunner, RunStore
+from document_enhancer.core.integrity import RecipeConfigurationMismatchError
 from document_enhancer.core.layout import (
     AUDIT,
     DECISIONS_YAML,
+    DRAFT_AUDIT,
+    DRAFT_DOCUMENT,
+    DRAFT_DOCUMENT_DOCX,
+    DRAFT_TRANSFORMATION,
+    DRAFT_VISUAL_EXTRACTIONS,
     FINAL_DOCX,
     FINAL_MARKDOWN,
     HTML_REPORT,
@@ -25,6 +31,7 @@ from document_enhancer.core.layout import (
     REVIEW_INDEX_MARKDOWN,
     REWRITE_PLAN,
     RUN_RECORD,
+    SEAL,
     SOURCE_MARKDOWN,
     SOURCE_METADATA,
 )
@@ -54,6 +61,17 @@ PNG_1X1 = base64.b64decode(
 )
 
 
+def _approve_all(run_path: Path) -> None:
+    path = run_path / DECISIONS_YAML
+    text = path.read_text(encoding="utf-8")
+    path.write_text(
+        text.replace("approve_rewrite: false", "approve_rewrite: true")
+        .replace('answer: ""', "answer: approved")
+        .replace("disposition: defer", "disposition: accept"),
+        encoding="utf-8",
+    )
+
+
 @pytest.mark.unit
 def test_runner_pauses_for_questions_and_resumes_from_yaml(tmp_path: Path) -> None:
     source = tmp_path / "input.md"
@@ -68,6 +86,16 @@ def test_runner_pauses_for_questions_and_resumes_from_yaml(tmp_path: Path) -> No
     assert waiting.status == "waiting"
     assert waiting.phase == "human_review"
     assert waiting.unresolved_question_ids == ["question-placeholder-001"]
+    assert all(
+        (tmp_path / "runs" / waiting.run_id / path).is_file()
+        for path in (
+            DRAFT_TRANSFORMATION,
+            DRAFT_DOCUMENT,
+            DRAFT_DOCUMENT_DOCX,
+            DRAFT_AUDIT,
+            DRAFT_VISUAL_EXTRACTIONS,
+        )
+    )
     assert (tmp_path / "runs" / waiting.run_id / REVIEW_INDEX_MARKDOWN).is_file()
     assert (tmp_path / "runs" / waiting.run_id / QUESTIONS_MARKDOWN).is_file()
     assert (tmp_path / "runs" / waiting.run_id / HTML_REPORT).is_file()
@@ -194,7 +222,12 @@ def test_runner_completes_clean_structured_document(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    result = CoreRunner(tmp_path / "runs").start(source)
+    runner = CoreRunner(tmp_path / "runs")
+    result = runner.start(source)
+    assert result.status == "waiting"
+    assert "audit.seal" not in result.artifacts
+    _approve_all(tmp_path / "runs" / result.run_id)
+    result = runner.resume(result.run_id)
 
     assert result.status == "succeeded"
     assert result.unresolved_question_ids == []
@@ -203,6 +236,84 @@ def test_runner_completes_clean_structured_document(tmp_path: Path) -> None:
     assert "audit.seal" in result.artifacts
     with pytest.raises(RuntimeError, match="sealed"):
         RunStore(tmp_path / "runs").write_text(result.run_id, FINAL_MARKDOWN, "tampered")
+
+
+@pytest.mark.unit
+def test_recovery_uses_registered_decisions_not_mutable_yaml(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "input.md"
+    source.write_text("# Source\n\nStatus: TBD\n", encoding="utf-8")
+    runner = CoreRunner(tmp_path / "runs")
+    waiting = runner.start(source)
+    run_path = tmp_path / "runs" / waiting.run_id
+    _approve_all(run_path)
+
+    def interrupted(*_: object, **__: object) -> RunRecord:
+        raise RuntimeError("simulated promotion interruption")
+
+    monkeypatch.setattr(runner, "_finish", interrupted)
+    with pytest.raises(RuntimeError, match="simulated promotion interruption"):
+        runner.resume(waiting.run_id)
+
+    registered = runner.store.load_run(waiting.run_id)
+    assert "review.decisions" in registered.artifacts
+    canonical = json.loads((run_path / "json/06-decisions.json").read_text(encoding="utf-8"))
+    assert canonical["decisions"][0]["answer"] == "approved"
+    runner.store.save_run(registered.model_copy(update={"status": "running", "phase": "rewrite"}))
+    decisions = run_path / DECISIONS_YAML
+    decisions.write_text(
+        decisions.read_text(encoding="utf-8").replace("answer: approved", "answer: compromised"),
+        encoding="utf-8",
+    )
+    monkeypatch.undo()
+
+    recovered = runner.resume(waiting.run_id)
+
+    assert recovered.status == "succeeded"
+    assert "audit.seal" in recovered.artifacts
+    final = (run_path / FINAL_MARKDOWN).read_text(encoding="utf-8")
+    assert "Status: approved" in final
+    assert "compromised" not in final
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "runner_kwargs",
+    [
+        {"document_type": "desktop_procedure"},
+        {"recipe_pack": Path(__file__).parents[3] / "reference_packs" / "enterprise_core"},
+    ],
+    ids=["changed-configuration", "changed-recipe"],
+)
+def test_recovery_blocks_changed_recipe_or_configuration(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    runner_kwargs: dict[str, object],
+) -> None:
+    source = tmp_path / "input.md"
+    source.write_text("# Source\n\nStatus: TBD\n", encoding="utf-8")
+    runner = CoreRunner(tmp_path / "runs")
+    waiting = runner.start(source)
+    run_path = tmp_path / "runs" / waiting.run_id
+    _approve_all(run_path)
+
+    def interrupted(*_: object, **__: object) -> RunRecord:
+        raise RuntimeError("simulated promotion interruption")
+
+    monkeypatch.setattr(runner, "_finish", interrupted)
+    with pytest.raises(RuntimeError, match="simulated promotion interruption"):
+        runner.resume(waiting.run_id)
+    monkeypatch.undo()
+
+    registered = runner.store.load_run(waiting.run_id)
+    runner.store.save_run(registered.model_copy(update={"status": "failed", "phase": "verify"}))
+    changed_runner = CoreRunner(tmp_path / "runs", **runner_kwargs)
+
+    with pytest.raises(RecipeConfigurationMismatchError):
+        changed_runner.resume(waiting.run_id)
+
+    assert not (run_path / SEAL).exists()
 
 
 @pytest.mark.unit
@@ -255,8 +366,8 @@ def test_resume_rehydrates_an_interrupted_analyze_phase(tmp_path: Path) -> None:
 
     resumed = CoreRunner(tmp_path / "runs").resume("interrupted")
 
-    assert resumed.status == "succeeded"
-    assert resumed.phase == "verify"
+    assert resumed.status == "waiting"
+    assert resumed.phase == "human_review"
 
 
 @pytest.mark.unit
@@ -276,13 +387,13 @@ def test_resume_retries_a_failed_verification_with_current_rewrite_contract(
     source.write_text("# Source\n\nThe owner reviews the result.\n", encoding="utf-8")
     runner = CoreRunner(tmp_path / "runs", rewrite_provider=RewriteStub())
 
-    failed = runner.start(source)
-    resumed = runner.resume(failed.run_id)
+    waiting = runner.start(source)
+    _approve_all(tmp_path / "runs" / waiting.run_id)
+    resumed = runner.resume(waiting.run_id)
 
-    assert failed.status == "failed"
-    assert failed.phase == "verify"
     assert resumed.status == "succeeded"
     assert "audit.seal" in resumed.artifacts
+    assert runner.rewrite_provider.calls == 0
 
 
 @pytest.mark.unit
@@ -298,12 +409,18 @@ def test_provider_enrichment_and_rewrite_are_recorded_as_optional_artifacts(tmp_
     source = tmp_path / "input.md"
     source.write_text("# Source\n\nThe owner reviews the result.\n", encoding="utf-8")
 
-    result = CoreRunner(
+    runner = CoreRunner(
         tmp_path / "runs", review_provider=ReviewStub(), rewrite_provider=RewriteStub()
-    ).start(source)
+    )
+    result = runner.start(source)
+    _approve_all(tmp_path / "runs" / result.run_id)
+    result = runner.resume(result.run_id)
 
     assert result.status == "succeeded"
-    assert "Owner approved." in (tmp_path / "runs" / result.run_id / FINAL_MARKDOWN).read_text()
+    assert (
+        "The owner reviews the result."
+        in (tmp_path / "runs" / result.run_id / FINAL_MARKDOWN).read_text()
+    )
     assert (tmp_path / "runs" / result.run_id / REWRITE_PLAN).is_file()
 
 
@@ -411,7 +528,10 @@ def test_runner_preserves_source_screenshot_as_referenced_appendix(tmp_path: Pat
         encoding="utf-8",
     )
 
-    result = CoreRunner(tmp_path / "runs").start(source)
+    runner = CoreRunner(tmp_path / "runs")
+    result = runner.start(source)
+    _approve_all(tmp_path / "runs" / result.run_id)
+    result = runner.resume(result.run_id)
     run_path = tmp_path / "runs" / result.run_id
     source_metadata = json.loads((run_path / SOURCE_METADATA).read_text(encoding="utf-8"))
     final_markdown = (run_path / FINAL_MARKDOWN).read_text(encoding="utf-8")
@@ -447,7 +567,10 @@ def test_runner_carries_docx_screenshot_into_final_docx_appendix(tmp_path: Path)
     caption.style = "Caption"
     document.save(str(source))
 
-    result = CoreRunner(tmp_path / "runs").start(source)
+    runner = CoreRunner(tmp_path / "runs")
+    result = runner.start(source)
+    _approve_all(tmp_path / "runs" / result.run_id)
+    result = runner.resume(result.run_id)
     run_path = tmp_path / "runs" / result.run_id
     final_markdown = (run_path / FINAL_MARKDOWN).read_text(encoding="utf-8")
 
@@ -482,7 +605,7 @@ def test_review_provider_uses_one_macro_call_and_bounded_section_batches(tmp_pat
 
     result = CoreRunner(tmp_path / "runs", review_provider=provider).start(source)
 
-    assert result.status == "succeeded"
+    assert result.status == "waiting"
     assert provider.batch_sizes == [0, 4, 4, 1]
 
 
@@ -591,7 +714,10 @@ def test_independent_audit_provider_is_recorded_without_changing_offline_contrac
     source = tmp_path / "input.md"
     source.write_text("# Source\n\nThe owner reviews the result.\n", encoding="utf-8")
 
-    result = CoreRunner(tmp_path / "runs", audit_provider=AuditStub()).start(source)
+    runner = CoreRunner(tmp_path / "runs", audit_provider=AuditStub())
+    result = runner.start(source)
+    _approve_all(tmp_path / "runs" / result.run_id)
+    result = runner.resume(result.run_id)
 
     assert result.status == "succeeded"
     audit = json.loads((tmp_path / "runs" / result.run_id / AUDIT).read_text(encoding="utf-8"))

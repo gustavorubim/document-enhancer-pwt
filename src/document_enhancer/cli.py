@@ -23,6 +23,7 @@ from .core import (
     GeminiReviewProvider,
     GeminiRewriteProvider,
     GeminiStructureProvider,
+    GeminiTransformationProvider,
     RunRecord,
     RunStore,
 )
@@ -30,6 +31,7 @@ from .core.layout import AUDIT, AUDIT_MARKDOWN, DECISIONS_YAML, FINAL_MARKDOWN, 
 from .core.recipes import load_recipe
 from .errors import DocumentEnhancerError
 from .llm.models import GeminiGatewayConfig, GeminiModelGateway
+from .llm.multimodal import GeminiMultimodalProvider
 from .references.loader import bundled_reference_pack_path
 
 app = typer.Typer(
@@ -226,6 +228,8 @@ def _runner(
         structure_mode=structure_mode,
         execution_mode=execution_mode,
         structure_provider=GeminiStructureProvider(gateway),
+        transformation_provider=GeminiTransformationProvider(gateway),
+        visual_provider=GeminiMultimodalProvider(gateway),
         review_provider=GeminiReviewProvider(gateway),
         rewrite_provider=GeminiRewriteProvider(gateway),
         audit_provider=GeminiAuditProvider(gateway),
