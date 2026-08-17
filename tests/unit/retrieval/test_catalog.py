@@ -85,6 +85,8 @@ def test_atomic_catalog_hybrid_search_namespaces_graph_and_filters(tmp_path: Pat
         "linked_chunks": 3,
         "unmatched_chunks": 2,
         "ambiguous_chunks": 0,
+        "source_to_target_chunks": 0,
+        "label_chunks": 3,
     }
     with RagCatalog.open(catalog_path, embeddings) as catalog:
         exact = catalog.search("POL-42 monthly review", limit=5)
@@ -272,7 +274,61 @@ def test_ambiguous_graph_labels_are_reported_not_guessed(tmp_path: Path) -> None
         "linked_chunks": 0,
         "unmatched_chunks": 1,
         "ambiguous_chunks": 1,
+        "source_to_target_chunks": 0,
+        "label_chunks": 0,
     }
+
+
+@pytest.mark.unit
+def test_rewritten_heading_links_through_verified_source_target_ids(tmp_path: Path) -> None:
+    bundle = write_bundle(
+        tmp_path / "runs",
+        "run-renamed",
+        "# Payments\n\n## Governance and Monitoring\n\nThe owner records each review.\n",
+        nodes=[
+            {
+                "node_id": "sec-controls",
+                "label": "Controls",
+                "node_type": "Control",
+                "provenance_span_ids": ["span-controls"],
+            }
+        ],
+        source_targets=[
+            {
+                "source_section_id": "sec-controls",
+                "source_title": "Controls",
+                "target_section_id": "template-monitoring",
+                "target_heading": "Governance and Monitoring",
+                "source_span_ids": ["span-controls"],
+            }
+        ],
+    )
+    embeddings = DeterministicEmbeddings()
+    path = tmp_path / "catalog"
+
+    summary = RagCatalogBuilder(path, embeddings).build([bundle])
+
+    assert summary["linking"] == {
+        "linked_chunks": 1,
+        "unmatched_chunks": 1,
+        "ambiguous_chunks": 0,
+        "source_to_target_chunks": 1,
+        "label_chunks": 0,
+    }
+    with RagCatalog.open(path, embeddings) as catalog:
+        chunk = next(
+            item
+            for item in catalog.chunks()
+            if item.heading_path[-1] == "Governance and Monitoring"
+        )
+        expansion = catalog.expand_graph(["run-renamed::sec-controls"])
+
+    assert chunk.target_section_id == "template-monitoring"
+    assert chunk.source_section_ids == ("sec-controls",)
+    assert chunk.link_method == "source_to_target"
+    assert chunk.graph_node_ids == ("run-renamed::sec-controls",)
+    assert chunk.provenance_span_ids == ("span-controls",)
+    assert chunk.chunk_id in {item.chunk_id for item in expansion.chunks}
 
 
 @pytest.mark.unit

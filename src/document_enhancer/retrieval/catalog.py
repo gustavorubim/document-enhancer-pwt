@@ -12,7 +12,7 @@ import uuid
 from collections import defaultdict, deque
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 import faiss
 import numpy as np
@@ -25,7 +25,7 @@ from .chunking import CHUNKER_VERSION, chunk_markdown
 from .embeddings import embedding_profile, format_document
 from .models import EmbeddingProfile, GraphExpansion, GraphPath, RagChunk, RetrievalHit
 
-CATALOG_SCHEMA = "document-enhancer.rag.catalog.v1"
+CATALOG_SCHEMA = "document-enhancer.rag.catalog.v2"
 _TOKEN_RE = re.compile(r"[A-Za-z0-9_]{2,}")
 _NORMALIZE_RE = re.compile(r"[^a-z0-9]+")
 
@@ -84,7 +84,13 @@ class RagCatalogBuilder:
     ) -> tuple[list[RagChunk], dict[str, tuple[str, ...]], dict[str, int]]:
         all_chunks: list[RagChunk] = []
         node_links: dict[str, tuple[str, ...]] = {}
-        linking = {"linked_chunks": 0, "unmatched_chunks": 0, "ambiguous_chunks": 0}
+        linking = {
+            "linked_chunks": 0,
+            "unmatched_chunks": 0,
+            "ambiguous_chunks": 0,
+            "source_to_target_chunks": 0,
+            "label_chunks": 0,
+        }
         for snapshot in snapshots:
             markdown = (snapshot.path / FINAL_MARKDOWN).read_text(encoding="utf-8")
             chunks = chunk_markdown(
@@ -97,35 +103,85 @@ class RagCatalogBuilder:
                 chunk_overlap=self.chunk_overlap,
             )
             labels: dict[str, list[Mapping[str, Any]]] = defaultdict(list)
+            nodes_by_id: dict[str, Mapping[str, Any]] = {}
             for node in snapshot.nodes:
                 labels[_normalized(str(node["label"]))].append(node)
+                nodes_by_id[str(node["node_id"])] = node
+            source_targets: dict[str, list[Any]] = defaultdict(list)
+            for link in snapshot.source_targets:
+                if link.target_section_id and link.target_heading:
+                    source_targets[_normalized(link.target_heading)].append(link)
             for chunk in chunks:
                 leaf = _normalized(chunk.heading_path[-1])
-                matches = labels.get(leaf, [])
-                if len(matches) == 1:
-                    linking["linked_chunks"] += 1
-                elif matches:
-                    linking["ambiguous_chunks"] += 1
-                else:
-                    linking["unmatched_chunks"] += 1
-                linked = (
-                    tuple(f"{snapshot.run_id}::{str(node['node_id'])}" for node in matches)
-                    if len(matches) == 1
-                    else ()
-                )
-                provenance = (
-                    tuple(
-                        dict.fromkeys(
-                            str(span)
-                            for node in matches
-                            for span in cast(list[object], node.get("provenance_span_ids", []))
+                linked: tuple[str, ...] = ()
+                provenance: tuple[str, ...] = ()
+                source_section_ids: tuple[str, ...] = ()
+                target_section_id: str | None = None
+                link_method = "none"
+                explicit = source_targets.get(leaf, [])
+                if explicit:
+                    target_ids = tuple(dict.fromkeys(link.target_section_id for link in explicit))
+                    if len(target_ids) == 1:
+                        target_section_id = target_ids[0]
+                        source_section_ids = tuple(
+                            dict.fromkeys(
+                                link.source_section_id
+                                for link in explicit
+                                if link.source_section_id
+                            )
                         )
-                    )
-                    if len(matches) == 1
-                    else ()
-                )
+                        linked = tuple(
+                            f"{snapshot.run_id}::{section_id}" for section_id in source_section_ids
+                        )
+                        provenance = tuple(
+                            dict.fromkeys(
+                                [span for link in explicit for span in link.source_span_ids]
+                                + [
+                                    str(span)
+                                    for section_id in source_section_ids
+                                    for span in cast(
+                                        list[object],
+                                        nodes_by_id[section_id].get("provenance_span_ids", []),
+                                    )
+                                ]
+                            )
+                        )
+                        if linked:
+                            linking["linked_chunks"] += 1
+                            linking["source_to_target_chunks"] += 1
+                            link_method = "source_to_target"
+                        else:
+                            linking["unmatched_chunks"] += 1
+                    else:
+                        linking["ambiguous_chunks"] += 1
+                else:
+                    matches = labels.get(leaf, [])
+                    if len(matches) == 1:
+                        linking["linked_chunks"] += 1
+                        linking["label_chunks"] += 1
+                        source_section_ids = (str(matches[0]["node_id"]),)
+                        linked = (f"{snapshot.run_id}::{source_section_ids[0]}",)
+                        provenance = tuple(
+                            dict.fromkeys(
+                                str(span)
+                                for span in cast(
+                                    list[object], matches[0].get("provenance_span_ids", [])
+                                )
+                            )
+                        )
+                        link_method = "label"
+                    elif matches:
+                        linking["ambiguous_chunks"] += 1
+                    else:
+                        linking["unmatched_chunks"] += 1
                 enriched = chunk.model_copy(
-                    update={"graph_node_ids": linked, "provenance_span_ids": provenance}
+                    update={
+                        "target_section_id": target_section_id,
+                        "source_section_ids": source_section_ids,
+                        "link_method": link_method,
+                        "graph_node_ids": linked,
+                        "provenance_span_ids": provenance,
+                    }
                 )
                 all_chunks.append(enriched)
                 node_links[enriched.chunk_id] = linked
@@ -176,6 +232,9 @@ class RagCatalogBuilder:
                     start_index INTEGER NOT NULL,
                     end_index INTEGER NOT NULL,
                     text TEXT NOT NULL,
+                    target_section_id TEXT,
+                    source_section_ids TEXT NOT NULL,
+                    link_method TEXT NOT NULL,
                     provenance_span_ids TEXT NOT NULL
                 );
                 CREATE VIRTUAL TABLE chunks_fts USING fts5(chunk_id UNINDEXED, text);
@@ -220,7 +279,7 @@ class RagCatalogBuilder:
                 ],
             )
             connection.executemany(
-                "INSERT INTO chunks VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO chunks VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 [
                     (
                         chunk.chunk_id,
@@ -236,6 +295,9 @@ class RagCatalogBuilder:
                         chunk.start_index,
                         chunk.end_index,
                         chunk.text,
+                        chunk.target_section_id,
+                        json.dumps(chunk.source_section_ids),
+                        chunk.link_method,
                         json.dumps(chunk.provenance_span_ids),
                     )
                     for vector_id, chunk in enumerate(chunks)
@@ -735,6 +797,9 @@ class RagCatalog:
         node_rows = self.connection.execute(
             "SELECT node_id FROM chunk_nodes WHERE chunk_id = ? ORDER BY node_id", (chunk_id,)
         ).fetchall()
+        link_method = str(row["link_method"])
+        if link_method not in {"none", "source_to_target", "label"}:
+            raise ValueError(f"catalog chunk has invalid link method: {link_method}")
         return RagChunk(
             chunk_id=str(row["chunk_id"]),
             run_id=str(row["run_id"]),
@@ -748,6 +813,14 @@ class RagCatalog:
             start_index=int(row["start_index"]),
             end_index=int(row["end_index"]),
             text=str(row["text"]),
+            target_section_id=(
+                str(row["target_section_id"]) if row["target_section_id"] is not None else None
+            ),
+            source_section_ids=tuple(json.loads(str(row["source_section_ids"]))),
+            link_method=cast(
+                Literal["none", "source_to_target", "label"],
+                link_method,
+            ),
             graph_node_ids=tuple(str(item["node_id"]) for item in node_rows),
             provenance_span_ids=tuple(json.loads(str(row["provenance_span_ids"]))),
         )

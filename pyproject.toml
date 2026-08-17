@@ -13,7 +13,7 @@ authors = [{ name = "Document Enhancer contributors" }]
 dependencies = [
   "markdown-it-py>=4.0,<5",
   "pydantic>=2.10,<3",
-  "pypdf>=5.0,<7",
+  "pypdf[image]>=5.0,<7",
   "python-docx>=1.1,<2",
   "rich>=13.9,<15",
   "ruamel.yaml>=0.18,<0.19",

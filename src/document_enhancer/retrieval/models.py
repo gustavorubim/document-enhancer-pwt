@@ -38,6 +38,9 @@ class RagChunk(BaseModel):
     start_index: int = Field(ge=0)
     end_index: int = Field(ge=0)
     text: str
+    target_section_id: str | None = None
+    source_section_ids: tuple[str, ...] = ()
+    link_method: Literal["none", "source_to_target", "label"] = "none"
     graph_node_ids: tuple[str, ...] = ()
     provenance_span_ids: tuple[str, ...] = ()
 

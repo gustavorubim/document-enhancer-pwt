@@ -7,6 +7,7 @@ from typing import cast
 
 import pytest
 
+from document_enhancer.core import providers as provider_models
 from document_enhancer.core.context_budget import ContextBudgetError, preflight_context
 from document_enhancer.core.providers import GeminiTransformationProvider
 from document_enhancer.core.transformation import VisualExtraction as BundleVisualExtraction
@@ -16,6 +17,14 @@ from document_enhancer.llm import FakeStructuredModel, GeminiGatewayConfig, Gemi
 _SOURCE_DIGEST = "a" * 64
 _RECIPE_DIGEST = "b" * 64
 _FIGURE_DIGEST = "c" * 64
+
+
+def test_mapping_schema_does_not_solicit_draft_prose() -> None:
+    schema_model = provider_models._ProviderMappingResponse
+    schema = schema_model.model_json_schema()
+    placement = schema["$defs"]["_ProviderTemplatePlacement"]["properties"]
+
+    assert "rewritten_markdown" not in placement
 
 
 def _visual() -> VisualExtraction:
@@ -219,6 +228,29 @@ def test_mapping_returns_macro_sections_process_questions_dispositions_coverage_
     assert "# Purpose" not in manifest_text
 
 
+def test_mapping_canonicalizes_provider_gap_ids_and_remaps_placement_references() -> None:
+    response = _mapping_response(with_gap=True)
+    gaps = cast(list[dict[str, object]], response["gaps"])
+    placements = cast(list[dict[str, object]], response["template_placement"])
+    gaps[0]["gap_id"] = "GAP-TABULAR-DATA"
+    placements[1]["gap_ids"] = ["GAP-TABULAR-DATA"]
+    provider = GeminiTransformationProvider(_gateway([response]))
+
+    result = provider.map_document(
+        source_text="Purpose and missing control source.",
+        source_digest=_SOURCE_DIGEST,
+        template_text="# Purpose\n# Controls",
+        source_spans=[
+            {"span_id": "span-1", "text": "Purpose source."},
+            {"span_id": "span-2", "text": "Missing control source."},
+        ],
+    )
+
+    assert result.bundle.gaps[0].gap_id == "GAP-001"
+    assert result.bundle.template_sections[1].gap_ids == ["GAP-001"]
+    assert result.template_placement[1].gap_ids == ["GAP-001"]
+
+
 def test_draft_consumes_frozen_mapping_and_returns_typed_sections() -> None:
     provider = GeminiTransformationProvider(
         _gateway([_mapping_response(with_gap=False), _draft_response()])
@@ -275,6 +307,57 @@ def test_draft_rejects_provider_reference_changes() -> None:
             mapping=mapping,
             template_text="# Purpose\n# Controls",
         )
+
+
+def test_draft_rejects_template_placeholders_in_generated_prose() -> None:
+    placeholder_draft = _draft_response()
+    sections = cast(list[dict[str, object]], placeholder_draft["sections"])
+    sections[0]["rewritten_markdown"] = "| Owner | Approval date |\n| --- | --- |\n| Ops | TBD |"
+    provider = GeminiTransformationProvider(
+        _gateway([_mapping_response(with_gap=False), placeholder_draft])
+    )
+    mapping = provider.map_document(
+        source_text="Purpose and control source.",
+        source_digest=_SOURCE_DIGEST,
+        template_text="# Purpose\n# Controls",
+        source_spans=[
+            {"span_id": "span-1", "text": "Purpose source."},
+            {"span_id": "span-2", "text": "Control source."},
+        ],
+    )
+
+    with pytest.raises(ValueError, match="unsupported placeholder text"):
+        provider.generate_draft(
+            source_text="Purpose and control source.",
+            mapping=mapping,
+            template_text="# Purpose\n# Controls",
+        )
+
+
+def test_draft_preserves_source_origin_placeholder_for_human_review() -> None:
+    placeholder_draft = _draft_response()
+    sections = cast(list[dict[str, object]], placeholder_draft["sections"])
+    sections[0]["rewritten_markdown"] = "The source status remains TBD."
+    provider = GeminiTransformationProvider(
+        _gateway([_mapping_response(with_gap=False), placeholder_draft])
+    )
+    mapping = provider.map_document(
+        source_text="Purpose status is TBD. Control source.",
+        source_digest=_SOURCE_DIGEST,
+        template_text="# Purpose\n# Controls",
+        source_spans=[
+            {"span_id": "span-1", "text": "Purpose status is TBD."},
+            {"span_id": "span-2", "text": "Control source."},
+        ],
+    )
+
+    draft = provider.generate_draft(
+        source_text="Purpose status is TBD. Control source.",
+        mapping=mapping,
+        template_text="# Purpose\n# Controls",
+    )
+
+    assert draft.sections[0].rewritten_markdown.endswith("TBD.")
 
 
 def test_independent_audit_rejects_provider_fidelity_findings() -> None:

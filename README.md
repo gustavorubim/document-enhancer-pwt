@@ -9,12 +9,20 @@ The product is intentionally file-backed and linear: no workflow engine, databas
 retrieval system, prompt-pack runtime, Deep Agents runtime, or compatibility mode is required on the
 authoring path.
 
+The evidence-backed current delivery state is recorded in [plan.md](plan.md); the frozen
+implementation contract and its verification history remain in
+[DRAFT_FIRST_IMPLEMENTATION_PLAN.md](DRAFT_FIRST_IMPLEMENTATION_PLAN.md) and
+[DRAFT_FIRST_IMPLEMENTATION_EVIDENCE.md](DRAFT_FIRST_IMPLEMENTATION_EVIDENCE.md).
+
 ## Operator journey
 
 1. Drop one `.md`, `.txt`, `.docx`, or `.pdf` into an inbox (or pass the file path) and select the
    reference pack/template and document type.
-2. Run Stage 1. Parse with heuristics and optional bounded LLM structure recovery, then write the
-   candidate draft, macro/section/flow analysis, contextual questions, and visual review markers.
+2. Run Stage 1. Parse with heuristics and optional bounded LLM structure recovery, analyze the
+   complete source against the selected template, and immediately write source-supported content in
+   the correct target sections. Missing or ambiguous content stays visible as typed review callouts.
+   Stage 1 also writes the macro/section/flow analysis, contextual questions with safe suggestions,
+   and visual review markers.
 3. Open `report.html`, read the candidate draft first, and compare the inferred and proposed Mermaid
    diagrams when a process is documented.
 4. Answer questions and steering in `review/decisions.yaml`, then set explicit
@@ -52,7 +60,7 @@ flowchart LR
     ingest --> runner
     recipe --> runner
     runner --> store["RunStore<br/>atomic named artifacts"]
-    runner -. "bounded typed calls;<br/>live optional" .-> providers["Structure, visual, mapping,<br/>draft, review, rewrite, and audit providers"]
+    runner -. "bounded typed calls;<br/>live optional" .-> providers["Structure, visual, mapping,<br/>draft, fidelity, revision, and audit providers"]
     providers --> gateway["GeminiModelGateway<br/>budgets, repair, cache, call manifests"]
     store --> bundle["Run bundle<br/>reviewed, audited, optionally sealed"]
     bundle -. "explicit rag index" .-> catalog["Local RAG catalog<br/>SQLite FTS5 + FAISS + graph"]
@@ -151,8 +159,8 @@ sequenceDiagram
     Runner->>Inputs: parse, normalize, score structure, load rubric
     Inputs-->>Runner: spans, sections, figures, recipe
     opt execution-mode live
-        Runner->>Models: bounded typed structure and review calls
-        Models-->>Runner: candidates with source-span references
+        Runner->>Models: bounded typed mapping, drafting, and fidelity calls
+        Models-->>Runner: candidates with frozen source-span references
     end
     Runner->>Store: write source, candidate draft, review, Mermaid, YAML, and report.html
     Store-->>CLI: waiting run record
@@ -177,12 +185,14 @@ sequenceDiagram
 ### Model and agent boundaries
 
 The authoring runtime is **not** a free-running agent and does not use Deep Agents. `CoreRunner`
-selects each operation and the application owns every promotion decision. Bounded typed providers
-use full-context preflight: structure recovery is called only when heuristics route to it; visual
-interpretation is limited to eligible extracted images; mapping, drafting, and draft audit consume
-the complete source/template/visual context within explicit budgets; review and rewrite receive
-typed evidence and approved decisions; and the independent content audit is additive to
-deterministic checks. Every model-derived visual table or diagram remains a human-review candidate.
+selects each operation and the application owns every promotion decision. It also does not use one
+opaque all-purpose model call: mapping/analysis, section drafting, draft fidelity, targeted Stage 2
+revision, and final audit have separate typed contracts. Bounded providers use full-context
+preflight: structure recovery is called only when heuristics route to it; visual interpretation is
+limited to eligible extracted images; mapping, drafting, and draft audit consume the complete
+source/template/visual context within explicit budgets; revisions receive typed evidence and
+approved decisions; and independent content audits are additive to deterministic checks. Every
+model-derived visual table or diagram remains a human-review candidate.
 
 The optional RAG runtime contains the tool-using agent. `AdaptiveRagAnswerer` routes focused
 questions to a bounded LangChain agent and corpus-wide questions to a question-driven map/reduce
@@ -194,15 +204,19 @@ flowchart TB
     subgraph authoring["Authoring: deterministic orchestration"]
         runner2["CoreRunner"] --> router["Heuristic structure router"]
         router -. "low quality + live" .-> structure["GeminiStructureProvider"]
-        runner2 -. "live" .-> review["GeminiReviewProvider"]
-        runner2 -. "approved decisions + live" .-> rewrite["GeminiRewriteProvider"]
-        runner2 -. "live" .-> audit["GeminiAuditProvider"]
+        runner2 -. "live" .-> mapping["Whole-document mapping + analysis"]
+        runner2 -. "frozen mapping + live" .-> drafting["Typed section drafting"]
+        runner2 -. "candidate + live" .-> fidelity["Independent draft fidelity"]
+        runner2 -. "approved decisions + live" .-> revision["Targeted revision"]
+        runner2 -. "final + live" .-> audit["Independent final audit"]
         structure --> gateway2["GeminiModelGateway"]
-        review --> gateway2
-        rewrite --> gateway2
+        mapping --> gateway2
+        drafting --> gateway2
+        fidelity --> gateway2
+        revision --> gateway2
         audit --> gateway2
         gateway2 --> typed["Strict Pydantic candidate"]
-        typed --> gates["Span, decision, graph, source-retention,<br/>figure, and audit promotion gates"]
+        typed --> gates["Span mapping, placeholder, decision, graph,<br/>figure, fidelity, and audit gates"]
         gates --> runner2
     end
 
@@ -236,11 +250,16 @@ flowchart TB
 - Stage 1 candidate artifacts are unapproved and never final or retrieval-authoritative. Stage 2
   validates explicit approval, immutable artifact digests, provenance, visual review, and audit
   results before emitting a strict `core.seal.v2` manifest.
+- The Stage 1 candidate retains the source document title. Provider-generated prose cannot contain
+  unresolved `TBD`/`TODO`/`TBC` markers copied from a template; missing data must be represented by
+  the frozen structured gap/question contract and resolved or explicitly waived before sealing.
 - The final Markdown is the canonical approved text. DOCX, semantic JSON, ontology JSON, Mermaid,
-  graph JSONL, and source-to-target CSV are derived outputs from the same reviewed run.
+  graph JSONL, and `core.source-target.v2` CSV are derived outputs from the same reviewed run. The
+  v2 map makes renamed target headings traceable to source section IDs and spans.
 - Retrieval indexing is explicit and fail-closed: it accepts passing sealed bundles, embeds only
   `markdown/07-final-document.md`, loads ontology as graph data, validates staged counts and hashes,
-  and atomically replaces the previous local catalog only after validation.
+  uses explicit source-to-target links before label fallback, and atomically replaces the previous
+  local catalog only after validation.
 
 When an implementation change moves a responsibility or changes a transition, update the relevant
 diagram and table in this section in the same task. `AGENTS.md` makes that README synchronization a
@@ -401,7 +420,7 @@ runs/RUN_ID/
 ├── documents/                  # original source and styled DOCX with native headings/tables
 ├── assets/source/              # immutable extracted source screenshots
 ├── assets/final/               # screenshot copies embedded by the final renderers
-├── data/                       # graph.jsonl and source-to-target.csv
+├── data/                       # graph.jsonl and v2 source-to-target.csv provenance map
 └── debug/                      # optional provider call manifests in JSONL
 ```
 
@@ -415,14 +434,20 @@ complete strict-v2 seal and makes `markdown/07-final-document.md` eligible for r
 ## Quality boundaries
 
 - Parsers preserve source bytes, block order, locations, stable span IDs, warnings, and digests.
-- Embedded PNG/JPEG figures in the DOCX body and local relative PNG/JPEG Markdown images are assigned
-  stable `FIG-###` IDs, referenced from their source section, and rendered once in a final appendix.
-  PDF images remain inventoried but are not extracted, and remote Markdown images are never fetched.
+- Embedded PNG/JPEG figures in the DOCX body, local relative PNG/JPEG Markdown images, and supported
+  direct embedded PDF image XObjects are assigned stable `FIG-###` IDs, referenced from their source
+  section/page, and rendered once in a final appendix. PDF promotion is bounded to 16 images, 4 MiB
+  per image, 16 million pixels, and 8,192 pixels per dimension; unsupported or over-budget images
+  remain inventoried with warnings. Whole-page rasterization, OCR, and remote Markdown fetches are
+  not performed.
 - Heuristics choose parser structure or bounded LLM structure recovery; providers cannot invent
   source spans or replace deterministic evidence checks.
 - Cross-section ambiguity is consolidated into evidence-linked questions with safe suggestions only
   when the source or recipe supports them; missing owners, dates, thresholds, and approvals remain
   human decisions.
+- Mapping accounts for every source span exactly once. Drafting cannot change frozen section,
+  status, gap, figure, or provenance references, and template-only placeholders are rejected before
+  a candidate can reach human review.
 - Native tables are deterministic parser output. Eligible image tables and diagrams can receive
   bounded candidate conversions, but the original figure is retained and every conversion remains
   `requires_review` until an explicit human decision.
@@ -447,8 +472,10 @@ PYTHONPATH=src:. uv run python -m tests.evaluation.draft_first_evaluation \
 ```
 
 The evidence ledger is [DRAFT_FIRST_IMPLEMENTATION_EVIDENCE.md](DRAFT_FIRST_IMPLEMENTATION_EVIDENCE.md).
-Live-provider proof is separate from the offline reward and is reported as not run unless credentials
-are explicitly available and the live checks actually execute.
+Live-provider proof is separate from the offline reward. On 2026-08-16, fictional fixture run
+`a5af52fe075d-b1429e75a0` completed live Stage 1, applied one source-supported decision, passed every
+final audit check, and emitted a strict `core.seal.v2` bundle. No user document or secret is stored
+in that checked-in evidence ledger.
 
 ## Optional local RAG and GraphRAG CLI
 
@@ -483,6 +510,11 @@ The RAG catalog is written under `.document-enhancer/rag/catalog/` unless `--cat
 `DOCENHANCE_RAG_CATALOG` selects another path. A build stages and validates the SQLite FTS5 catalog,
 FAISS index, graph topology, row counts, embedding profile, and SHA-256 file digests before replacing
 the prior catalog. A failed or tampered input leaves the promoted catalog unchanged.
+
+Catalog schema v2 stores each chunk's target template section ID, explicit source section IDs, and
+link method. It consumes the sealed `core.source-target.v2` CSV before trying unique-label fallback,
+so rewritten headings can still expand the correct source graph topology. Ambiguous and unmatched
+chunks remain counted rather than being guessed into a link.
 
 Corpus selection is intentionally conservative:
 
@@ -706,4 +738,5 @@ uv run python scripts/verify_reference_pack.py reference_packs/enterprise_core
 uv build
 ```
 
-Active product objective and engineering guidance: `AGENTS.md`.
+Current implementation/release plan: `plan.md`. Product objective and engineering guidance:
+`AGENTS.md`.

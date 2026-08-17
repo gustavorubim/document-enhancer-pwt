@@ -1191,7 +1191,11 @@ class CoreRunner:
             template_text=self.recipe.template_text if self.recipe else "",
             visual_extractions=visuals,
         )
-        draft_markdown = self._render_candidate_draft(draft, visuals)
+        draft_markdown = self._render_candidate_draft(
+            draft,
+            visuals,
+            document_title=sections[0].title if sections else None,
+        )
         record = register_artifact(
             record,
             "draft.transformation",
@@ -1435,8 +1439,14 @@ class CoreRunner:
     def _render_candidate_draft(
         draft: DraftGenerationResult,
         visuals: list[RichVisualExtraction],
+        *,
+        document_title: str | None = None,
     ) -> str:
         text = draft.document_markdown.rstrip() + "\n"
+        if document_title:
+            safe_title = re.sub(r"[\r\n]+", " ", document_title).lstrip("# ").strip()
+            if safe_title:
+                text = re.sub(r"\A# Candidate draft\n", f"# {safe_title}\n", text, count=1)
         for extraction in visuals:
             if extraction.status == "unsupported":
                 continue
@@ -1852,7 +1862,7 @@ class CoreRunner:
             self.store.write_text(
                 record.run_id,
                 SOURCE_TO_TARGET_CSV,
-                source_target_csv(review, final_text),
+                source_target_csv(review, final_text, mapping=mapping),
                 media_type="text/csv; charset=utf-8",
             ),
         )
@@ -1867,7 +1877,11 @@ class CoreRunner:
                     plan.deferred_decision_ids
                 ),
                 "source_anchor_retained": source_anchor_retained(normalized, final_text),
-                "source_sections_accounted_for": source_sections_retained(review, final_text),
+                "source_sections_accounted_for": source_sections_retained(
+                    review,
+                    final_text,
+                    mapping=mapping.bundle if mapping is not None else None,
+                ),
                 "required_sections_present": required_sections_present(
                     self.recipe, final_text, waived_requirement_ids=waived
                 ),

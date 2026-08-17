@@ -66,7 +66,9 @@ def test_stage_one_materializes_candidate_and_stage_two_seals_only_after_approva
             DRAFT_VISUAL_EXTRACTIONS,
         )
     )
-    assert "UNAPPROVED DRAFT" in (run_path / DRAFT_DOCUMENT).read_text(encoding="utf-8")
+    candidate = (run_path / DRAFT_DOCUMENT).read_text(encoding="utf-8")
+    assert candidate.startswith("# Intake\n")
+    assert "UNAPPROVED DRAFT" in candidate
     assert (
         json.loads((run_path / DRAFT_TRANSFORMATION).read_text())["schema_version"]
         == "core.transformation-mapping.v1"

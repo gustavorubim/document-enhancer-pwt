@@ -6,13 +6,17 @@ import hashlib
 import io
 import re
 import zipfile
+from collections import Counter
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .figures import final_figure_path
 from .models import AuditReport, ReviewReport, SourceFigure
 from .recipes import Recipe
 from .review import title_matches
+
+if TYPE_CHECKING:
+    from .transformation import TransformationBundle
 
 
 def semantic_references_valid(semantic: dict[str, Any]) -> bool:
@@ -37,7 +41,36 @@ def graph_types_valid(semantic: dict[str, Any], recipe: Recipe | None) -> bool:
     return True
 
 
-def source_sections_retained(review: ReviewReport, final_text: str) -> bool:
+def source_sections_retained(
+    review: ReviewReport,
+    final_text: str,
+    *,
+    mapping: TransformationBundle | None = None,
+) -> bool:
+    """Verify that source sections remain accounted for after rewriting.
+
+    Template-aligned drafts can legitimately rename every heading.  For those runs, use the
+    validated span-disposition ledger instead of guessing from title tokens: every source span
+    must be placed or duplicated into a known destination, and each destination section must cite
+    that span.  Legacy runs without a mapping retain the conservative title-presence check.
+    """
+
+    if mapping is not None:
+        targets = {item.template_section_id: item for item in mapping.template_sections}
+        dispositions = {item.source_span_id: item for item in mapping.source_dispositions}
+        for section in review.sections:
+            for span_id in section.span_ids:
+                disposition = dispositions.get(span_id)
+                if disposition is None or disposition.action == "intentionally_omitted":
+                    return False
+                if not disposition.destination_section_ids:
+                    return False
+                for destination_id in disposition.destination_section_ids:
+                    target = targets.get(destination_id)
+                    if target is None or span_id not in target.source_span_ids:
+                        return False
+        return True
+
     lower_final = final_text.lower()
     for section in review.sections:
         tokens = [
@@ -103,8 +136,28 @@ def dual_flow_artifacts_present(review: ReviewReport) -> bool:
     return bool(review.inferred_mermaid.strip()) and bool(review.proposed_mermaid.strip())
 
 
+_UNRESOLVED_PLACEHOLDER_RE = re.compile(
+    r"\b(?:TBD|TODO|TBC)\b|\[\s*\?\s*\]|\?{3,}",
+    re.IGNORECASE,
+)
+
+
+def unresolved_placeholder_counts(text: str) -> Counter[str]:
+    """Return normalized unresolved-marker counts for provenance comparisons."""
+
+    markers: list[str] = []
+    for match in _UNRESOLVED_PLACEHOLDER_RE.finditer(text):
+        marker = match.group(0).upper()
+        if marker.startswith("["):
+            marker = "[?]"
+        elif marker.startswith("?"):
+            marker = "???"
+        markers.append(marker)
+    return Counter(markers)
+
+
 def no_unresolved_placeholders(final_text: str) -> bool:
-    return re.search(r"\b(?:TBD|TODO|TBC)\b|\[\s*\?\s*\]|\?{3,}", final_text, re.IGNORECASE) is None
+    return not unresolved_placeholder_counts(final_text)
 
 
 def deferred_decisions_resolved(deferred_ids: list[str]) -> bool:
@@ -268,4 +321,5 @@ __all__ = [
     "semantic_references_valid",
     "source_anchor_retained",
     "source_sections_retained",
+    "unresolved_placeholder_counts",
 ]

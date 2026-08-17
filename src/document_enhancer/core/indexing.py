@@ -7,6 +7,8 @@ importing ``CoreRunner``.
 
 from __future__ import annotations
 
+import csv
+import io
 import json
 import re
 import sqlite3
@@ -30,10 +32,23 @@ from .layout import (
     ONTOLOGY,
     ORIGINAL_DOCUMENT_PREFIX,
     SEAL,
+    SOURCE_TO_TARGET_CSV,
 )
 
 _DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
 _REQUIRED_MANIFEST_KEYS = REQUIRED_SEAL_ARTIFACT_KEYS
+
+
+@dataclass(frozen=True, slots=True)
+class SourceTargetLink:
+    """One verified final-heading to canonical source-section relationship."""
+
+    source_section_id: str
+    source_title: str
+    target_section_id: str
+    target_heading: str
+    disposition: str
+    source_span_ids: tuple[str, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,6 +71,7 @@ class SealedBundle:
     nodes: tuple[Mapping[str, Any], ...]
     edges: tuple[Mapping[str, Any], ...]
     sections: tuple[tuple[str, str], ...]
+    source_targets: tuple[SourceTargetLink, ...]
 
     @property
     def graph_records(self) -> tuple[Mapping[str, Any], ...]:
@@ -131,6 +147,25 @@ def load_sealed_bundle(bundle: Path) -> SealedBundle:
     if graph_node_ids != node_ids or _edge_keys(graph_edges) != _edge_keys(edges):
         raise ValueError("graph and ontology exports do not describe the same graph")
 
+    source_targets: tuple[SourceTargetLink, ...] = ()
+    source_target_ref = manifest.artifacts.get("audit.source_to_target")
+    if source_target_ref is not None:
+        if source_target_ref.path != SOURCE_TO_TARGET_CSV:
+            raise ValueError(
+                f"sealed artifact audit.source_to_target must use canonical path "
+                f"{SOURCE_TO_TARGET_CSV!r}"
+            )
+        source_target_bytes = _read_verified_bytes(
+            resolved,
+            source_target_ref,
+            key="audit.source_to_target",
+        )
+        source_targets = _parse_source_targets(
+            source_target_bytes,
+            final_digest=manifest.final_digest,
+            node_ids=node_ids,
+        )
+
     sections = tuple(_chunks(final_markdown))
     return SealedBundle(
         path=resolved,
@@ -149,6 +184,7 @@ def load_sealed_bundle(bundle: Path) -> SealedBundle:
         nodes=tuple(nodes),
         edges=tuple(edges),
         sections=sections,
+        source_targets=source_targets,
     )
 
 
@@ -348,6 +384,88 @@ def _read_object_bytes(raw: bytes, label: str) -> dict[str, Any]:
     return cast(dict[str, Any], value)
 
 
+def _parse_source_targets(
+    raw: bytes,
+    *,
+    final_digest: str,
+    node_ids: set[str],
+) -> tuple[SourceTargetLink, ...]:
+    """Parse either the current explicit linkage CSV or the historical four-column form."""
+
+    try:
+        text = raw.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise ValueError("source-to-target artifact is not valid UTF-8") from exc
+    reader = csv.DictReader(io.StringIO(text))
+    current_fields = [
+        "schema_version",
+        "source_section_id",
+        "source_title",
+        "target_section_id",
+        "target_heading",
+        "disposition",
+        "source_span_ids",
+        "final_digest",
+    ]
+    legacy_fields = ["section_id", "title", "disposition", "final_digest"]
+    if reader.fieldnames not in (current_fields, legacy_fields):
+        raise ValueError("source-to-target artifact has an unsupported header")
+
+    links: list[SourceTargetLink] = []
+    for line_number, row in enumerate(reader, start=2):
+        if row.get("final_digest") != final_digest:
+            raise ValueError(
+                f"source-to-target row {line_number} does not match the sealed final document"
+            )
+        if reader.fieldnames == legacy_fields:
+            source_id = str(row.get("section_id") or "").strip()
+            source_title = str(row.get("title") or "").strip()
+            target_id = source_id
+            target_heading = source_title
+            spans: tuple[str, ...] = ()
+        else:
+            if row.get("schema_version") != "core.source-target.v2":
+                raise ValueError(
+                    f"source-to-target row {line_number} has an unsupported schema version"
+                )
+            source_id = str(row.get("source_section_id") or "").strip()
+            source_title = str(row.get("source_title") or "").strip()
+            target_id = str(row.get("target_section_id") or "").strip()
+            target_heading = str(row.get("target_heading") or "").strip()
+            try:
+                span_values = json.loads(str(row.get("source_span_ids") or "[]"))
+            except json.JSONDecodeError as exc:
+                raise ValueError(
+                    f"source-to-target row {line_number} has invalid source_span_ids"
+                ) from exc
+            if not isinstance(span_values, list) or not all(
+                isinstance(value, str) and value for value in span_values
+            ):
+                raise ValueError(
+                    f"source-to-target row {line_number} source_span_ids must be strings"
+                )
+            spans = tuple(dict.fromkeys(str(value) for value in span_values))
+        if source_id and source_id not in node_ids:
+            raise ValueError(
+                f"source-to-target row {line_number} references unknown source section {source_id!r}"
+            )
+        if bool(target_id) != bool(target_heading):
+            raise ValueError(
+                f"source-to-target row {line_number} must provide both target ID and heading"
+            )
+        links.append(
+            SourceTargetLink(
+                source_section_id=source_id,
+                source_title=source_title,
+                target_section_id=target_id,
+                target_heading=target_heading,
+                disposition=str(row.get("disposition") or "").strip(),
+                source_span_ids=spans,
+            )
+        )
+    return tuple(links)
+
+
 def _parse_graph_jsonl(
     graph_jsonl: str,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
@@ -459,4 +577,4 @@ def _chunks(markdown: str) -> list[tuple[str, str]]:
     return chunks
 
 
-__all__ = ["CoreBundleIndex", "SealedBundle", "load_sealed_bundle"]
+__all__ = ["CoreBundleIndex", "SealedBundle", "SourceTargetLink", "load_sealed_bundle"]

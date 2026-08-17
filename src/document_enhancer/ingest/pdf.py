@@ -27,19 +27,219 @@ class ScannedPDFError(UnsupportedInputError):
     """Raised when OCR would be required to read one or more PDF pages."""
 
 
-def _page_has_images(page: Any) -> bool:
+def _page_image_objects(page: Any) -> list[tuple[str, Any]]:
+    """Return direct embedded image XObjects without rasterizing a page or running OCR."""
+
     try:
         resources = page.get("/Resources")
         if resources is None:
-            return False
+            return []
         resources = resources.get_object()
         xobjects = resources.get("/XObject")
         if xobjects is None:
-            return False
+            return []
         xobjects = xobjects.get_object()
-        return any(value.get_object().get("/Subtype") == "/Image" for value in xobjects.values())
+        return sorted(
+            (
+                (str(name), value.get_object())
+                for name, value in xobjects.items()
+                if value.get_object().get("/Subtype") == "/Image"
+            ),
+            key=lambda item: item[0],
+        )
     except (AttributeError, KeyError, TypeError, ValueError):
-        return False
+        return []
+
+
+def _unsupported_image_asset(
+    *,
+    source_digest: str,
+    page_number: int,
+    image_name: str,
+    source_span_id: str | None,
+    ordinal: int,
+    width: int,
+    height: int,
+    reason: str,
+) -> EmbeddedAsset:
+    location = SourceLocation(kind="pdf", page=page_number)
+    identity = f"{source_digest}:{page_number}:{image_name}:{reason}".encode()
+    return EmbeddedAsset(
+        asset_id=f"asset-{sha256_bytes(identity)[:20]}",
+        kind="figure",
+        name=f"page-{page_number}-{image_name.lstrip('/') or 'image'}",
+        source_span_id=source_span_id,
+        location=location,
+        safety="unsupported",
+        metadata={
+            "pdf_embedded_image": True,
+            "xobject": image_name,
+            "width": width,
+            "height": height,
+            "reason": reason,
+            "occurrences": [
+                {
+                    "source_span_id": source_span_id,
+                    "ordinal": ordinal,
+                    "location": location.model_dump(mode="json"),
+                }
+            ],
+        },
+    )
+
+
+def _extract_page_images(
+    page: Any,
+    *,
+    source_digest: str,
+    page_number: int,
+    source_span_id: str | None,
+    ordinal: int,
+    remaining_images: int,
+    max_image_bytes: int,
+    max_image_pixels: int,
+    max_image_dimension: int,
+) -> tuple[list[EmbeddedAsset], list[ExtractionWarning], int]:
+    assets: list[EmbeddedAsset] = []
+    warnings: list[ExtractionWarning] = []
+    extracted = 0
+    location = SourceLocation(kind="pdf", page=page_number)
+    for image_name, image_object in _page_image_objects(page):
+        try:
+            width = int(image_object.get("/Width", 0))
+            height = int(image_object.get("/Height", 0))
+        except (TypeError, ValueError):
+            width = height = 0
+        reason = ""
+        if remaining_images - extracted <= 0:
+            reason = "document_image_count_budget_exceeded"
+        elif (
+            width <= 0
+            or height <= 0
+            or width > max_image_dimension
+            or height > max_image_dimension
+            or width * height > max_image_pixels
+        ):
+            reason = "image_dimensions_budget_exceeded"
+        if reason:
+            assets.append(
+                _unsupported_image_asset(
+                    source_digest=source_digest,
+                    page_number=page_number,
+                    image_name=image_name,
+                    source_span_id=source_span_id,
+                    ordinal=ordinal,
+                    width=width,
+                    height=height,
+                    reason=reason,
+                )
+            )
+            warnings.append(
+                ExtractionWarning(
+                    code="pdf_image_budget_exceeded",
+                    message="An embedded PDF image exceeded the configured extraction budget and was inventoried without decoding.",
+                    severity="warning",
+                    location=location,
+                    source_digest=source_digest,
+                )
+            )
+            continue
+        try:
+            image = page.images[image_name]
+            payload = bytes(image.data)
+        except (ImportError, KeyError, PdfReadError, OSError, TypeError, ValueError):
+            assets.append(
+                _unsupported_image_asset(
+                    source_digest=source_digest,
+                    page_number=page_number,
+                    image_name=image_name,
+                    source_span_id=source_span_id,
+                    ordinal=ordinal,
+                    width=width,
+                    height=height,
+                    reason="image_decode_failed",
+                )
+            )
+            warnings.append(
+                ExtractionWarning(
+                    code="pdf_image_decode_failed",
+                    message="An embedded PDF image could not be decoded safely and remains an unsupported inventory entry.",
+                    severity="warning",
+                    location=location,
+                    source_digest=source_digest,
+                )
+            )
+            continue
+        suffix = Path(str(image.name)).suffix.lower()
+        media_type = (
+            "image/png"
+            if suffix == ".png" and payload.startswith(b"\x89PNG\r\n\x1a\n")
+            else "image/jpeg"
+            if suffix in {".jpg", ".jpeg"} and payload.startswith(b"\xff\xd8\xff")
+            else None
+        )
+        if media_type is None or len(payload) > max_image_bytes:
+            reason = (
+                "image_encoded_size_budget_exceeded"
+                if len(payload) > max_image_bytes
+                else "image_format_unsupported"
+            )
+            assets.append(
+                _unsupported_image_asset(
+                    source_digest=source_digest,
+                    page_number=page_number,
+                    image_name=image_name,
+                    source_span_id=source_span_id,
+                    ordinal=ordinal,
+                    width=width,
+                    height=height,
+                    reason=reason,
+                )
+            )
+            warnings.append(
+                ExtractionWarning(
+                    code=(
+                        "pdf_image_budget_exceeded"
+                        if len(payload) > max_image_bytes
+                        else "pdf_image_format_unsupported"
+                    ),
+                    message="An embedded PDF image was inventoried but not promoted because its decoded format or size is unsupported.",
+                    severity="warning",
+                    location=location,
+                    source_digest=source_digest,
+                )
+            )
+            continue
+        image_digest = sha256_bytes(payload)
+        assets.append(
+            EmbeddedAsset(
+                asset_id=f"asset-{image_digest[:20]}",
+                kind="figure",
+                name=f"page-{page_number}-{image_name.lstrip('/')}{suffix}",
+                source_span_id=source_span_id,
+                location=location,
+                media_type=media_type,
+                digest=image_digest,
+                size_bytes=len(payload),
+                safety="passive",
+                metadata={
+                    "pdf_embedded_image": True,
+                    "xobject": image_name,
+                    "width": width,
+                    "height": height,
+                    "occurrences": [
+                        {
+                            "source_span_id": source_span_id,
+                            "ordinal": ordinal,
+                            "location": location.model_dump(mode="json"),
+                        }
+                    ],
+                },
+                payload=payload,
+            )
+        )
+        extracted += 1
+    return assets, warnings, extracted
 
 
 def _page_links(page: Any, page_number: int) -> tuple[EmbeddedAsset, ...]:
@@ -78,7 +278,7 @@ def _page_links(page: Any, page_number: int) -> tuple[EmbeddedAsset, ...]:
 
 
 class PdfParser:
-    """Extract text per page using pypdf; image-only/scanned pages are unsupported."""
+    """Extract text and bounded direct image objects; image-only/scanned pages remain unsupported."""
 
     supported_suffixes = frozenset({".pdf"})
 
@@ -87,9 +287,27 @@ class PdfParser:
         *,
         max_source_bytes: int = DEFAULT_MAX_SOURCE_BYTES,
         fail_on_scanned: bool = True,
+        max_extracted_images: int = 16,
+        max_image_bytes: int = 4_000_000,
+        max_image_pixels: int = 16_000_000,
+        max_image_dimension: int = 8192,
     ) -> None:
+        if (
+            min(
+                max_extracted_images,
+                max_image_bytes,
+                max_image_pixels,
+                max_image_dimension,
+            )
+            <= 0
+        ):
+            raise ValueError("PDF image extraction budgets must be positive")
         self.max_source_bytes = max_source_bytes
         self.fail_on_scanned = fail_on_scanned
+        self.max_extracted_images = max_extracted_images
+        self.max_image_bytes = max_image_bytes
+        self.max_image_pixels = max_image_pixels
+        self.max_image_dimension = max_image_dimension
 
     def can_parse(self, source: Path) -> bool:
         return source.suffix.lower() in self.supported_suffixes
@@ -112,6 +330,7 @@ class PdfParser:
         warnings: list[ExtractionWarning] = []
         assets: list[EmbeddedAsset] = []
         scanned_pages: list[int] = []
+        extracted_image_count = 0
         for page_number, page in enumerate(reader.pages, start=1):
             try:
                 page_text = page.extract_text() or ""
@@ -170,18 +389,20 @@ class PdfParser:
                 blocks.append(block)
                 link_assets = _page_links(page, page_number)
                 assets.extend(link_assets)
-                if _page_has_images(page):
-                    assets.append(
-                        EmbeddedAsset(
-                            asset_id=f"asset-{sha256_bytes(f'pdf:{page_number}:figure'.encode())[:20]}",
-                            kind="figure",
-                            name=f"page-{page_number}-image",
-                            source_span_id=block.span_id,
-                            location=location,
-                            safety="unsupported",
-                            metadata={"page_image": True},
-                        )
-                    )
+                image_assets, image_warnings, extracted = _extract_page_images(
+                    page,
+                    source_digest=digest,
+                    page_number=page_number,
+                    source_span_id=block.span_id,
+                    ordinal=block.ordinal,
+                    remaining_images=self.max_extracted_images - extracted_image_count,
+                    max_image_bytes=self.max_image_bytes,
+                    max_image_pixels=self.max_image_pixels,
+                    max_image_dimension=self.max_image_dimension,
+                )
+                assets.extend(image_assets)
+                warnings.extend(image_warnings)
+                extracted_image_count += extracted
 
         if scanned_pages and self.fail_on_scanned:
             pages = ", ".join(str(page) for page in scanned_pages)
@@ -200,9 +421,22 @@ class PdfParser:
             warnings=tuple(warnings) + text_warnings,
             assets=tuple(assets) + tuple(text_assets),
             parser_name="pdf-pypdf",
-            parser_version="1",
+            parser_version="2",
             scanned=bool(scanned_pages),
-            metadata={"page_count": len(reader.pages), "scanned_pages": scanned_pages},
+            metadata={
+                "page_count": len(reader.pages),
+                "scanned_pages": scanned_pages,
+                "extracted_image_count": extracted_image_count,
+                "image_extraction": {
+                    "mode": "embedded_xobject_only",
+                    "max_images": self.max_extracted_images,
+                    "max_bytes_per_image": self.max_image_bytes,
+                    "max_pixels_per_image": self.max_image_pixels,
+                    "max_dimension": self.max_image_dimension,
+                    "ocr": False,
+                    "whole_page_rasterization": False,
+                },
+            },
         )
 
 

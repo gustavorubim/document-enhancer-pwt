@@ -1,19 +1,38 @@
 # Follow-up work
 
-## RAG graph linkage after heading rewrites
+Open product or quality follow-ups: **none** as of 2026-08-16.
 
-- Observed on sealed run `5e43c27208ec-b1b4c8bfbb`: the catalog contains 32 chunks, 73 graph
-  nodes, and 66 graph edges, but exact unique-label matching links only 1 chunk. The final rewrite
-  renamed or consolidated most source headings. Semantic/FTS retrieval and graph expansion from the
-  linked Appendix section work, so this does not block the current CLI.
-- Improve the sealed export or source-to-target map to carry deterministic final-heading-to-source
-  section IDs into chunk metadata. Prefer explicit IDs over fuzzy entity matching, preserve
-  ambiguous/unmatched counts, and add a rewritten-heading integration fixture before broadening the
-  linker.
+## Completed in the current increment
 
-## PDF screenshot extraction
+### RAG graph linkage after heading rewrites
 
-- PDF image objects are still inventoried with page provenance but are not materialized into the
-  screenshot appendix. Add bounded raster extraction only when a representative PDF fixture and a
-  supported image-decoding dependency are available; do not rasterize whole pages or introduce OCR
-  on the authoring path.
+- `data/source-to-target.csv` now uses `core.source-target.v2` and records explicit source section
+  IDs, target template IDs/headings, source spans, disposition, and final digest.
+- The sealed-bundle adapter validates the map. RAG catalog v2 links chunks from explicit target IDs
+  before label fallback and reports explicit, label, ambiguous, and unmatched linkage counts.
+- A rewritten-heading integration test proves that a final `Governance and Monitoring` chunk links
+  to the original `Controls` source node and can expand its real graph edges.
+
+### PDF screenshot extraction
+
+- The PDF parser now materializes supported direct embedded PNG/JPEG XObjects with page,
+  occurrence, source-span, byte, pixel, dimension, and digest controls.
+- A deterministic PDF fixture proves extraction, Stage 1 visual review, approved Stage 2 appendix
+  promotion, final PNG preservation, DOCX media embedding, and passing audit checks.
+- Whole-page rasterization and OCR remain deliberate non-goals, not unfinished work. Unsupported or
+  over-budget images stay inventoried with warnings.
+
+### Live provider proof and fail-closed hardening
+
+- Fictional run `a5af52fe075d-b1429e75a0` completed live Stage 1, applied one source-supported
+  decision, passed every final audit check, and emitted a strict v2 seal.
+- Provider gap IDs are canonicalized deterministically, mapping responses cannot carry prose, the
+  source document title is retained in the candidate, mapping-backed span accounting supports
+  renamed headings, and generated template placeholders are rejected before promotion.
+
+## Deliberate non-goals
+
+Persistent/shared RAG sessions, managed databases, server deployment, OCR, whole-page PDF
+rasterization, Deep Agents, unbounded tool loops, and autonomous business decisions are outside the
+current product contract. They are not active follow-ups without a new failing acceptance case and
+an explicit scoped reward.

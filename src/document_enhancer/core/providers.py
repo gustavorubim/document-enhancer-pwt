@@ -13,6 +13,7 @@ from document_enhancer.llm.caching import canonical_json, digest_bytes, digest_j
 from document_enhancer.llm.models import GeminiModelGateway
 from document_enhancer.llm.structured import schema_for
 
+from .audit import unresolved_placeholder_counts
 from .context_budget import (
     ContextBudgetError,
     ContextPreflight,
@@ -526,7 +527,6 @@ class _ProviderTemplatePlacement(BaseModel):
         "conflicting",
         "not_applicable",
     ]
-    rewritten_markdown: str = ""
     source_span_ids: list[str] = []
     figure_ids: list[str] = []
     gap_ids: list[str] = []
@@ -1255,7 +1255,8 @@ class GeminiTransformationProvider:
             "coverage, gap, and template-placement data. Use only supplied IDs. A question "
             "suggestion must be safe and carry source_supported, recipe_guidance, or none; never "
             "invent an owner, date, threshold, approval, system, policy, or numeric value. "
-            "Do not generate draft prose in template placement.\n"
+            "Template placement has no prose/content field: mapping and drafting are separate "
+            "operations, so do not generate draft prose in this call.\n"
             f"Document digest: {source_digest}\n"
             f"Recipe and evidence catalog:\n{canonical_json(recipe_metadata)}"
         )
@@ -1343,8 +1344,13 @@ class GeminiTransformationProvider:
             "Consume the mapping below as frozen: do not add, remove, rename, or reassign any "
             "section, source span, figure, gap, question, status, or provenance reference. "
             "Return typed sections with rewritten_markdown only; do not return one opaque document "
-            "string. Improve grammar and clarity without inventing facts. Preserve unresolved gaps "
-            "as structured callouts and do not turn questions into source claims.\n"
+            "string. Improve grammar and clarity without inventing facts. Treat the template as a "
+            "structural guide, not evidence: never copy TBD, TODO, TBC, bracketed question marks, "
+            "empty template-only fields, or unsupported table columns into rewritten_markdown. "
+            "Preserve unresolved gaps only through the frozen structured gap callouts; never place "
+            "placeholder text in prose or turn questions into source claims. When a populated "
+            "mapping supports only a general source statement, preserve that generality instead of "
+            "expanding it into an incomplete template table.\n"
             f"Frozen mapping:\n{canonical_json(mapping_payload)}"
         )
         prompt, preflight = self._prepare(
@@ -1375,6 +1381,7 @@ class GeminiTransformationProvider:
         sections = self._promote_draft_sections(
             bundle,
             cast(_ProviderDraftResponse, candidate),
+            source_text=source_text,
         )
         draft_bundle = bundle.model_copy(update={"template_sections": sections})
         coverage = validate_coverage(
@@ -1425,13 +1432,15 @@ class GeminiTransformationProvider:
         source_id_set = set(source_ids)
         visual_pairs = [_to_bundle_visual(item) for item in visual_catalog]
         figure_ids = {item.figure_id for item in (pair[0] for pair in visual_pairs)}
+        raw_gap_ids = [item.gap_id for item in candidate.gaps]
+        if len(raw_gap_ids) != len(set(raw_gap_ids)):
+            raise ValueError("mapping contains duplicate provider gap IDs")
+        gap_id_map = {
+            raw_id: f"GAP-{index:03d}" for index, raw_id in enumerate(raw_gap_ids, start=1)
+        }
         template_sections: list[DraftSection] = []
         template_placement: list[TemplatePlacement] = []
         for raw in placements:
-            if raw.rewritten_markdown.strip():
-                raise ValueError(
-                    f"mapping placement {raw.template_section_id} unexpectedly contains draft text"
-                )
             requirement = requirement_by_id.get(raw.template_section_id)
             heading = raw.heading
             required = raw.required
@@ -1448,6 +1457,7 @@ class GeminiTransformationProvider:
                 raw.source_span_ids, source_id_set, label=f"section {raw.template_section_id}"
             )
             _ensure_known(raw.figure_ids, figure_ids, label=f"section {raw.template_section_id}")
+            canonical_gap_ids = _dedupe([gap_id_map.get(gap_id, gap_id) for gap_id in raw.gap_ids])
             template_sections.append(
                 DraftSection(
                     template_section_id=raw.template_section_id,
@@ -1456,7 +1466,7 @@ class GeminiTransformationProvider:
                     rewritten_markdown="",
                     source_span_ids=_dedupe(raw.source_span_ids),
                     figure_ids=_dedupe(raw.figure_ids),
-                    gap_ids=_dedupe(raw.gap_ids),
+                    gap_ids=canonical_gap_ids,
                     required=required,
                     order=order,
                     level=raw.level,
@@ -1470,7 +1480,7 @@ class GeminiTransformationProvider:
                     status=raw.status,
                     source_span_ids=_dedupe(raw.source_span_ids),
                     figure_ids=_dedupe(raw.figure_ids),
-                    gap_ids=_dedupe(raw.gap_ids),
+                    gap_ids=canonical_gap_ids,
                     required=required,
                     order=order,
                     level=raw.level,
@@ -1495,7 +1505,15 @@ class GeminiTransformationProvider:
             seen_questions.add(question.question_id)
             questions.append(question)
 
-        gaps = [Gap.model_validate(item.model_dump(mode="python")) for item in candidate.gaps]
+        gaps = [
+            Gap.model_validate(
+                {
+                    **item.model_dump(mode="python"),
+                    "gap_id": gap_id_map[item.gap_id],
+                }
+            )
+            for item in candidate.gaps
+        ]
         findings = _promote_findings(candidate.macro.findings)
         for finding in findings:
             _ensure_known(finding.evidence_span_ids, source_id_set, label=finding.finding_id)
@@ -1581,6 +1599,8 @@ class GeminiTransformationProvider:
     def _promote_draft_sections(
         bundle: TransformationBundle,
         candidate: _ProviderDraftResponse,
+        *,
+        source_text: str,
     ) -> list[DraftSection]:
         expected = {item.template_section_id: item for item in bundle.template_sections}
         received_ids = [item.template_section_id for item in candidate.sections]
@@ -1593,6 +1613,7 @@ class GeminiTransformationProvider:
         if extra:
             raise ValueError("draft response invents sections: " + ", ".join(extra))
         promoted: list[DraftSection] = []
+        remaining_source_placeholders = unresolved_placeholder_counts(source_text)
         for base in bundle.template_sections:
             raw = next(
                 item
@@ -1609,6 +1630,18 @@ class GeminiTransformationProvider:
                 if received is not None and _dedupe(received) != list(frozen):
                     raise ValueError(f"draft changed frozen {name} for {base.template_section_id}")
             text = raw.rewritten_markdown.rstrip()
+            draft_placeholders = unresolved_placeholder_counts(text)
+            unsupported_placeholders = {
+                marker: count - remaining_source_placeholders[marker]
+                for marker, count in draft_placeholders.items()
+                if count > remaining_source_placeholders[marker]
+            }
+            if unsupported_placeholders:
+                raise ValueError(
+                    f"draft section {base.template_section_id} contains unsupported placeholder "
+                    "text; template-only missing information must remain a structured gap"
+                )
+            remaining_source_placeholders.subtract(draft_placeholders)
             updates: dict[str, object] = {"rewritten_markdown": text}
             if text:
                 if not base.source_span_ids:

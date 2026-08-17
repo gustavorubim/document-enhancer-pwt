@@ -56,7 +56,7 @@ def test_rag_index_and_inspect_json_cli(tmp_path: Path) -> None:
     }
     assert inspected.exit_code == 0, inspected.output
     payload = json.loads(inspected.stdout)
-    assert payload["schema_version"] == "document-enhancer.rag.catalog.v1"
+    assert payload["schema_version"] == "document-enhancer.rag.catalog.v2"
     assert payload["embedding_profile"]["provider"] == "offline"
     assert "\x1b[" not in inspected.stdout
 

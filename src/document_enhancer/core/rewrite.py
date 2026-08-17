@@ -5,9 +5,10 @@ from __future__ import annotations
 import csv
 import hashlib
 import io
+import json
 import re
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from docx import Document
 from docx.enum.section import WD_ORIENT
@@ -32,6 +33,9 @@ from .models import (
 )
 from .recipes import Recipe
 from .review import title_matches
+
+if TYPE_CHECKING:
+    from .transformation_provider_models import TransformationMapping
 
 _PLACEHOLDER_RE = re.compile(r"\b(?:TBD|TODO|TBC)\b|\[\s*\?\s*\]|\?{3,}", re.IGNORECASE)
 
@@ -737,18 +741,117 @@ def graph_json_lines(graph: dict[str, list[dict[str, str]]]) -> list[str]:
     return public_graph_jsonl(graph).splitlines()
 
 
-def source_target_csv(review: ReviewReport, final_text: str) -> str:
+def source_target_csv(
+    review: ReviewReport,
+    final_text: str,
+    *,
+    mapping: TransformationMapping | None = None,
+) -> str:
+    """Render the sealed source-to-final-section linkage contract.
+
+    Version 2 records the final/template heading separately from the source section ID.  Optional
+    retrieval consumers can therefore link a renamed final heading to the canonical graph node
+    without fuzzy label guessing.  A non-draft run emits the same contract with a one-to-one source
+    and target identity.
+    """
+
     stream = io.StringIO()
     writer = csv.writer(stream)
-    writer.writerow(["section_id", "title", "disposition", "final_digest"])
-    digest = hashlib.sha256(final_text.encode("utf-8")).hexdigest()
-    for section in review.sections:
-        title_tokens = [
-            token for token in re.findall(r"[a-z0-9]+", section.title.lower()) if len(token) >= 3
+    writer.writerow(
+        [
+            "schema_version",
+            "source_section_id",
+            "source_title",
+            "target_section_id",
+            "target_heading",
+            "disposition",
+            "source_span_ids",
+            "final_digest",
         ]
-        retained = bool(title_tokens) and all(token in final_text.lower() for token in title_tokens)
+    )
+    digest = hashlib.sha256(final_text.encode("utf-8")).hexdigest()
+    if mapping is None:
+        for section in review.sections:
+            title_tokens = [
+                token
+                for token in re.findall(r"[a-z0-9]+", section.title.lower())
+                if len(token) >= 3
+            ]
+            retained = bool(title_tokens) and all(
+                token in final_text.lower() for token in title_tokens
+            )
+            writer.writerow(
+                [
+                    "core.source-target.v2",
+                    section.section_id,
+                    section.title,
+                    section.section_id,
+                    section.title,
+                    "retained" if retained else "missing",
+                    json.dumps(section.span_ids, separators=(",", ":")),
+                    digest,
+                ]
+            )
+        return stream.getvalue()
+
+    source_by_id = {section.section_id: section for section in review.sections}
+    target_spans: dict[str, set[str]] = {
+        section.template_section_id: set(section.source_span_ids)
+        for section in mapping.template_sections
+    }
+    for disposition in mapping.source_dispositions:
+        for target_id in disposition.destination_section_ids:
+            target_spans.setdefault(target_id, set()).add(disposition.source_span_id)
+
+    mapped_source_ids: set[str] = set()
+    for target in sorted(
+        mapping.template_sections,
+        key=lambda item: (item.order, item.template_section_id),
+    ):
+        spans = target_spans.get(target.template_section_id, set())
+        sources = [section for section in review.sections if spans.intersection(section.span_ids)]
+        if not sources:
+            writer.writerow(
+                [
+                    "core.source-target.v2",
+                    "",
+                    "",
+                    target.template_section_id,
+                    target.heading,
+                    target.status,
+                    json.dumps(sorted(spans), separators=(",", ":")),
+                    digest,
+                ]
+            )
+            continue
+        for source in sources:
+            mapped_source_ids.add(source.section_id)
+            writer.writerow(
+                [
+                    "core.source-target.v2",
+                    source.section_id,
+                    source.title,
+                    target.template_section_id,
+                    target.heading,
+                    target.status,
+                    json.dumps(sorted(spans.intersection(source.span_ids)), separators=(",", ":")),
+                    digest,
+                ]
+            )
+
+    for source_id in sorted(set(source_by_id) - mapped_source_ids):
+        source = source_by_id[source_id]
         writer.writerow(
-            [section.section_id, section.title, "retained" if retained else "missing", digest]
+            [
+                "core.source-target.v2",
+                source.section_id,
+                source.title,
+                "",
+                "",
+                "unmapped_source",
+                json.dumps(source.span_ids, separators=(",", ":")),
+                digest,
+            ]
         )
     return stream.getvalue()
 

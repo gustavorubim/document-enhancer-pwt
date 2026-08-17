@@ -3,14 +3,16 @@
 ## Verification boundary
 
 - Frozen-plan integrated baseline: `2cbb1332f7924078872a0b8b7e6aa02fb0a6134c`.
-- Lane scope: tests, deterministic draft-first fixtures/evaluation, `README.md`, and this evidence
-  ledger only. No production source, plan, configuration, dependency manifest, or lockfile was
-  changed.
-- Verification mode: offline deterministic fixtures and fakes. No live-provider, browser, hosted-CI,
-  or public-download evidence was used.
-- Live-provider proof: **not run**. Credentials were not supplied and no live model call was
-  exercised.
-- Push/merge: **not run**; pushing is out of scope for this lane.
+- Current increment scope: explicit source-to-target retrieval linkage, bounded PDF embedded-image
+  extraction, provider-contract hardening, source-title/mapping-backed accounting, tests,
+  dependency lock, and synchronized root documentation.
+- Verification modes: deterministic offline fixtures/fakes plus one opt-in live Gemini run against
+  the checked-in fictional complete-process fixture. No user document, browser, hosted-CI, or
+  public-download result is claimed.
+- Live-provider proof: **pass**. Run `a5af52fe075d-b1429e75a0` completed Stage 1, accepted one answer
+  copied from its cited source evidence, passed every final audit check, and wrote a strict
+  `core.seal.v2` manifest.
+- Publication evidence is recorded after the current literal gate and Git integration complete.
 
 Scores below are recorded only after the named acceptance tests and the complete repository gate
 pass on the integrated checkout. A reward is not inferred from a narrower focused test.
@@ -57,6 +59,40 @@ The shared retrieval fixture helper now creates `core.seal.v2` manifests with co
 ontology, source, final, and audit artifact references. Core indexing fixtures now use real Stage 1
 approval/resume; failed-audit coverage mutates and re-registers a complete digest-valid v2 manifest.
 
+## Current follow-up increment evidence
+
+### Explicit rewritten-heading linkage
+
+- `core.source-target.v2` separates source section identity from target template identity and records
+  source spans plus the final digest.
+- The sealed adapter verifies that map. RAG catalog v2 stores target section ID, source section IDs,
+  and link method on each chunk.
+- The focused retrieval suite includes a renamed-heading case that links `Governance and Monitoring`
+  to the original `Controls` graph node and expands its real edges.
+
+### Bounded PDF image extraction
+
+- Direct embedded PNG/JPEG XObjects are checked before decode against image-count, byte, pixel, and
+  dimension limits. Page, occurrence, source-span, media-type, and digest provenance is preserved.
+- The PDF end-to-end fixture reaches Stage 1 visual review, explicit acceptance, final PNG appendix,
+  DOCX media embedding, and a passing final audit. Oversized dimensions are rejected before decode.
+- The same deterministic fixture was rendered with Poppler and visually inspected; source text and
+  the colored embedded image were present without visible layout defects.
+
+### Live provider and fail-closed behavior
+
+- Final proof run: `/tmp/document-enhancer-live-validation-final2/a5af52fe075d-b1429e75a0`
+  (ephemeral local evidence, not committed). It produced 19 validated source-target links, 74 graph
+  nodes, and 65 graph edges; the sealed-bundle loader accepted it.
+- An earlier live candidate copied template `TBD` cells while claiming fidelity. The application now
+  rejects placeholder occurrences unsupported by the complete source before Stage 1 promotion,
+  while preserving source-origin markers for human review. The prompt requires template-only
+  missing information to remain in the frozen structured gap contract, and regression tests cover
+  both sides of that provenance boundary.
+- Provider gap identifiers are canonicalized to stable `GAP-###` IDs, mapping placement cannot
+  contain draft prose, the source title is retained, and renamed headings use the explicit span
+  ledger for final source-accounting checks.
+
 ## Complete repository gate
 
 Run literally once from the integrated checkout:
@@ -71,17 +107,19 @@ uv run python scripts/verify_reference_pack.py reference_packs/enterprise_core
 uv build
 ```
 
-Complete gate result: **PASS**. The approved-cache run completed with the following exact results:
+Current complete gate result: **PASS** on the post-correction checkout.
 
-- `uv sync --frozen`: passed; editable package synchronized.
-- `uv run ruff format --check .`: passed; 106 files already formatted.
+- `uv sync --frozen`: passed; editable package synchronized from the frozen lock.
+- `uv run ruff format --check .`: passed; **108 files already formatted**.
 - `uv run ruff check .`: passed; all checks passed.
 - `uv run ty check`: passed; all checks passed.
-- `uv run pytest -m "not live_model and not public_download"`: **218 passed, 2 deselected in
-  8.19s**.
+- `uv run pytest -m "not live_model and not public_download"`: **227 passed, 2 deselected in
+  7.97s**.
 - `uv run python scripts/verify_reference_pack.py reference_packs/enterprise_core`: passed;
-  enterprise_core 2.0.0, 27 files.
-- `uv build`: passed; source distribution and wheel built successfully.
+  `enterprise_core` 2.0.0, 27 files, all four document types.
+- `uv build`: passed; built `document_enhancer-0.1.0.tar.gz` and
+  `document_enhancer-0.1.0-py3-none-any.whl`.
 
-The lane commit SHA is returned in the final handoff. The frozen-plan integrated baseline for this
-lane remains `2cbb1332f7924078872a0b8b7e6aa02fb0a6134c`; no push or merge was performed.
+Before the literal gate, all five README Mermaid blocks rendered successfully with Mermaid CLI and
+installed headless Chrome, all four local Markdown links resolved, and `git diff --check` passed.
+Publication/remote ancestry is verified during the Git closeout and reported in the final handoff.

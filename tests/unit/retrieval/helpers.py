@@ -1,12 +1,21 @@
 from __future__ import annotations
 
+import csv
 import hashlib
+import io
 import json
 from pathlib import Path
 from typing import Any
 
 from document_enhancer.core.integrity import build_seal_manifest, register_artifact
-from document_enhancer.core.layout import AUDIT, FINAL_MARKDOWN, GRAPH_JSONL, ONTOLOGY, SEAL
+from document_enhancer.core.layout import (
+    AUDIT,
+    FINAL_MARKDOWN,
+    GRAPH_JSONL,
+    ONTOLOGY,
+    SEAL,
+    SOURCE_TO_TARGET_CSV,
+)
 
 
 def write_bundle(
@@ -16,6 +25,7 @@ def write_bundle(
     *,
     nodes: list[dict[str, Any]] | None = None,
     edges: list[dict[str, Any]] | None = None,
+    source_targets: list[dict[str, Any]] | None = None,
     audit_status: str = "pass",
 ) -> Path:
     bundle = root / run_id
@@ -57,6 +67,38 @@ def write_bundle(
         "output.graph": register_artifact(bundle, GRAPH_JSONL),
         "output.ontology": register_artifact(bundle, ONTOLOGY),
     }
+    if source_targets is not None:
+        stream = io.StringIO()
+        writer = csv.DictWriter(
+            stream,
+            fieldnames=[
+                "schema_version",
+                "source_section_id",
+                "source_title",
+                "target_section_id",
+                "target_heading",
+                "disposition",
+                "source_span_ids",
+                "final_digest",
+            ],
+        )
+        writer.writeheader()
+        final_digest = hashlib.sha256(final.encode()).hexdigest()
+        for item in source_targets:
+            writer.writerow(
+                {
+                    "schema_version": "core.source-target.v2",
+                    "source_section_id": item.get("source_section_id", ""),
+                    "source_title": item.get("source_title", ""),
+                    "target_section_id": item.get("target_section_id", ""),
+                    "target_heading": item.get("target_heading", ""),
+                    "disposition": item.get("disposition", "populated"),
+                    "source_span_ids": json.dumps(item.get("source_span_ids", [])),
+                    "final_digest": final_digest,
+                }
+            )
+        (bundle / SOURCE_TO_TARGET_CSV).write_text(stream.getvalue(), encoding="utf-8")
+        artifacts["audit.source_to_target"] = register_artifact(bundle, SOURCE_TO_TARGET_CSV)
     seal = build_seal_manifest(
         run_id=run_id,
         source_digest=artifacts["source.original"].sha256,

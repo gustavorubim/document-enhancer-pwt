@@ -18,13 +18,17 @@ The intended operator journey is:
    - the inferred process as Mermaid
    - the proposed/corrected process as Mermaid
    - what is incorrect, missing, or ambiguous in the documented flow
-6. Separate genuine questions, ambiguities, and steering decisions into one editable
-   `review/decisions.yaml` for the human.
-7. After decisions are answered, rewrite the document from approved decisions, source evidence, and
-   the recipe/template requirements.
-8. Deliver the final document, audit, and change explanation. Seal only when deterministic checks
+6. During Stage 1, map all source spans to the selected template and write an unapproved candidate
+   in clear English using only source-supported content. Preserve missing, ambiguous, conflicting,
+   or unreadable content as typed gaps and visible review callouts; never copy template-only
+   placeholders into generated prose.
+7. Separate genuine questions, ambiguities, safe context-aware suggestions, and steering decisions
+   into one editable `review/decisions.yaml` for the human.
+8. After decisions are answered, revise the exact candidate from approved decisions and source
+   evidence without rerunning or silently changing the frozen Stage 1 mapping.
+9. Deliver the final document, audit, and change explanation. Seal only when deterministic checks
    pass.
-9. Emit portable semantic/graph/ontology-ready exports so a later GraphRAG, RAG, or ontology system
+10. Emit portable semantic/graph/ontology-ready exports so a later GraphRAG, RAG, or ontology system
    can consume the bundle. Retrieval services are consumers of sealed outputs, not part of the
    authoring critical path.
 
@@ -33,8 +37,10 @@ gate, one recipe/reference pack, compact `run.json` state, and no legacy graph/c
 runtime on the authoring path. Do not reintroduce platform machinery that does not advance the
 operator journey above.
 
-Active architecture and acceptance criteria live in `SIMPLIFICATION_PLAN.md`. Residual product and
-quality work lives in `FOLLOW_UP.md`.
+The current architecture, completed rewards, and release gate live in `plan.md`. The frozen
+draft-first implementation contract remains in `DRAFT_FIRST_IMPLEMENTATION_PLAN.md`, its evidence
+ledger is `DRAFT_FIRST_IMPLEMENTATION_EVIDENCE.md`, and current implementation details live in
+`README.md`. Residual product and quality work lives only in `FOLLOW_UP.md`.
 
 ## Mission
 
@@ -116,10 +122,12 @@ credentials are explicitly available.
 After an increment passes its acceptance criteria, the integrator must:
 
 1. Merge the verified implementation.
-2. Update `SIMPLIFICATION_PLAN.md` / `plan.md` with evidence-backed status when the contract changed.
+2. Update `plan.md` with evidence-backed status when the contract or release state changed; do not
+   rewrite the frozen historical implementation plan.
 3. Update `README.md` for the completed implementation, including any affected diagrams. README
    synchronization is mandatory, not conditional on whether the public command surface changed.
-4. Record remaining non-blocking work in `FOLLOW_UP.md`.
+4. Update `DRAFT_FIRST_IMPLEMENTATION_EVIDENCE.md` with the checks actually exercised and record
+   every remaining non-blocking item in `FOLLOW_UP.md`.
 5. Archive or close completed threads and remove completed worktrees when safe.
 6. Push the integrated branch when a remote is configured and pushing is in scope.
 7. Begin the next unblocked critical-path workflow gap immediately.

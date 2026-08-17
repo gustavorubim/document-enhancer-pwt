@@ -7,15 +7,21 @@ does not change the five-phase contract or the output bundle shape.
 
 from __future__ import annotations
 
+import csv
 import json
+import zipfile
 from pathlib import Path
 
 import pytest
+from tests.pdf_fixtures import text_pdf_with_embedded_rgb
 
 from document_enhancer.core import CoreRunner
+from document_enhancer.core.indexing import load_sealed_bundle
 from document_enhancer.core.layout import (
     AUDIT,
     DECISIONS_YAML,
+    FINAL_DOCX,
+    FINAL_MARKDOWN,
     FLOW_MARKDOWN,
     GRAPH_JSONL,
     HTML_REPORT,
@@ -26,6 +32,7 @@ from document_enhancer.core.layout import (
     REVIEW,
     SEAL,
     SECTIONS_MARKDOWN,
+    SOURCE_TO_TARGET_CSV,
 )
 from document_enhancer.core.recipes import load_recipe
 
@@ -147,6 +154,9 @@ def test_core_clean_synthetic_process_seals_ontology_graph_and_audit_bundle(
     graph_lines = (run_path / GRAPH_JSONL).read_text(encoding="utf-8").splitlines()
     seal = json.loads((run_path / SEAL).read_text(encoding="utf-8"))
     review = json.loads((run_path / REVIEW).read_text(encoding="utf-8"))
+    with (run_path / SOURCE_TO_TARGET_CSV).open(encoding="utf-8", newline="") as handle:
+        source_targets = list(csv.DictReader(handle))
+    sealed_snapshot = load_sealed_bundle(run_path)
 
     assert audit["status"] == "pass"
     assert all(audit["checks"].values())
@@ -185,3 +195,47 @@ def test_core_clean_synthetic_process_seals_ontology_graph_and_audit_bundle(
     assert GRAPH_JSONL in {item["path"] for item in seal["artifacts"].values()}
     assert AUDIT in {item["path"] for item in seal["artifacts"].values()}
     assert HTML_REPORT in {item["path"] for item in seal["artifacts"].values()}
+    assert source_targets
+    assert {row["schema_version"] for row in source_targets} == {"core.source-target.v2"}
+    assert all(row["target_section_id"] and row["target_heading"] for row in source_targets)
+    assert sealed_snapshot.source_targets
+
+
+@pytest.mark.e2e
+def test_pdf_embedded_image_reaches_review_appendix_and_final_docx(tmp_path: Path) -> None:
+    source = tmp_path / "visual-control.pdf"
+    source.write_bytes(
+        text_pdf_with_embedded_rgb("The owner reviews the visual control table monthly.")
+    )
+    runner = CoreRunner(
+        tmp_path / "runs",
+        recipe_pack=REFERENCE_PACK,
+        document_type="process",
+    )
+
+    result = runner.start(source)
+    run_path = tmp_path / "runs" / result.run_id
+    decisions = run_path / DECISIONS_YAML
+    decisions.write_text(
+        decisions.read_text(encoding="utf-8")
+        .replace("approve_rewrite: false", "approve_rewrite: true")
+        .replace('answer: ""', "answer: approved")
+        .replace("disposition: defer", "disposition: accept"),
+        encoding="utf-8",
+    )
+    result = runner.resume(result.run_id)
+
+    final_markdown = (run_path / FINAL_MARKDOWN).read_text(encoding="utf-8")
+    audit = json.loads((run_path / AUDIT).read_text(encoding="utf-8"))
+    final_image = run_path / "assets/final/FIG-001.png"
+    with zipfile.ZipFile(run_path / FINAL_DOCX) as archive:
+        embedded_media = [name for name in archive.namelist() if name.startswith("word/media/")]
+
+    assert result.status == "succeeded"
+    assert "Appendix A — Source screenshots" in final_markdown
+    assert "../assets/final/FIG-001.png" in final_markdown
+    assert final_image.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
+    assert audit["checks"]["figure_appendix_complete"] is True
+    assert audit["checks"]["figure_asset_digests_match"] is True
+    assert audit["checks"]["final_docx_figures_embedded"] is True
+    assert embedded_media

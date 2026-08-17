@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 from pypdf import PdfWriter
+from tests.pdf_fixtures import text_pdf_with_embedded_rgb
 
 from document_enhancer.errors import UnsupportedInputError
 from document_enhancer.ingest.docx import DocxParser
@@ -156,6 +157,48 @@ def test_text_pdf_preserves_page_provenance_and_warns_reading_order(tmp_path: Pa
     assert raw.blocks[0].location.page == 1
     assert any(warning.code == "pdf_reading_order_best_effort" for warning in raw.warnings)
     assert "Approved extract" in raw.blocks[0].text
+
+
+@pytest.mark.unit
+def test_pdf_extracts_bounded_embedded_image_bytes_with_page_provenance(tmp_path: Path) -> None:
+    source = tmp_path / "facts-with-image.pdf"
+    source.write_bytes(text_pdf_with_embedded_rgb("Approved visual control table"))
+
+    raw = PdfParser().parse(source)
+
+    figures = [asset for asset in raw.assets if asset.kind == "figure"]
+    assert len(figures) == 1
+    figure = figures[0]
+    assert figure.safety == "passive"
+    assert figure.media_type == "image/png"
+    assert figure.payload and figure.payload.startswith(b"\x89PNG\r\n\x1a\n")
+    assert figure.digest is not None
+    assert figure.source_span_id == raw.blocks[0].span_id
+    assert figure.location and figure.location.page == 1
+    assert figure.metadata["pdf_embedded_image"] is True
+    assert figure.metadata["occurrences"][0]["ordinal"] == raw.blocks[0].ordinal
+    assert raw.metadata["extracted_image_count"] == 1
+
+
+@pytest.mark.security
+def test_pdf_image_dimensions_are_bounded_before_decode(tmp_path: Path) -> None:
+    source = tmp_path / "oversized-image.pdf"
+    source.write_bytes(
+        text_pdf_with_embedded_rgb(
+            "Image inventory remains readable",
+            declared_width=20_000,
+            declared_height=20_000,
+        )
+    )
+
+    raw = PdfParser().parse(source)
+
+    figure = next(asset for asset in raw.assets if asset.kind == "figure")
+    assert figure.safety == "unsupported"
+    assert figure.payload is None
+    assert figure.metadata["reason"] == "image_dimensions_budget_exceeded"
+    assert any(warning.code == "pdf_image_budget_exceeded" for warning in raw.warnings)
+    assert raw.metadata["extracted_image_count"] == 0
 
 
 @pytest.mark.security
